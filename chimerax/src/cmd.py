@@ -29,50 +29,46 @@ ALL_TYPES = tuple(C.ALL.keys())
 
 
 def ensure_ui(session):
-    """Register the mouse mode and hook ViewDock, once, on first use.
+    """Register the mouse mode, the selection listener and the ViewDock hook.
 
-    Called from the commands and from the panel - never at startup. Touching
+    Called from the commands and the panel - never at startup. Touching
     session.ui during bundle initialisation constructs the mouse-mode manager
     before ChimeraX does, which duplicates the 'mouse hover' trigger and takes
     the Toolbar down with it.
+
+    Each piece is checked and installed independently, and re-checked on every
+    call. A single "already done" flag meant that if any one piece failed, or
+    the state object was later replaced, nothing was ever retried and the
+    feature silently stayed missing with no way back.
     """
-    if getattr(session, "_hitpick_ui_ready", False):
-        return
     ui = getattr(session, "ui", None)
     if ui is None or not getattr(ui, "is_gui", False):
         return                      # nogui: nothing to register
     if not hasattr(ui, "mouse_modes"):
         return                      # UI not built yet; try again next time
-    session._hitpick_ui_ready = True
+
+    st = get_state(session)
+
     try:
         from .mousemode import register_mouse_mode
         register_mouse_mode(session)
     except Exception as e:
         session.logger.info("hitpick: mouse mode unavailable (%s)" % e)
+
+    if getattr(st, "_sel_handler", None) is None:
+        try:
+            _install_selection_listener(session)
+        except Exception as e:
+            session.logger.info(
+                "hitpick: selection listener unavailable (%s)" % e)
+
     try:
-        _install_selection_listener(session)
-    except Exception as e:
-        session.logger.info("hitpick: selection listener unavailable (%s)" % e)
-    try:
-        from .viewdock_link import autohook
-        autohook(session)
+        from .viewdock_link import autohook, is_hooked
+        if not is_hooked(session):
+            autohook(session)
     except Exception as e:
         session.logger.info("hitpick: ViewDock link not established (%s)" % e)
 
-
-# ---------------------------------------------------------------------------
-# Command return values
-#
-# ChimeraX JSON-encodes whatever a command returns when the REST bridge runs
-# with `json true`. Returning a rich Python object raises inside the encoder,
-# the response is never queued, and the REST handler thread then waits
-# forever while still holding the port - the whole server wedges, and the
-# command itself looks like it silently did nothing.
-#
-# So every hitpick command returns JSON-friendly data only: a dict, a list, a
-# string, a number, a bool or None. Never a PoseResult, a HandbookHit, a
-# state object or a set.
-# ---------------------------------------------------------------------------
 
 def _pose_summary(result):
     if result is None:

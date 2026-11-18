@@ -165,21 +165,24 @@ def interaction_label_text(it, show_lengths=True, show_angles=False,
     """The text drawn on one interaction line."""
     parts = []
     if show_lengths:
-        parts.append("%.2f A" % it.distance)
+        parts.append("%.2f" % it.distance)
     if show_angles:
         for k, v in it.angles.items():
             if v is None or v != v:          # NaN: not measurable
                 continue
-            parts.append("%s %.0f deg" % (_short_angle(k), v))
+            parts.append("%s%.0f" % (_short_angle(k), v))
     if show_quality:
         parts.append("q%.2f" % it.quality)
-    return "  ".join(parts)
+    # Single spaces: these labels sit on top of the structure and several of
+    # them land near each other, so every character costs legibility.
+    return " ".join(parts)
 
 
 def _short_angle(name):
-    return {"dha": "D-H..A", "haa": "H..A-X", "interplanar": "planes",
-            "offset": "offset", "normal_offset": "off-axis",
-            "cxa": "C-X..A", "xay": "X..A-Y"}.get(name, name)
+    """Abbreviations kept very short: these are drawn over the structure."""
+    return {"dha": "DHA", "haa": "HAX", "interplanar": "tilt",
+            "offset": "off", "normal_offset": "off",
+            "cxa": "CXA", "xay": "XAY"}.get(name, name)
 
 
 def label_interactions(session, interactions=None, all_atoms=None,
@@ -218,13 +221,56 @@ def label_interactions(session, interactions=None, all_atoms=None,
                 setattr(pb, LABEL_ATTR, text)
             except Exception:
                 continue
+        kind = m.name[len(GROUP_PREFIX):].replace(" ", "_")
+        r, g, b = TYPE_COLORS.get(kind, (60, 60, 60))
         try:
             label(session, Objects(pseudobonds=pbs), "pseudobonds",
-                  attribute=LABEL_ATTR)
+                  attribute=LABEL_ATTR,
+                  color=_readable_text_color(session, (r, g, b)),
+                  bg_color=_label_backdrop(session),
+                  height=LABEL_HEIGHT)
             n += len(pbs)
         except Exception as e:
             session.logger.info("hitpick: could not label %s (%s)" % (m.name, e))
     return n
+
+
+# Label size in scene units. Interaction labels cluster in a small volume, so
+# they are kept small; atom annotations are smaller still.
+LABEL_HEIGHT = 0.35
+ATOM_LABEL_HEIGHT = 0.3
+
+
+def _scene_background(session):
+    try:
+        bg = session.main_view.background_color
+        return tuple(int(255 * c) for c in bg[:3])
+    except Exception:
+        return (255, 255, 255)
+
+
+def _label_backdrop(session):
+    """A translucent plate in the scene background colour.
+
+    Without it, label text sits directly on sticks and surfaces and is
+    effectively unreadable - which is exactly how it looked the first time
+    this was rendered.
+    """
+    r, g, b = _scene_background(session)
+    return (r, g, b, 190)
+
+
+def _readable_text_color(session, rgb):
+    """Darken or lighten the type colour until it reads on the backdrop."""
+    r, g, b = _scene_background(session)
+    light_bg = (0.299 * r + 0.587 * g + 0.114 * b) > 140
+    cr, cg, cb = rgb
+    if light_bg:
+        f = 0.65                      # darken for a light background
+        return (int(cr * f), int(cg * f), int(cb * f), 255)
+    f = 0.4                           # lighten for a dark one
+    return (int(cr + (255 - cr) * f), int(cg + (255 - cg) * f),
+            int(cb + (255 - cb) * f), 255)
 
 
 def clear_interaction_labels(session):
@@ -270,7 +316,8 @@ def annotate_atoms(session, labels, all_atoms, clear_first=True):
     if clear_first:
         clear_atom_labels(session, all_atoms)
     try:
-        label(session, Objects(atoms=atoms), "atoms", attribute=LABEL_ATTR)
+        label(session, Objects(atoms=atoms), "atoms", attribute=LABEL_ATTR,
+              bg_color=_label_backdrop(session), height=ATOM_LABEL_HEIGHT)
     except Exception as e:
         session.logger.warning("hitpick: labelling failed (%s)" % e)
         return 0

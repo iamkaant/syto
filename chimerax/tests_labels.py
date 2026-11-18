@@ -12,6 +12,7 @@ read back what was drawn:
     never appear).
 """
 import os
+import re
 import sys
 
 from chimerax.core.commands import run
@@ -78,21 +79,24 @@ st = hpstate.get_state(session)
 print("\n[1] interaction labels show lengths by default")
 texts = [t for _, t in all_label_texts(session)]
 print("    sample:", texts[:4])
+DIST = re.compile(r"\d+\.\d{2}")
+ANGLE = re.compile(r"(DHA|HAX|CXA|XAY|tilt|off)\d")
+
 check(len(texts) > 0, "some interaction labels exist")
-check(any(" A" in t for t in texts), "a length appears in the label text")
-check(not any("deg" in t for t in texts), "no angles while angles are off")
+check(any(DIST.search(t) for t in texts), "a length appears in the label text")
+check(not any(ANGLE.search(t) for t in texts), "no angles while angles are off")
 
 print("\n[2] switching angles ON changes the label text")
 run(session, "hitpick angles true")
 texts_ang = [t for _, t in all_label_texts(session)]
 print("    sample:", texts_ang[:4])
-check(any("deg" in t for t in texts_ang), "angles now appear in the labels")
+check(any(ANGLE.search(t) for t in texts_ang), "angles now appear in the labels")
 check(texts_ang != texts, "label text actually changed")
 
 print("\n[3] switching angles OFF removes them again")
 run(session, "hitpick angles false")
 texts_off = [t for _, t in all_label_texts(session)]
-check(not any("deg" in t for t in texts_off), "angles gone again")
+check(not any(ANGLE.search(t) for t in texts_off), "angles gone again")
 
 print("\n[4] pKBHX atom labels appear and do not wipe the others")
 before = len(all_label_texts(session))
@@ -102,19 +106,20 @@ pk = [t for _, t in after if "pKBHX" in t]
 print("    pKBHX labels:", pk[:4])
 check(len(pk) > 0, "pKBHX labels were created")
 check(len(after) > before, "total label count grew (nothing was wiped)")
-check(any(" A" in t for _, t in after),
+check(any(DIST.search(t) and "pKBHX" not in t for _, t in after),
       "interaction length labels survived the atom labelling")
 
 print("\n[5] 'labels off' removes only our atom labels")
 run(session, "hitpick labels off")
 after_off = all_label_texts(session)
 check(not any("pKBHX" in t for _, t in after_off), "pKBHX labels removed")
-check(any(" A" in t for _, t in after_off),
+check(any(DIST.search(t) and "pKBHX" not in t for _, t in after_off),
       "interaction labels still present after clearing atom labels")
 
 print("\n[6] lengths toggle off clears interaction labels")
 run(session, "hitpick lengths false")
-check(not any(" A" in t for _, t in all_label_texts(session)),
+check(not any(DIST.search(t) and "pKBHX" not in t
+              for _, t in all_label_texts(session)),
       "interaction labels gone when lengths are off")
 
 print()
