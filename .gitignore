@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+.DS_Store
+
+# vendored browser runtime (large, fetched by tools/fetch_web_deps.py)
+web/vendor/
+
+# compiled handbook data is a build product of data-src/
+core/hitpicking/data/handbook.json
+
+# local scratch
+scratch/
+*.log
