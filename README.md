@@ -27,9 +27,16 @@ atom for atom.
 T-shaped π-stacking, cation–π, halogen bonds, hydrophobic contacts.
 
 **Flags clashes and strain**: van der Waals overlaps with the site and inside
-the ligand (drawn in red, severe ones separately), near-eclipsed torsions,
-puckered aromatic rings, twisted amides, and the docking program's own strain
-terms. Inside ChimeraX this uses ChimeraX's own per-atom radii, so the numbers
+the ligand (drawn in red, severe ones separately), puckered aromatic rings,
+and the docking program's own strain terms.
+
+**Measures every rotatable torsion** and judges the ones that can be judged:
+an sp3–sp3 bond on an eclipsed rotamer, an aromatic amine or anilide twisted
+out of the ring plane with no ortho substituent to force it, a twisted amide,
+an ortho-substituted biaryl held unnaturally flat. Where a twist IS forced by
+an ortho substituent it says so rather than crying strain. Torsions it cannot
+judge are reported as `unjudged`, never as fine — see the note on the torsion
+library below. Inside ChimeraX this uses ChimeraX's own per-atom radii, so the numbers
 agree with its Clashes tool rather than quietly differing.
 
 Each interaction reports the measured distance and angles, a 0–1 geometric
@@ -88,6 +95,8 @@ hitpick analyze                  # analyse the displayed pose and draw it
 hitpick report                   # text listing with geometry and flags
 
 hitpick clashes true             # draw van der Waals clashes (red)
+hitpick torsions                 # flagged torsions; 'true' for all of them
+hitpick limits true              # put the literature limits in the labels
 hitpick hide hydrophobic weak_hbond
 hitpick show all
 hitpick lengths false
@@ -159,10 +168,12 @@ Bissantz 2010, Dougherty 2013, Cavallo 2016, Green & Popelier 2014.
 See `data-src/external/GAPS_AND_CONFLICTS.txt` for what is missing and which
 values disagree.
 
-**Known gaps:** the Roche torsion library is not usable (the Hamburg dataset
-page states "All rights reserved"; the 2016 CSD version needs a CCDC licence),
-so torsion-strain detection will rely on geometry plus optional OpenMM rather
-than CSD-derived preferences. Allen 1987 bond-length tables were not accessed,
+**Known gaps:** there is no redistributable CSD torsion library. The Hamburg
+dataset page states "All rights reserved", the 2016 CSD-histogram version
+needs a CCDC licence, and RDKit's ETKDG preferences are compiled into C++
+rather than shipped as a reusable table. So torsions are judged only where the
+chemistry is unambiguous without statistics, and everything else is marked
+`unjudged` rather than scored with invented numbers. Allen 1987 bond-length tables were not accessed,
 so there are no generic bond-geometry baselines yet.
 
 Nothing in this repository redistributes copyrighted text or figures: the

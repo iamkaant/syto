@@ -314,8 +314,11 @@ def label_strain(session, strain, all_atoms):
         if not (0 <= anchor < len(all_atoms)):
             continue
         a = all_atoms[anchor]
-        short = {"eclipsed_torsion": "eclipsed", "nonplanar_ring": "puckered",
-                 "twisted_amide": "twisted amide"}.get(f.kind, f.kind)
+        short = {"eclipsed_torsion": "eclipsed", "eclipsed": "eclipsed",
+                 "nonplanar_ring": "puckered",
+                 "twisted_amide": "twisted amide",
+                 "twisted_out_of_conjugation": "out of plane %.0f" % abs(f.value),
+                 "forced_planar": "forced flat"}.get(f.kind, f.kind)
         try:
             setattr(a, LABEL_ATTR, short)
         except Exception:

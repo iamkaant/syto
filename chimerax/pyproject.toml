@@ -106,6 +106,10 @@ description = "Show the literature limits alongside each measured value"
 category = "Binding Analysis"
 description = "Show or hide the basicity scale plot in the panel"
 
+[chimerax.command."hitpick torsions"]
+category = "Binding Analysis"
+description = "List rotatable torsions and flag the strained ones"
+
 [chimerax.command."hitpick clear"]
 category = "Binding Analysis"
 description = "Remove hitpick drawings"

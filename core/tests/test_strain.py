@@ -210,3 +210,124 @@ def test_strain_report_on_real_poses():
                 assert r.combined.is_ligand[c.i]
                 assert not r.combined.is_ligand[c.j]
     assert seen_clash, "no clash at all in 40 docked poses is implausible"
+
+
+# ---------------------------------------------- conjugated torsions (aryl-N)
+
+rdkit = pytest.importorskip("rdkit", reason="RDKit is a dev dependency")
+from rdkit import Chem, RDLogger  # noqa: E402
+from rdkit.Chem import AllChem  # noqa: E402
+RDLogger.DisableLog("rdApp.*")
+from hitpicking.io.sdf import _parse_record  # noqa: E402
+from hitpicking.strain import torsions as T  # noqa: E402
+
+
+def build3d(smiles, seed=0xBEEF):
+    m = Chem.AddHs(Chem.MolFromSmiles(smiles))
+    assert AllChem.EmbedMolecule(m, randomSeed=seed) == 0, smiles
+    AllChem.MMFFOptimizeMolecule(m)
+    return _parse_record(Chem.MolToMolBlock(m).split("\n"), 1, smiles)
+
+
+def set_torsion(ms, t, degrees):
+    """Rotate everything on one side of the torsion's central bond."""
+    p, a, b, q = t.atoms
+    cur = ms.dihedral(p, a, b, q)
+    delta = math.radians(degrees - cur)
+    axis = ms.xyz[b] - ms.xyz[a]
+    axis = axis / np.linalg.norm(axis)
+    # atoms reachable from b without crossing the a-b bond
+    moving, stack = set(), [b]
+    while stack:
+        cur_a = stack.pop()
+        for nb in ms.neighbors(cur_a):
+            nb = int(nb)
+            if nb == a or nb in moving or nb == b:
+                continue
+            moving.add(nb)
+            stack.append(nb)
+    c, s_, t_ = math.cos(delta), math.sin(delta), 1 - math.cos(delta)
+    x, y, z = axis
+    R = np.array([
+        [t_*x*x + c,   t_*x*y - s_*z, t_*x*z + s_*y],
+        [t_*x*y + s_*z, t_*y*y + c,   t_*y*z - s_*x],
+        [t_*x*z - s_*y, t_*y*z + s_*x, t_*z*z + c]])
+    origin = ms.xyz[b].copy()
+    for i in moving:
+        ms.xyz[i] = origin + R @ (ms.xyz[i] - origin)
+
+
+def _find(ms, subtype):
+    for t in T.analyze_torsions(ms, ligand_only=False):
+        if t.subtype == subtype:
+            return t
+    return None
+
+
+def test_aniline_nitrogen_is_recognised():
+    ms = build3d("Nc1ccccc1")          # aniline
+    t = _find(ms, "aniline N")
+    assert t is not None, "aryl-NH2 torsion not found"
+    assert t.bond_type == T.CONJUGATED
+
+
+def test_anilide_nitrogen_is_recognised():
+    ms = build3d("CC(=O)Nc1ccccc1")    # acetanilide
+    t = _find(ms, "anilide N")
+    assert t is not None, "aryl-N(amide) torsion not found"
+
+
+def test_coplanar_anilide_is_not_flagged():
+    ms = build3d("CC(=O)Nc1ccccc1")
+    t = _find(ms, "anilide N")
+    set_torsion(ms, t, 0.0)
+    again = _find(ms, "anilide N")
+    assert not again.flagged, again.note
+
+
+def test_perpendicular_anilide_is_flagged():
+    """An anilide square to the ring has given up its conjugation."""
+    ms = build3d("CC(=O)Nc1ccccc1")
+    t = _find(ms, "anilide N")
+    set_torsion(ms, t, 90.0)
+    again = _find(ms, "anilide N")
+    assert again.flagged, again.note
+    assert again.assessment == T.TWISTED
+    assert "ortho" in again.note
+
+
+def test_ortho_substitution_excuses_the_twist():
+    """2,6-dimethylacetanilide is twisted because it must be, not from strain."""
+    ms = build3d("CC(=O)Nc1c(C)cccc1C")
+    t = _find(ms, "anilide N")
+    assert t is not None
+    set_torsion(ms, t, 90.0)
+    again = _find(ms, "anilide N")
+    assert again.ortho_substituted, "ortho substituent not detected"
+    assert not again.flagged, again.note
+    assert "expected" in again.note
+
+
+def test_aryl_carbonyl_is_recognised():
+    ms = build3d("O=C(C)c1ccccc1")     # acetophenone
+    assert _find(ms, "aryl carbonyl") is not None
+
+
+def test_biaryl_is_reported_but_not_judged():
+    """Both planar and twisted biphenyls are common; without CSD data the
+    honest answer is to say so rather than guess."""
+    ms = build3d("c1ccccc1-c1ccccc1")
+    ts = [t for t in T.analyze_torsions(ms, ligand_only=False)
+          if t.bond_type == T.BIARYL]
+    assert ts, "biaryl bond not found"
+    assert ts[0].assessment == T.UNJUDGED
+    assert "CSD" in ts[0].note
+
+
+def test_unjudged_is_never_counted_as_fine():
+    ms = build3d("c1ccccc1-c1ccccc1")
+    ts = T.analyze_torsions(ms, ligand_only=False)
+    for t in ts:
+        if t.assessment == T.UNJUDGED:
+            assert not t.flagged
+            assert t.assessment != T.OK     # silence is not approval

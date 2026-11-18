@@ -389,6 +389,48 @@ hitpick_lengths_desc = CmdDesc(optional=[("show", BoolArg)],
                                synopsis="Show or hide interaction lengths")
 
 
+def hitpick_torsions(session, all=False):
+    """List every rotatable torsion, with a judgement where one is possible."""
+    ensure_ui(session)
+    st = get_state(session)
+    if st.result is None or st.result.strain is None:
+        raise UserError("nothing analysed yet; run: hitpick analyze")
+    ts = st.result.strain.torsions
+    if not ts:
+        session.logger.info("hitpick: no rotatable torsions in this ligand")
+        return {"n": 0}
+
+    ms = st.molsys
+    log = session.logger
+    log.info("<b>torsions &mdash; %s</b>" % st.result.name, is_html=True)
+    shown = 0
+    for t in sorted(ts, key=lambda x: (not x.flagged, x.bond_type)):
+        if not (all or t.flagged):
+            continue
+        shown += 1
+        mark = "!" if t.flagged else " "
+        log.info("  %s %-16s %7.1f deg   %s - %s"
+                 % (mark, t.subtype or t.bond_type, t.angle,
+                    ms.atom_label(t.bond[0]), ms.atom_label(t.bond[1])))
+        if t.note:
+            log.info("      %s" % t.note)
+    if not all:
+        n_un = sum(1 for t in ts if t.assessment == "unjudged")
+        log.info("  %d torsion(s) total; %d flagged. Use 'hitpick torsions "
+                 "true' for all of them." % (len(ts), shown))
+        if n_un:
+            log.info("  %d could not be judged: there is no redistributable "
+                     "CSD torsion library, so bond types without an "
+                     "unambiguous preference are reported, not scored."
+                     % n_un)
+    return {"n": len(ts), "shown": shown}
+
+
+hitpick_torsions_desc = CmdDesc(
+    optional=[("all", BoolArg)],
+    synopsis="List rotatable torsions and flag the strained ones")
+
+
 def hitpick_limits(session, show=True):
     """Put the literature limits in the label text, not just in its colour."""
     ensure_ui(session)
@@ -649,6 +691,8 @@ def register_commands(logger):
     register("hitpick clashes", hitpick_clashes_desc, hitpick_clashes,
              logger=logger)
     register("hitpick limits", hitpick_limits_desc, hitpick_limits,
+             logger=logger)
+    register("hitpick torsions", hitpick_torsions_desc, hitpick_torsions,
              logger=logger)
     register("hitpick scaleplot", hitpick_scaleplot_desc, hitpick_scaleplot,
              logger=logger)

@@ -323,10 +323,16 @@ def find_distorted_amides(ms, tolerance=AMIDE_TWIST_TOLERANCE):
 # -------------------------------------------------------------- top level
 
 class StrainReport:
-    def __init__(self, clashes, internal, findings):
+    def __init__(self, clashes, internal, findings, torsions=None):
         self.clashes = list(clashes)
         self.internal = list(internal)
         self.findings = list(findings)
+        # every rotatable torsion, measured; most carry no judgement
+        self.torsions = list(torsions or [])
+
+    @property
+    def flagged_torsions(self):
+        return [t for t in self.torsions if t.flagged]
 
     @property
     def worst_overlap(self):
@@ -341,6 +347,8 @@ class StrainReport:
             "severe_clashes": sum(1 for c in self.clashes + self.internal
                                   if c.severe),
             "strain_flags": len(self.findings),
+            "torsions": len(self.torsions),
+            "flagged_torsions": len(self.flagged_torsions),
         }
 
     def summary(self):
@@ -356,6 +364,10 @@ class StrainReport:
         if c["strain_flags"]:
             bits.append("%d strain flag%s"
                         % (c["strain_flags"], "" if c["strain_flags"] == 1 else "s"))
+        if c["flagged_torsions"]:
+            bits.append("%d torsion%s worth a look"
+                        % (c["flagged_torsions"],
+                           "" if c["flagged_torsions"] == 1 else "s"))
         return "; ".join(bits) if bits else "no clashes or strain flags"
 
     def to_dict(self):
@@ -363,7 +375,8 @@ class StrainReport:
                 "worst_overlap": round(self.worst_overlap, 3),
                 "clashes": [c.to_dict() for c in self.clashes],
                 "internal_clashes": [c.to_dict() for c in self.internal],
-                "findings": [f.to_dict() for f in self.findings]}
+                "findings": [f.to_dict() for f in self.findings],
+                "torsions": [t.to_dict() for t in self.torsions]}
 
 
 # DOCK 3.x writes its own torsional strain terms into the pose comment block.
@@ -404,7 +417,18 @@ def analyze_strain(ms, **kw):
         ms, **{k: v for k, v in kw.items()
                if k in ("overlap_cutoff", "hbond_allowance", "radii",
                         "bond_separation")})
-    findings = (find_eclipsed_torsions(ms) + find_nonplanar_rings(ms)
-                + find_distorted_amides(ms)
+    from .torsions import analyze_torsions
+    torsions = analyze_torsions(ms)
+
+    # The torsion pass supersedes the standalone eclipsed/amide checks: it
+    # covers the same bonds and also the conjugated ones, with the ortho
+    # reasoning that decides whether a twist is strain or just sterics.
+    findings = (find_nonplanar_rings(ms)
                 + dock_strain_findings(ms.meta.get("ligand_meta")))
-    return StrainReport(clashes, internal, findings)
+    for t in torsions:
+        if not t.flagged:
+            continue
+        findings.append(StrainFinding(
+            t.assessment.replace(" ", "_"), t.atoms, t.angle, "deg",
+            t.note, severity="warning"))
+    return StrainReport(clashes, internal, findings, torsions)
