@@ -97,6 +97,9 @@ hitpick report                   # text listing with geometry and flags
 hitpick clashes true             # draw van der Waals clashes (red)
 hitpick torsions                 # flagged torsions; 'true' for all of them
 hitpick limits true              # put the literature limits in the labels
+hitpick width 0.05               # thinner lines (ChimeraX's own default is 0.075)
+hitpick hover true               # detail in the hover balloon
+hitpick panel                    # detach the panel; widen it for two columns
 hitpick hide hydrophobic weak_hbond
 hitpick show all
 hitpick lengths false
@@ -107,7 +110,14 @@ hitpick clear
 ```
 
 Open **Tools → Binding Analysis → Hit Picking Handbook** for the panel with
-per-type checkboxes and the clicked-atom entry.
+per-type checkboxes and the clicked-atom entry. Drag it out of the ChimeraX
+window (or run `hitpick panel`) and widen it: past ~680 px it lays out in two
+columns, past ~1100 px in three.
+
+**Hovering** replaces ChimeraX's balloon with the handbook's answer: an atom
+gives its role and basicity, an interaction line gives every measured term
+against its limits, a clash gives its overlap, a rotatable bond gives its
+torsion. `hitpick hover false` gives ChimeraX's own balloon back.
 
 **Click-to-explain works out of the box**: select a single atom (ctrl-click)
 and its handbook entry appears in the log and the panel. Turn it off with

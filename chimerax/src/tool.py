@@ -35,9 +35,11 @@ class HandbookTool(HtmlToolInstance):
     help = None
 
     def __init__(self, session, tool_name):
-        super().__init__(session, tool_name, size_hint=(480, 820),
+        super().__init__(session, tool_name, size_hint=(560, 820),
                          log_errors=True)
         self.display_name = "Hit Picking Handbook"
+        # Wide enough that the two-column layout has somewhere to go once the
+        # panel is detached; it still collapses to one column when docked.
         from .cmd import ensure_ui
         ensure_ui(session)
         st = get_state(session)
@@ -140,6 +142,11 @@ class HandbookTool(HtmlToolInstance):
             elif path == "scaleplot":
                 from .cmd import hitpick_scaleplot
                 hitpick_scaleplot(session, one("on") == "1")
+            elif path == "hover":
+                from .cmd import hitpick_hover
+                hitpick_hover(session, one("on") == "1")
+            elif path == "float":
+                self.float_window(one("on") != "0")
             elif path == "labels":
                 from .cmd import hitpick_labels
                 hitpick_labels(session, one("quantity", "pKBHX"))
@@ -167,6 +174,17 @@ class HandbookTool(HtmlToolInstance):
                     run(session, c)
         except Exception as e:
             session.logger.warning("hitpick panel: %s" % e)
+
+    def float_window(self, floating=True):
+        """Detach the panel so it can be widened into two columns."""
+        try:
+            self.tool_window.floating = bool(floating)
+            return True
+        except Exception as e:
+            self.session.logger.info(
+                "hitpick: could not detach the panel (%s). Drag its title bar "
+                "out of the ChimeraX window instead." % e)
+            return False
 
     def _reanalyse(self):
         st = self._state

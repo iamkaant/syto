@@ -28,14 +28,15 @@ class Options:
     __slots__ = ("enabled_nci", "include_weak_hbonds", "site_radius",
                  "show_lengths", "show_angles", "detect_strain",
                  "show_clashes", "show_strain_labels", "show_limits",
-                 "show_scale",
+                 "show_scale", "hover_detail", "line_width",
                  "handbook_on_click", "annotate_atom_values", "use_active_learning")
 
     def __init__(self, enabled_nci=None, include_weak_hbonds=False,
                  site_radius=10.0, show_lengths=True, show_angles=False,
                  detect_strain=True, show_clashes=True,
                  show_strain_labels=True, show_limits=False,
-                 show_scale=True, handbook_on_click=True,
+                 show_scale=True, hover_detail=True, line_width=0.075,
+                 handbook_on_click=True,
                  annotate_atom_values=False, use_active_learning=False):
         self.enabled_nci = set(C.DEFAULT_ENABLED if enabled_nci is None
                                else enabled_nci)
@@ -53,6 +54,10 @@ class Options:
         self.show_limits = show_limits
         # show the basicity scale plot in the panel
         self.show_scale = show_scale
+        # replace ChimeraX's hover balloon with our own detail
+        self.hover_detail = hover_detail
+        # pseudobond radius; ChimeraX's own hydrogen bonds use 0.075
+        self.line_width = line_width
         self.handbook_on_click = handbook_on_click
         self.annotate_atom_values = annotate_atom_values
         self.use_active_learning = use_active_learning

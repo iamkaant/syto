@@ -63,10 +63,29 @@ def clear_groups(session, kinds=None):
     return len(removed)
 
 
-def _quality_style(quality, kind):
+# ChimeraX draws its own hydrogen bonds at 0.075, so that is the default here
+# too: a tool that sits alongside ViewDock should not shout over it. Quality
+# still modulates the width, but gently - the previous range went to 0.18 for
+# interactions and 0.30 for clashes, up to four times ChimeraX's own.
+DEFAULT_LINE_WIDTH = 0.075
+_WIDTH = {}
+
+
+def line_width(session=None):
+    return _WIDTH.get(session, DEFAULT_LINE_WIDTH)
+
+
+def set_line_width(session, width):
+    _WIDTH[session] = max(0.005, float(width))
+    return _WIDTH[session]
+
+
+def _quality_style(quality, kind, base=None):
     """Radius and alpha from the geometric quality."""
     q = max(0.0, min(1.0, float(quality)))
-    radius = 0.06 + 0.12 * q
+    base = DEFAULT_LINE_WIDTH if base is None else base
+    # 0.7x at the worst, 1.25x at the best: visible but not a different tool
+    radius = base * (0.7 + 0.55 * q)
     alpha = int(90 + 165 * q)
     r, g, b = TYPE_COLORS.get(kind, (200, 200, 200))
     return radius, (r, g, b, alpha)
@@ -104,7 +123,8 @@ def draw_interactions(session, interactions, all_atoms, show_lengths=True,
                 pb = pbg.new_pseudobond(a1, a2)
             except Exception:
                 continue
-            radius, rgba = _quality_style(it.quality, kind)
+            radius, rgba = _quality_style(it.quality, kind,
+                                          base=line_width(session))
             pb.radius = radius
             pb.color = rgba
             try:
@@ -276,8 +296,10 @@ def draw_clashes(session, strain, all_atoms, show_overlap=True):
                 pb = pbg.new_pseudobond(all_atoms[c.i], all_atoms[c.j])
             except Exception:
                 continue
-            # thickness grows with the overlap, so the worst one stands out
-            pb.radius = 0.08 + min(0.22, 0.18 * c.overlap)
+            # thickness grows with the overlap so the worst one stands out,
+            # but stays in the same family of widths as everything else
+            base = line_width(session)
+            pb.radius = base * (1.0 + min(0.8, 0.6 * c.overlap))
             pb.color = (r, g, b, 255)
             try:
                 pb._hitpick_text = ("%.2f over" % c.overlap) if show_overlap else ""

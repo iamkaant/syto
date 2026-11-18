@@ -63,6 +63,13 @@ def ensure_ui(session):
                 "hitpick: selection listener unavailable (%s)" % e)
 
     try:
+        from .hover import install as install_hover, is_installed
+        if st.options.hover_detail and not is_installed(session):
+            install_hover(session)
+    except Exception as e:
+        session.logger.info("hitpick: hover detail unavailable (%s)" % e)
+
+    try:
         from .viewdock_link import autohook, is_hooked
         if not is_hooked(session):
             autohook(session)
@@ -298,6 +305,7 @@ hitpick_analyze_desc = _analyze_desc()
 def _redraw(session, st):
     if st.result is None:
         return
+    render.set_line_width(session, st.options.line_width)
     render.draw_interactions(
         session, st.result.interactions, st.all_atoms,
         show_lengths=st.options.show_lengths,
@@ -387,6 +395,80 @@ def hitpick_lengths(session, show=True):
 
 hitpick_lengths_desc = CmdDesc(optional=[("show", BoolArg)],
                                synopsis="Show or hide interaction lengths")
+
+
+def hitpick_width(session, width=None):
+    """Set the thickness of the interaction and clash lines."""
+    ensure_ui(session)
+    st = get_state(session)
+    if width is None:
+        session.logger.info(
+            "hitpick: line width is %.3f (ChimeraX draws its own hydrogen "
+            "bonds at %.3f). Set it with: hitpick width 0.05"
+            % (st.options.line_width, render.DEFAULT_LINE_WIDTH))
+        return st.options.line_width
+    st.options.line_width = render.set_line_width(session, width)
+    if st.result is not None:
+        _redraw(session, st)
+    session.logger.info("hitpick: line width %.3f" % st.options.line_width)
+    return st.options.line_width
+
+
+hitpick_width_desc = CmdDesc(
+    optional=[("width", FloatArg)],
+    synopsis="Set the thickness of interaction and clash lines")
+
+
+def hitpick_panel(session, floating=True):
+    """Detach the handbook panel, so it can be widened to two columns."""
+    from .tool import HandbookTool
+    tools = [t for t in session.tools.list() if isinstance(t, HandbookTool)]
+    if not tools:
+        from chimerax.core.commands import run
+        run(session, 'ui tool show "Hit Picking Handbook"')
+        tools = [t for t in session.tools.list() if isinstance(t, HandbookTool)]
+    if not tools:
+        raise UserError("could not open the Hit Picking Handbook panel")
+    ok = tools[0].float_window(floating)
+    if ok:
+        session.logger.info(
+            "hitpick: panel %s. Widen it past ~680 px and it lays out in two "
+            "columns; past ~1100 px, three."
+            % ("detached" if floating else "docked"))
+    return ok
+
+
+hitpick_panel_desc = CmdDesc(
+    optional=[("floating", BoolArg)],
+    synopsis="Detach or re-dock the handbook panel")
+
+
+def hitpick_hover(session, show=True):
+    """Put hitpick detail in ChimeraX's hover balloon, or give it back."""
+    ensure_ui(session)
+    st = get_state(session)
+    st.options.hover_detail = bool(show)
+    from . import hover
+    if show:
+        ok = hover.install(session)
+        if not ok and not hover.is_installed(session):
+            session.logger.warning(
+                "hitpick: the 'mouse hover' trigger does not exist yet - "
+                "hover over the 3D view once, then try again.")
+            return False
+        session.logger.info(
+            "hitpick: hovering an atom now shows its role and basicity, and "
+            "hovering an interaction shows the measured geometry against its "
+            "limits.")
+    else:
+        hover.remove(session)
+        session.logger.info("hitpick: ChimeraX's own hover balloon restored.")
+    return st.options.hover_detail
+
+
+hitpick_hover_desc = CmdDesc(
+    optional=[("show", BoolArg)],
+    synopsis="Show hitpick detail in the hover balloon")
 
 
 def hitpick_torsions(session, all=False):
@@ -694,5 +776,8 @@ def register_commands(logger):
              logger=logger)
     register("hitpick torsions", hitpick_torsions_desc, hitpick_torsions,
              logger=logger)
+    register("hitpick hover", hitpick_hover_desc, hitpick_hover, logger=logger)
+    register("hitpick panel", hitpick_panel_desc, hitpick_panel, logger=logger)
+    register("hitpick width", hitpick_width_desc, hitpick_width, logger=logger)
     register("hitpick scaleplot", hitpick_scaleplot_desc, hitpick_scaleplot,
              logger=logger)

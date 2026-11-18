@@ -110,6 +110,18 @@ description = "Show or hide the basicity scale plot in the panel"
 category = "Binding Analysis"
 description = "List rotatable torsions and flag the strained ones"
 
+[chimerax.command."hitpick hover"]
+category = "Binding Analysis"
+description = "Show hitpick detail in the hover balloon"
+
+[chimerax.command."hitpick panel"]
+category = "Binding Analysis"
+description = "Detach or re-dock the handbook panel"
+
+[chimerax.command."hitpick width"]
+category = "Binding Analysis"
+description = "Set the thickness of interaction and clash lines"
+
 [chimerax.command."hitpick clear"]
 category = "Binding Analysis"
 description = "Remove hitpick drawings"
