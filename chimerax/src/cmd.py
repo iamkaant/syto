@@ -60,6 +60,42 @@ def ensure_ui(session):
         session.logger.info("hitpick: ViewDock link not established (%s)" % e)
 
 
+# ---------------------------------------------------------------------------
+# Command return values
+#
+# ChimeraX JSON-encodes whatever a command returns when the REST bridge runs
+# with `json true`. Returning a rich Python object raises inside the encoder,
+# the response is never queued, and the REST handler thread then waits
+# forever while still holding the port - the whole server wedges, and the
+# command itself looks like it silently did nothing.
+#
+# So every hitpick command returns JSON-friendly data only: a dict, a list, a
+# string, a number, a bool or None. Never a PoseResult, a HandbookHit, a
+# state object or a set.
+# ---------------------------------------------------------------------------
+
+def _pose_summary(result):
+    if result is None:
+        return None
+    return {
+        "name": result.name,
+        "counts": dict(result.counts),
+        "n_interactions": len(result.interactions),
+        "warnings": list(result.warnings),
+    }
+
+
+def _state_summary(st):
+    return {
+        "ready": st.ready,
+        "receptor": getattr(st.receptor_model, "name", None),
+        "ligand": getattr(st.ligand_model, "name", None),
+        "enabled": sorted(st.options.enabled_nci),
+        "handbook": st.handbook.describe() if st.handbook else None,
+        "pose": _pose_summary(st.result),
+    }
+
+
 def _install_selection_listener(session):
     """Explain an atom whenever the user selects exactly one.
 
@@ -159,7 +195,7 @@ def hitpick_setup(session, receptor=None, ligand=None):
 
     if ligand is not None:
         hitpick_analyze(session, ligand)
-    return st
+    return _state_summary(st)
 
 
 hitpick_setup_desc = CmdDesc(
@@ -179,7 +215,7 @@ def hitpick_analyze(session, ligand=None):
     it took out the REST bridge rather than reporting itself.
     """
     if getattr(session, "_hitpick_analyzing", False):
-        return get_state(session).result
+        return _pose_summary(get_state(session).result)
     ensure_ui(session)
     st = get_state(session)
     if not st.ready:
@@ -227,7 +263,7 @@ def _analyze_pose(session, st, lig):
     for w in res.warnings:
         session.logger.warning("hitpick: " + w)
     st.notify()
-    return st.result
+    return _pose_summary(st.result)
 
 
 def _guess_displayed_ligand(session, st):
@@ -299,7 +335,7 @@ def hitpick_show(session, types=None):
                         % ", ".join(sorted(st.options.enabled_nci)))
     if st.result is not None:
         hitpick_analyze(session, st.ligand_model)
-    return st.options.enabled_nci
+    return sorted(st.options.enabled_nci)
 
 
 hitpick_show_desc = CmdDesc(optional=[("types", RestOfLine)],
@@ -314,7 +350,7 @@ def hitpick_hide(session, types=None):
                         % (", ".join(sorted(st.options.enabled_nci)) or "nothing"))
     if st.result is not None:
         hitpick_analyze(session, st.ligand_model)
-    return st.options.enabled_nci
+    return sorted(st.options.enabled_nci)
 
 
 hitpick_hide_desc = CmdDesc(optional=[("types", RestOfLine)],
@@ -404,7 +440,7 @@ def hitpick_explain(session, atoms=None):
     if hit.highlight:
         render.highlight(session, hit.highlight, st.all_atoms)
     st.notify()
-    return hit
+    return hit.to_dict()
 
 
 def _log_hit(session, hit):
@@ -456,7 +492,7 @@ def hitpick_report(session):
             log.info("        ! " + f)
     for w in r.warnings:
         log.warning("   " + w)
-    return r
+    return _pose_summary(r)
 
 
 hitpick_report_desc = CmdDesc(synopsis="Text report for the current pose")

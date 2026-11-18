@@ -9,7 +9,7 @@ fail=0
 echo "=== core unit tests ==="
 "$PY" -m pytest "$ROOT/core/tests" -q || fail=1
 
-for t in tests_viewdock_contract tests_labels; do
+for t in tests_viewdock_contract tests_labels tests_json_returns; do
   echo
   echo "=== chimerax/$t.py ==="
   out="$("$CX" --nogui --silent --exit --script "$ROOT/chimerax/$t.py" 2>&1)"
