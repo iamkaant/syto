@@ -96,16 +96,9 @@ def draw_interactions(session, interactions, all_atoms, show_lengths=True,
             radius, rgba = _quality_style(it.quality, kind)
             pb.radius = radius
             pb.color = rgba
-            parts = []
-            if show_lengths:
-                parts.append("%.2f A" % it.distance)
-            if show_angles:
-                for k, v in it.angles.items():
-                    if v == v:
-                        parts.append("%s %.0f" % (k, v))
-            parts.append("q=%.2f" % it.quality)
             try:
-                pb.hitpick_label = " ".join(parts)
+                pb._hitpick_text = interaction_label_text(
+                    it, show_lengths, show_angles)
                 pb.hitpick_kind = kind
             except Exception:
                 pass
@@ -142,53 +135,160 @@ def _representative_atom(group, other_group, all_atoms):
     return best
 
 
-def label_interactions(session, kinds=None):
-    """Turn on pseudobond distance labels for our groups."""
-    from chimerax.core.commands import run
+LABEL_ATTR = "hitpick_label"
+_ATTR_REGISTERED = set()
+
+
+def _register_attrs(session):
+    """Register the per-object label attribute once per session.
+
+    Labelling through the `attribute=` argument lets every atom or
+    pseudobond carry its own text in a single call. Building one `label`
+    COMMAND per atom from a spec string is what the earlier version did, and
+    it failed silently for ligands with no chain id - which is why clicking
+    "Label pKBHX" appeared to delete every label instead of adding any.
+    """
+    if session in _ATTR_REGISTERED:
+        return
+    from chimerax.atomic import Atom, Pseudobond
+    for cls in (Atom, Pseudobond):
+        try:
+            cls.register_attr(session, LABEL_ATTR, "HitPickingTool",
+                              attr_type=str)
+        except Exception:
+            pass          # already registered by an earlier session
+    _ATTR_REGISTERED.add(session)
+
+
+def interaction_label_text(it, show_lengths=True, show_angles=False,
+                           show_quality=True):
+    """The text drawn on one interaction line."""
+    parts = []
+    if show_lengths:
+        parts.append("%.2f A" % it.distance)
+    if show_angles:
+        for k, v in it.angles.items():
+            if v is None or v != v:          # NaN: not measurable
+                continue
+            parts.append("%s %.0f deg" % (_short_angle(k), v))
+    if show_quality:
+        parts.append("q%.2f" % it.quality)
+    return "  ".join(parts)
+
+
+def _short_angle(name):
+    return {"dha": "D-H..A", "haa": "H..A-X", "interplanar": "planes",
+            "offset": "offset", "normal_offset": "off-axis",
+            "cxa": "C-X..A", "xay": "X..A-Y"}.get(name, name)
+
+
+def label_interactions(session, interactions=None, all_atoms=None,
+                       show_lengths=True, show_angles=False):
+    """Label each interaction line with its own geometry.
+
+    Uses one label call over a per-pseudobond attribute, so distance AND
+    angles can differ per line. The previous version labelled whole groups
+    with a fixed "{0.length}" format, which is why switching angles on
+    changed nothing.
+    """
     from chimerax.atomic import PseudobondGroup
+    from chimerax.core.objects import Objects
+    from chimerax.label.label3d import label
+
+    _register_attrs(session)
+    if not show_lengths and not show_angles:
+        clear_interaction_labels(session)
+        return 0
+
     n = 0
-    # Snapshot: running the label command below adds models, and iterating
-    # session.models while it changes raises.
     for m in list(session.models):
         if not isinstance(m, PseudobondGroup) or not m.name.startswith(GROUP_PREFIX):
             continue
-        if kinds and m.name not in {group_name(k) for k in kinds}:
+        pbs = m.pseudobonds
+        if len(pbs) == 0:
             continue
+        for pb in pbs:
+            text = getattr(pb, "_hitpick_text", None)
+            if text is None:
+                try:
+                    text = "%.2f A" % pb.length
+                except Exception:
+                    text = ""
+            try:
+                setattr(pb, LABEL_ATTR, text)
+            except Exception:
+                continue
         try:
-            run(session, 'label #%s pseudobonds text "{0.length:.2f}"'
-                % m.id_string, log=False)
-            n += 1
-        except Exception:
-            pass
+            label(session, Objects(pseudobonds=pbs), "pseudobonds",
+                  attribute=LABEL_ATTR)
+            n += len(pbs)
+        except Exception as e:
+            session.logger.info("hitpick: could not label %s (%s)" % (m.name, e))
     return n
 
 
+def clear_interaction_labels(session):
+    from chimerax.atomic import PseudobondGroup
+    from chimerax.core.objects import Objects
+    from chimerax.label.label3d import label_delete
+    for m in list(session.models):
+        if not isinstance(m, PseudobondGroup) or not m.name.startswith(GROUP_PREFIX):
+            continue
+        try:
+            label_delete(session, Objects(pseudobonds=m.pseudobonds),
+                         "pseudobonds")
+        except Exception:
+            pass
+
+
 def annotate_atoms(session, labels, all_atoms, clear_first=True):
-    """Put handbook values (e.g. pKBHX) on atoms in the 3D view."""
-    from chimerax.core.commands import run
-    if clear_first:
-        clear_atom_labels(session, all_atoms)
-    n = 0
+    """Put handbook values (e.g. pKBHX) on atoms in the 3D view.
+
+    `labels` maps atom index -> text. Only OUR atoms are relabelled; other
+    labels in the session are left alone.
+    """
+    from chimerax.atomic import Atoms
+    from chimerax.core.objects import Objects
+    from chimerax.label.label3d import label
+
+    _register_attrs(session)
+    sel, texts = [], []
     for idx, text in labels.items():
         i = int(idx)
         if not (0 <= i < len(all_atoms)):
             continue
         a = all_atoms[i]
         try:
-            spec = "#%s/%s:%d@%s" % (a.structure.id_string, a.residue.chain_id
-                                     or "", a.residue.number, a.name)
-            run(session, 'label %s text "%s" height 0.4'
-                % (spec, text.replace('"', "'")), log=False)
-            n += 1
+            setattr(a, LABEL_ATTR, str(text))
         except Exception:
             continue
-    return n
+        sel.append(a)
+        texts.append(text)
+    if not sel:
+        return 0
+    atoms = Atoms(sel)
+    if clear_first:
+        clear_atom_labels(session, all_atoms)
+    try:
+        label(session, Objects(atoms=atoms), "atoms", attribute=LABEL_ATTR)
+    except Exception as e:
+        session.logger.warning("hitpick: labelling failed (%s)" % e)
+        return 0
+    return len(sel)
 
 
 def clear_atom_labels(session, all_atoms=None):
-    from chimerax.core.commands import run
+    """Delete only the atom labels we created."""
+    from chimerax.atomic import Atoms
+    from chimerax.core.objects import Objects
+    from chimerax.label.label3d import label_delete
+    if not all_atoms:
+        return
+    ours = [a for a in all_atoms if getattr(a, LABEL_ATTR, None)]
+    if not ours:
+        return
     try:
-        run(session, "label delete", log=False)
+        label_delete(session, Objects(atoms=Atoms(ours)), "atoms")
     except Exception:
         pass
 

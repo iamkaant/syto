@@ -241,8 +241,9 @@ def _redraw(session, st):
         session, st.result.interactions, st.all_atoms,
         show_lengths=st.options.show_lengths,
         show_angles=st.options.show_angles)
-    if st.options.show_lengths:
-        render.label_interactions(session)
+    render.label_interactions(session,
+                              show_lengths=st.options.show_lengths,
+                              show_angles=st.options.show_angles)
 
 
 def _parse_types(text):
@@ -304,8 +305,6 @@ hitpick_hide_desc = CmdDesc(optional=[("types", RestOfLine)],
 def hitpick_lengths(session, show=True):
     st = get_state(session)
     st.options.show_lengths = bool(show)
-    if not show:
-        render.clear_atom_labels(session)
     if st.result is not None:
         _redraw(session, st)
     return st.options.show_lengths
@@ -338,7 +337,7 @@ def hitpick_labels(session, quantity="pKBHX"):
         raise UserError("nothing analysed yet; run: hitpick analyze")
     q = (quantity or "").strip()
     if q.lower() in ("off", "none", "clear"):
-        render.clear_atom_labels(session)
+        render.clear_atom_labels(session, st.all_atoms)
         st.options.annotate_atom_values = False
         return 0
     labels = st.handbook.annotate_system(st.molsys, q, ligand_only=True)
