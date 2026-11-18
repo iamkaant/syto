@@ -126,6 +126,10 @@ description = "Set the thickness of interaction and clash lines"
 category = "Binding Analysis"
 description = "Plot the QM energy profile for this pose's torsions"
 
+[chimerax.command."hitpick reveal"]
+category = "Binding Analysis"
+description = "Display the residues the interactions point at"
+
 [chimerax.command."hitpick clear"]
 category = "Binding Analysis"
 description = "Remove hitpick drawings"

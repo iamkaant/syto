@@ -397,6 +397,22 @@ hitpick_lengths_desc = CmdDesc(optional=[("show", BoolArg)],
                                synopsis="Show or hide interaction lengths")
 
 
+def hitpick_reveal(session, show=True):
+    """Display the residues our interactions point at."""
+    ensure_ui(session)
+    st = get_state(session)
+    if st.result is None:
+        raise UserError("nothing analysed yet; run: hitpick analyze")
+    n = render.reveal_partners(session, st.result.interactions, st.all_atoms)
+    session.logger.info("hitpick: revealed %d interacting atom(s)" % n)
+    return n
+
+
+hitpick_reveal_desc = CmdDesc(
+    optional=[("show", BoolArg)],
+    synopsis="Display the residues the interactions point at")
+
+
 def hitpick_width(session, width=None):
     """Set the thickness of the interaction and clash lines."""
     ensure_ui(session)
@@ -840,5 +856,7 @@ def register_commands(logger):
              hitpick_torsionprofile, logger=logger)
     register("hitpick panel", hitpick_panel_desc, hitpick_panel, logger=logger)
     register("hitpick width", hitpick_width_desc, hitpick_width, logger=logger)
+    register("hitpick reveal", hitpick_reveal_desc, hitpick_reveal,
+             logger=logger)
     register("hitpick scaleplot", hitpick_scaleplot_desc, hitpick_scaleplot,
              logger=logger)

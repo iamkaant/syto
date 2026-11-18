@@ -107,8 +107,14 @@ def _centroid_marker(session, mset, indices, all_atoms, cache):
         return None
     c = np.mean(pts, axis=0)
     try:
+        # The marker must stay DISPLAYED: a pseudobond is shown only when
+        # both endpoint atoms are shown, so hiding the marker made the
+        # stacking line undrawable. Tiny and fully transparent instead, so
+        # the line appears and the dot does not.
         m = mset.create_marker(c, (180, 180, 180, 0), 0.01)
-        m.display = False      # the line is the point, not the dot
+        m.display = True
+        m.radius = 0.01
+        m.color = (180, 180, 180, 0)
     except Exception:
         return None
     cache[key] = m
@@ -157,6 +163,7 @@ def draw_interactions(session, interactions, all_atoms, show_lengths=True,
     clear_groups(session)
     mset = None
     centroid_cache = {}
+    hidden = {}
     by_kind = {}
     for it in interactions:
         if it.quality < min_quality:
@@ -189,6 +196,12 @@ def draw_interactions(session, interactions, all_atoms, show_lengths=True,
                                           base=line_width(session))
             pb.radius = radius
             pb.color = rgba
+            # Note: shown_when_atoms_hidden concerns the atoms' hide BITS
+            # (ribbon depiction) and is True by default; it does not help
+            # here. `pb.shown` requires both endpoint atoms to be DISPLAYED,
+            # so a line to an undisplayed water or side chain cannot be drawn
+            # at all. draw_interactions reports how many are affected and
+            # `hitpick reveal` fixes them.
             try:
                 pb._hitpick_text = interaction_label_text(
                     it, show_lengths, show_angles, show_limits)
@@ -202,6 +215,15 @@ def draw_interactions(session, interactions, all_atoms, show_lengths=True,
             if pbg not in session.models:
                 session.models.add([pbg])
             made[kind] = pbg.num_pseudobonds
+            hidden[kind] = sum(1 for pb in pbg.pseudobonds if not pb.shown)
+
+    total_hidden = sum(hidden.values())
+    if total_hidden:
+        session.logger.info(
+            "hitpick: %d interaction line(s) point at atoms that are not "
+            "displayed, so ChimeraX cannot draw them. Use "
+            "<b>hitpick reveal</b> to show those residues."
+            % total_hidden, is_html=True)
     return made
 
 
@@ -622,6 +644,31 @@ def highlight(session, indices, all_atoms):
         Atoms(sel).selected = True
     finally:
         st._suppress_selection = False
+    return len(sel)
+
+
+def reveal_partners(session, interactions, all_atoms):
+    """Display the atoms an interaction points at.
+
+    A line drawn to a hidden atom still reads, but showing the partner makes
+    it obvious what is being contacted. Off by default because it changes
+    the display state of the user's own models.
+    """
+    from chimerax.atomic import Atoms
+    sel = []
+    for it in interactions:
+        for i in tuple(it.lig_atoms) + tuple(it.rec_atoms):
+            if 0 <= int(i) < len(all_atoms):
+                sel.append(all_atoms[int(i)])
+    if not sel:
+        return 0
+    atoms = Atoms(sel)
+    try:
+        atoms.displays = True
+        residues = atoms.unique_residues
+        residues.atoms.displays = True
+    except Exception:
+        return 0
     return len(sel)
 
 
