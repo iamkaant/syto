@@ -118,7 +118,15 @@ def build(min_scans=5, split_ortho=True):
             curve[str(int(idx * TWIST_BIN))] = summarise(vals)
         name = "%s|%s|%s" % (bond_type, subtype or "-",
                              "ortho" if ortho else "no-ortho")
+        # A catch-all class has a number but no chemistry behind it: every
+        # sp3-sp3 bond in one bucket, or everything perception could not
+        # name. Its median is an average over unlike things, so it is marked
+        # here and the tool reports it as indicative rather than quoting it
+        # as this bond's cost.
+        coarse = (bond_type in ("other", "sp3-sp3")
+                  or subtype in ("", "-", "conjugated"))
         out_classes[name] = {
+            "coarse": coarse,
             "bond_type": bond_type,
             "subtype": subtype,
             "ortho_substituted": ortho,

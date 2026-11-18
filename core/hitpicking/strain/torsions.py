@@ -88,7 +88,8 @@ def _qm_class(bond_type, subtype, ortho):
                         "ortho" if ortho else "no-ortho")
     cls = qm["classes"].get(key)
     if cls is not None:
-        return cls, True
+        # a catch-all class is not an answer about THIS bond
+        return cls, not cls.get("coarse", False)
     # A class for the OTHER ortho state is not a substitute. An ortho
     # substituent is exactly what moves the preferred angle - an ortho biaryl
     # prefers about 38 degrees where an unsubstituted one prefers 15 - so
@@ -432,8 +433,14 @@ def analyze_torsions(ms, ligand_only=True):
                        "(QM, %.1f-%.1f across %d scans)"
                        % (med, q1, q3, n))
             if not exact:
-                qm_note += (" - indicative only: no QM class for this "
-                            "ortho substitution, read from %s" % cls_name)
+                coarse = (_qm_class(btype, subtype, ortho) or (None, None))[0]
+                if coarse is not None and coarse.get("coarse"):
+                    qm_note += (" - indicative only: %s is a catch-all class "
+                                "covering unlike bonds, so this is an average "
+                                "rather than a cost for this one" % cls_name)
+                else:
+                    qm_note += (" - indicative only: no QM class for this "
+                                "ortho substitution, read from %s" % cls_name)
             if exact and med >= QM_NOTE_KCAL:
                 assessment = STRAINED
                 note = (note + "; " if note else "") + qm_note
