@@ -471,6 +471,37 @@ hitpick_explain_desc = CmdDesc(optional=[("atoms", Or(AtomsArg, EmptyArg))],
 
 # ------------------------------------------------------------------- report
 
+def hitpick_scale(session, quantity="pKBHX", all_elements=False):
+    """Print the basicity scale, with the last clicked moiety marked."""
+    ensure_ui(session)
+    st = get_state(session)
+    if st.handbook is None:
+        raise UserError("handbook data not built; run tools/build_data.py")
+    mids = list(st.last_hit.moiety_ids) if st.last_hit else []
+    lines = st.handbook.scale_text(quantity, mids,
+                                   same_element_only=not all_elements)
+    if not lines:
+        session.logger.warning("hitpick: no %s data to plot" % quantity)
+        return None
+    if mids:
+        session.logger.info("<b>%s scale &mdash; %s</b>"
+                            % (quantity, st.last_hit.title), is_html=True)
+    else:
+        session.logger.info("<b>%s scale (click an atom to mark one)</b>"
+                            % quantity, is_html=True)
+    for ln in lines:
+        session.logger.info(ln.replace(" ", "&nbsp;"), is_html=True)
+    session.logger.info("values from Laurence et al. 2009, "
+                        "<a href='https://doi.org/10.1021/jm801331y'>"
+                        "10.1021/jm801331y</a>", is_html=True)
+    return {"quantity": quantity, "rows": len(lines)}
+
+
+hitpick_scale_desc = CmdDesc(
+    optional=[("quantity", StringArg), ("all_elements", BoolArg)],
+    synopsis="Show where the clicked atom sits on the basicity scale")
+
+
 def hitpick_report(session):
     st = get_state(session)
     if st.result is None:
@@ -523,3 +554,4 @@ def register_commands(logger):
     register("hitpick clear", hitpick_clear_desc, hitpick_clear, logger=logger)
     register("hitpick autoexplain", hitpick_autoexplain_desc,
              hitpick_autoexplain, logger=logger)
+    register("hitpick scale", hitpick_scale_desc, hitpick_scale, logger=logger)

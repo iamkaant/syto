@@ -67,6 +67,8 @@ class Handbook:
         self.by_moiety = payload.get("by_moiety", {})
         # moiety -> quantity -> the parent compound's own cited value
         self.representative = payload.get("representative", {})
+        # moiety -> narrowed statistics, where a source entry lumps families
+        self.subfamily = payload.get("subfamily", {})
         self.interaction_map = payload.get("interaction_map", {})
         self._always = payload.get("always_relevant", [])
         self.stats = payload.get("stats", {})
@@ -210,8 +212,17 @@ class Handbook:
         out = []
         seen = set()
         for mid in moiety_ids:
+            sub = self.subfamily.get(mid) or {}
             for e in self.for_moiety(mid):
                 st = e.get("summary_stats") or {}
+                # Where this entry lumps several families together, use the
+                # statistics for THIS moiety's family only. Quoting the whole
+                # "alcohol / water / phenol" range for a phenol reads an
+                # order of magnitude too basic.
+                narrowed = (sub.get("stats") or {}) if sub.get("entry") == e["id"] else {}
+                if narrowed:
+                    st = dict(st)
+                    st.update(narrowed)
                 for q in LABEL_QUANTITIES:
                     if q not in st:
                         continue
@@ -227,6 +238,7 @@ class Handbook:
                         "max": s["max"], "n": s["n"], "unit": s.get("unit"),
                         "n_flagged": s.get("n_flagged", 0),
                         "derived": True,
+                        "narrowed": bool(narrowed.get(q)),
                     }
                     rep = self.representative_for(moiety_ids, q)
                     if rep and rep.get("entry") == e["id"]:
@@ -249,17 +261,21 @@ class Handbook:
             rep = a.get("representative")
             if rep and isinstance(rep.get("value"), (int, float)):
                 rflag = "*" if rep.get("flags") else ""
-                return "%s %.2f%s (%.1f-%.1f)%s" % (
-                    quantity, float(rep["value"]), rflag,
-                    a["min"], a["max"], flag)
+                head = "%s %.2f%s" % (quantity, float(rep["value"]), rflag)
+                # Only show a range when there is a real range to show: with
+                # one compound behind it, "(-0.4--0.4)" is noise, and the
+                # double minus is unreadable.
+                if a["n"] < 2 or round(a["min"], 1) == round(a["max"], 1):
+                    return head
+                return "%s (%.1f to %.1f)%s" % (head, a["min"], a["max"], flag)
             n = a["n"]
             if a["min"] == a["max"]:
                 return "%s %.2f%s" % (quantity, a["median"], flag)
             if n < MIN_N_FOR_MEDIAN:
                 # Too few compounds for a median to mean anything.
-                return "%s %.1f-%.1f (n=%d)%s" % (
+                return "%s %.1f to %.1f (n=%d)%s" % (
                     quantity, a["min"], a["max"], n, flag)
-            return "%s ~%.1f (%.1f-%.1f)%s" % (
+            return "%s ~%.1f (%.1f to %.1f)%s" % (
                 quantity, a["median"], a["min"], a["max"], flag)
         return None
 
@@ -350,6 +366,17 @@ class Handbook:
         return tuple(sorted(atoms))
 
     # --------------------------------------------------------------- misc
+
+    def scale(self, quantity="pKBHX", moiety_ids=(), same_element_only=False):
+        """Where a moiety sits among every family on the `quantity` scale."""
+        from .scale import build_scale
+        return build_scale(self, quantity, moiety_ids, same_element_only)
+
+    def scale_text(self, quantity="pKBHX", moiety_ids=(),
+                   same_element_only=True, width=46):
+        from .scale import build_scale, text_scale
+        return text_scale(build_scale(self, quantity, moiety_ids,
+                                      same_element_only), width)
 
     def conflicts(self):
         """Values the extraction flagged as disagreeing between sources."""

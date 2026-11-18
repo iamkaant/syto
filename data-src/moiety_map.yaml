@@ -212,6 +212,50 @@ map:
     - hydrophobic_burial
     - ch_pi_alkyl_aryl
 
+# Some source entries deliberately lump several chemical families together
+# ("Alcohol / water / phenol O"). Quoting that whole range for one of them is
+# wrong, not merely vague: aliphatic alcohols sit near 1.0 while phenols sit
+# near 0.0, so a phenol shown as "0.4 (-0.3-1.1)" reads an order of magnitude
+# too basic. A subfamily narrows an entry to the values whose compound name
+# matches, and the statistics shown are computed over that subset.
+#
+# `match` keeps values whose compound contains any of these (case-insensitive);
+# `exclude` drops values containing any of them. Both may be given.
+subfamily:
+  phenol_oh:
+    entry: hbond_alcohol_phenol_o
+    match: [phenol]
+  phenol_oh_donor:
+    entry: hbond_alcohol_phenol_o
+    match: [phenol]
+  alcohol_oh:
+    entry: hbond_alcohol_phenol_o
+    exclude: [phenol, water]
+  alcohol_oh_donor:
+    entry: hbond_alcohol_phenol_o
+    exclude: [phenol, water]
+  water_o:
+    entry: hbond_alcohol_phenol_o
+    match: [water]
+  water_oh:
+    entry: hbond_alcohol_phenol_o
+    match: [water]
+  furan_o:
+    entry: hbond_furan_thiophene_pyrrole
+    match: [furan]
+  thioether_s:
+    entry: hbond_thioether_thiol_s
+    exclude: [thiol]
+  thiol_s:
+    entry: hbond_thioether_thiol_s
+    match: [thiol]
+  # NOTE: the azines are deliberately NOT narrowed. Pyrazine, pyrimidine and
+  # pyridazine are one chemical family whose spread (0.3-2.0) is exactly the
+  # context a picker wants beside the parent value; narrowing each to its own
+  # single compound replaced that with a useless "0.92 (0.9-0.9)".
+  # Narrowing is for entries that lump genuinely DIFFERENT families, such as
+  # alcohols with phenols.
+
 # The parent compound of a moiety, where the dataset contains it by name.
 # The family range stays on screen, but the unsubstituted parent is a far
 # better anchor than a median: the azine entry spans 0.3-2.0, while pyrazine
@@ -233,6 +277,9 @@ representative:
   thiophene_s: thiophene
   nitrile_n: Acetonitrile
   water_o: Water
+  phenol_oh: Phenol
+  alcohol_oh: Ethanol
+  thiol_s: Thiophenol
 
 # Interaction-type -> source entry, for the panel shown when a user clicks a
 # drawn interaction line rather than an atom.

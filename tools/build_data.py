@@ -256,6 +256,35 @@ def build(strict_release=False, write=True, quiet=False):
                     "ref": v.get("ref"), "note": v.get("note"),
                 })
 
+    # narrow lumped entries to the family the moiety actually belongs to
+    subfamily = {}
+    for mid, spec in (mp.get("subfamily", {}) or {}).items():
+        eid = (spec or {}).get("entry")
+        entry = ext_by_id.get(eid)
+        if entry is None:
+            errors.append("subfamily[%s]: no such entry %r" % (mid, eid))
+            continue
+        if mid not in moiety_map:
+            errors.append("subfamily[%s]: not in the moiety map" % mid)
+            continue
+        inc = [t.lower() for t in (spec.get("match") or [])]
+        exc = [t.lower() for t in (spec.get("exclude") or [])]
+        subset = {"values": []}
+        for v in iter_values(entry):
+            name = str(v.get("compound", "")).lower()
+            if inc and not any(t in name for t in inc):
+                continue
+            if exc and any(t in name for t in exc):
+                continue
+            subset["values"].append(v)
+        if not subset["values"]:
+            warnings.append("subfamily[%s]: matched no values in %s" % (mid, eid))
+            continue
+        stats = summarise_quantities(subset)
+        if stats:
+            subfamily[mid] = {"entry": eid, "stats": stats,
+                              "n_values": len(subset["values"])}
+
     # resolve each moiety's parent compound to a concrete cited value
     representative = {}
     for mid, compound in (mp.get("representative", {}) or {}).items():
@@ -303,6 +332,7 @@ def build(strict_release=False, write=True, quiet=False):
         "entries": entries,
         "by_moiety": by_moiety,
         "representative": representative,
+        "subfamily": subfamily,
         "always_relevant": always,
         "interaction_map": inter_map,
         "sources": sources,
@@ -317,6 +347,7 @@ def build(strict_release=False, write=True, quiet=False):
             "n_conflicts": len(conflicts),
             "flags": flag_counts,
             "n_representative": len(representative),
+            "n_subfamily": len(subfamily),
             "n_mapped_moieties": len(moiety_map),
             "n_unmapped_moieties": len(known - set(moiety_map)),
         },

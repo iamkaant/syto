@@ -88,6 +88,13 @@ class HandbookTool(HtmlToolInstance):
             }
         if st.last_hit is not None:
             snap["hit"] = st.last_hit.to_dict()
+            if hb is not None:
+                try:
+                    snap["scale"] = hb.scale(
+                        "pKBHX", st.last_hit.moiety_ids,
+                        same_element_only=not st.options.show_angles)
+                except Exception:
+                    snap["scale"] = None
         return snap
 
     # ------------------------------------------------------- UI -> state

@@ -90,6 +90,10 @@ description = "Text report of the current pose"
 category = "Binding Analysis"
 description = "Explain an atom automatically when it is selected"
 
+[chimerax.command."hitpick scale"]
+category = "Binding Analysis"
+description = "Show where the clicked atom sits on the basicity scale"
+
 [chimerax.command."hitpick clear"]
 category = "Binding Analysis"
 description = "Remove hitpick drawings"

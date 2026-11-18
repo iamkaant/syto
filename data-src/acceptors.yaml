@@ -225,12 +225,12 @@ entries:
     curation_status: needs_review
 
   - id: alcohol_oh
-    title: Hydroxyl oxygen
-    moiety_ids: [alcohol_oh, phenol_oh]
+    title: Aliphatic hydroxyl oxygen
+    moiety_ids: [alcohol_oh, alcohol_oh_donor]
     summary: >
-      A hydroxyl is both donor and acceptor. As an acceptor it is moderate; a
-      phenol OH is a weaker acceptor but a stronger donor than an aliphatic
-      alcohol.
+      An aliphatic hydroxyl is both donor and acceptor, and moderately good at
+      both. Electron-withdrawing substituents on the carbon collapse its
+      basicity: 2,2,2-trifluoroethanol is below zero while ethanol is near 1.0.
     basicity_rank: 5
     values:
       - quantity: pKBHX
@@ -241,6 +241,31 @@ entries:
     practical_notes:
       - "Being able to do both is why hydroxyls are so often conserved. Check
          whether it is satisfying BOTH roles in this pose."
+    curation_status: needs_review
+
+  - id: phenol_oh
+    title: Phenol oxygen
+    moiety_ids: [phenol_oh, phenol_oh_donor]
+    summary: >
+      A phenol oxygen is a much WEAKER acceptor than an aliphatic alcohol -
+      near zero on the pKBHX scale against about 1.0 for ethanol - because its
+      lone pair is delocalised into the ring. As a DONOR it is the other way
+      round: a phenol OH is more acidic and donates better than an alcohol.
+      Judge the two roles separately.
+    basicity_rank: 2
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry: {d_ideal: 2.80, d_min: 2.55, d_max: 3.35, ref: *geom_ref}
+    practical_notes:
+      - "If a pose relies on a phenol O accepting a hydrogen bond, be
+         sceptical - it is barely basic. The same OH donating is a much
+         stronger proposition."
+      - "Tyrosine's OH is the same group, and the most common place this
+         matters in a binding site."
+    see_also: [alcohol_oh]
     curation_status: needs_review
 
   - id: nitrile_n

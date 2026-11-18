@@ -136,8 +136,9 @@ def test_atom_labels_show_family_range_not_a_false_single_value():
     assert labels, "no pKBHX labels produced for a drug-like ligand"
     for text in labels.values():
         assert "pKBHX" in text
-        # a range or an exact single-compound value, never a bare mean
-        assert ("(" in text and "-" in text) or text.count(".") == 1
+        # a range, or a single cited value, but never a bare unqualified mean
+        assert ("(" in text and " to " in text) or "n=" in text \
+            or text.count(".") == 1
 
 
 @needs_hb
@@ -165,3 +166,55 @@ def test_flagged_values_are_counted():
         "crystal_statistics", "gas_phase_only", "value_conflict",
         "secondary_source", "secondary_citation", "read_from_image",
         "computed"}
+
+
+# ------------------------------------------------------- the basicity scale
+
+@needs_hb
+def test_scale_places_the_clicked_moiety_in_context():
+    """A lone number says nothing; the scale is the comparison."""
+    sc = hb.scale("pKBHX", ["pyrazine_n"], same_element_only=True)
+    assert sc, "no scale produced"
+    assert sc["min"] < sc["max"]
+    labels = [f["label"] for f in sc["families"]]
+    assert len(labels) >= 5, labels
+    hi = [f for f in sc["families"] if f["highlighted"]]
+    assert len(hi) == 1 and "azine" in hi[0]["label"], labels
+    # the marker is the parent compound's own value
+    assert sc["marker"] and abs(sc["marker"]["value"] - 0.92) < 0.01
+    # restricted to nitrogen families
+    assert all(f["element"] in ("N", "") for f in sc["families"]), labels
+    # every tick carries its compound, so the UI can label it on hover
+    for f in sc["families"]:
+        assert f["points"]
+        assert all("compound" in p and "value" in p for p in f["points"])
+
+
+@needs_hb
+def test_scale_orders_families_sensibly():
+    """Stronger acceptors first: the ordering is the point of the figure."""
+    sc = hb.scale("pKBHX", [], same_element_only=False)
+    labels = [f["label"] for f in sc["families"]]
+    def pos(name):
+        return next(i for i, l in enumerate(labels) if name in l)
+    # amines and imidazole above pyridine; pyridine above the azines
+    assert pos("imidazole N") < pos("pyridine N") < pos("azine N")
+    # carbonyls: amide above ester
+    assert pos("amide C=O") < pos("ester C=O")
+
+
+@needs_hb
+def test_scale_text_marks_the_selected_family():
+    lines = hb.scale_text("pKBHX", ["imidazole_n3"], same_element_only=True)
+    assert lines
+    marked = [l for l in lines if l.startswith(">")]
+    assert len(marked) == 1 and "imidazole" in marked[0]
+    assert any("2.42" in l or "pKBHX =" in l for l in lines)
+
+
+@needs_hb
+def test_scale_handles_a_moiety_with_no_data():
+    sc = hb.scale("pKBHX", ["hydrophobic"], same_element_only=True)
+    assert sc is not None
+    assert sc["marker"] is None
+    assert not any(f["highlighted"] for f in sc["families"])

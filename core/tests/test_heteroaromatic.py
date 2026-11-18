@@ -168,3 +168,75 @@ def test_substituted_pyrrole_type_n_is_not_an_acceptor():
     assert others
     neg = classify_non_acceptor(ms, others[0])
     assert neg and "sextet" in neg[1]
+
+
+# ------------------------------------------------- lumped-family narrowing
+
+LUMPED = [
+    # (SMILES, moiety, expected parent value, must NOT be confused with)
+    ("Oc1ccccc1", "phenol_oh", -0.07, 1.02),   # phenol vs ethanol
+    ("CCO",       "alcohol_oh", 1.02, -0.07),  # ethanol vs phenol
+]
+
+
+@pytest.mark.parametrize("smiles,mid,value,other", LUMPED)
+def test_lumped_entries_are_narrowed_to_the_right_family(smiles, mid, value, other):
+    """"Alcohol / water / phenol O" is one entry covering three families.
+
+    A phenol is near zero on the pKBHX scale and an aliphatic alcohol near
+    1.0; quoting the lumped range for either reads an order of magnitude
+    wrong. The statistics shown must come from that moiety's own family.
+    """
+    from hitpicking.handbook import Handbook
+    hb = Handbook.load_or_none()
+    if hb is None:
+        pytest.skip("handbook.json not built")
+
+    ms = build(smiles)
+    idx = next(i for i in range(ms.n_atoms)
+               if str(ms.element[i]) == "O"
+               and classify_acceptor(ms, i)
+               and classify_acceptor(ms, i)[0] == mid)
+
+    rep = hb.representative_for([mid], "pKBHX")
+    assert rep and abs(float(rep["value"]) - value) < 0.01, (mid, rep)
+
+    ann = [a for a in hb.for_atom(ms, idx).annotations
+           if a["quantity"] == "pKBHX"]
+    assert ann, mid
+    a = ann[0]
+    assert a.get("narrowed"), "%s was not narrowed to its own family" % mid
+    # Narrowing must actually drop values: the lumped entry has 16, the
+    # phenols 3. (The numeric ranges still overlap, and legitimately so -
+    # trifluoroethanol is as weak an acceptor as a phenol - so overlap is
+    # not the thing to assert on.)
+    full = hb.entry(a["entry"])["summary_stats"]["pKBHX"]["n"]
+    assert a["n"] < full, (mid, a["n"], full)
+    # and the two families' parent compounds must be far apart
+    assert abs(float(rep["value"]) - other) > 0.8, (mid, rep["value"], other)
+
+    label = hb.label_for_atom(ms, idx, "pKBHX")
+    assert ("%.2f" % value) in label, label
+
+
+def test_phenol_and_alcohol_do_not_share_a_narrative_entry():
+    from hitpicking.handbook import Handbook
+    hb = Handbook.load_or_none()
+    if hb is None:
+        pytest.skip("handbook.json not built")
+    ph = {e["id"] for e in hb.for_moiety("phenol_oh")}
+    al = {e["id"] for e in hb.for_moiety("alcohol_oh")}
+    assert "phenol_oh" in ph and "phenol_oh" not in al
+
+
+def test_single_value_families_show_no_pointless_range():
+    """"-0.40 (-0.4--0.4)" is noise, and the double minus is unreadable."""
+    from hitpicking.handbook import Handbook
+    hb = Handbook.load_or_none()
+    if hb is None:
+        pytest.skip("handbook.json not built")
+    ms = build("c1ccoc1")
+    idx = next(i for i in range(ms.n_atoms) if str(ms.element[i]) == "O")
+    label = hb.label_for_atom(ms, idx, "pKBHX")
+    assert label and "(" not in label, label
+    assert "--" not in label
