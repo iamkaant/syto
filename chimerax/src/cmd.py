@@ -73,12 +73,16 @@ def ensure_ui(session):
 def _pose_summary(result):
     if result is None:
         return None
-    return {
+    out = {
         "name": result.name,
         "counts": dict(result.counts),
         "n_interactions": len(result.interactions),
         "warnings": list(result.warnings),
     }
+    if result.strain is not None:
+        out["strain"] = result.strain.counts
+        out["worst_overlap"] = round(result.strain.worst_overlap, 2)
+    return out
 
 
 def _state_summary(st):
@@ -248,14 +252,20 @@ def _analyze_pose(session, st, lig):
                               include_weak_hbonds=st.options.include_weak_hbonds,
                               features=feats)
 
+    strain = None
+    if st.options.detect_strain:
+        from hitpicking.strain import analyze_strain
+        strain = analyze_strain(ms)
+
     from hitpicking.analysis import PoseResult
     n_rec = st.receptor_model.num_atoms
     st.result = PoseResult(lig.name, res.interactions, res.warnings,
-                           res.counts, {}, combined=ms, n_receptor=n_rec)
+                           res.counts, {}, combined=ms, n_receptor=n_rec,
+                           strain=strain)
 
     _redraw(session, st)
     session.logger.info("hitpick: %s -> %s"
-                        % (lig.name, render.legend_text(res.counts)))
+                        % (lig.name, st.result.summary()))
     for w in res.warnings:
         session.logger.warning("hitpick: " + w)
     st.notify()
@@ -519,6 +529,16 @@ def hitpick_report(session):
         log.info("   " + "  ".join(bits) + "   " + it.label)
         for f in it.flags:
             log.info("        ! " + f)
+    if r.strain is not None:
+        sr = r.strain
+        if sr.clashes or sr.internal or sr.findings:
+            log.info("   <b>clashes and strain</b>", is_html=True)
+        for c in sr.clashes + sr.internal:
+            log.info("   %-15s d=%.2f A  overlap %.2f A%s   %s"
+                     % (c.kind, c.distance, c.overlap,
+                        "  SEVERE" if c.severe else "", c.label))
+        for f in sr.findings:
+            log.info("   %-15s %s" % (f.severity, f.message))
     for w in r.warnings:
         log.warning("   " + w)
     return _pose_summary(r)

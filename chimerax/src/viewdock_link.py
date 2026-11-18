@@ -42,7 +42,8 @@ COL_HBONDS = "HP H-Bonds"
 COL_SALT = "HP Salt"
 COL_STACK = "HP Stack"
 COL_SCORE = "HP Quality"
-COLUMNS = (COL_HBONDS, COL_SALT, COL_STACK, COL_SCORE)
+COL_CLASH = "HP Clash"
+COLUMNS = (COL_HBONDS, COL_SALT, COL_STACK, COL_SCORE, COL_CLASH)
 
 # Keys written by earlier builds of this bundle. They used underscores, so
 # ViewDock's display_key turned "hitpick_hbonds" into "hitpick hbonds", which
@@ -290,6 +291,9 @@ def annotate_structure(session, structure, result, allowed=None):
         # Sum of geometric qualities: a crude "how much well-formed
         # interaction is there". Explicitly NOT an energy, never shown as one.
         COL_SCORE: round(sum(i.quality for i in result.interactions), 2),
+        # worst vdW overlap in Angstrom; blank when strain is switched off
+        COL_CLASH: (round(result.strain.worst_overlap, 2)
+                    if getattr(result, "strain", None) is not None else ""),
     }
     for title, v in values.items():
         if allowed is not None and title not in allowed:

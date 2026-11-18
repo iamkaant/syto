@@ -89,6 +89,7 @@ def from_structures(structures, ligand_structures=(), ligand_residues=None):
     lig_set = set(ligand_structures or ())
 
     all_atoms = []
+    radii = []
     xyz, element, name, hyb, arom, fchg = [], [], [], [], [], []
     part, res_name, res_seq, chain_id = [], [], [], []
     own_mb = []
@@ -99,6 +100,7 @@ def from_structures(structures, ligand_structures=(), ligand_residues=None):
         atoms = s.atoms
         offset[s] = n
         coords = atoms.scene_coords          # scene coords: models may be moved
+        at_radii = atoms.radii               # ChimeraX's own vdW radii
         els = atoms.element_names
         idatms = atoms.idatm_types
         names = atoms.names
@@ -111,6 +113,7 @@ def from_structures(structures, ligand_structures=(), ligand_residues=None):
             el = str(els[k])
             it = str(idatms[k]) if idatms[k] else ""
             xyz.append(coords[k])
+            radii.append(float(at_radii[k]))
             element.append(el)
             name.append(str(names[k])[:6])
             hyb.append(_hyb_from_idatm(it, el))
@@ -151,7 +154,11 @@ def from_structures(structures, ligand_structures=(), ligand_residues=None):
         res_name=np.asarray(res_name, dtype="<U4"),
         res_seq=np.asarray(res_seq, dtype=np.int32),
         chain_id=np.asarray(chain_id, dtype="<U2"),
-        meta={"source": "chimerax", "format": "chimerax"},
+        meta={"source": "chimerax", "format": "chimerax",
+              # Pass ChimeraX's per-atom radii through, so clash detection
+              # here agrees with the Clashes tool rather than quietly using
+              # a different radius table.
+              "vdw_radii": np.asarray(radii, dtype=np.float64)},
     )
 
     # ChimeraX's own ring perception is authoritative; trust it over ours.

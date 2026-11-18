@@ -56,8 +56,9 @@ class PoseResult:
     """Everything known about one pose."""
 
     def __init__(self, name, interactions, warnings, counts, scores=None,
-                 combined=None, n_receptor=0):
+                 combined=None, n_receptor=0, strain=None):
         self.name = name
+        self.strain = strain
         self.interactions = interactions
         self.warnings = warnings
         self.counts = counts
@@ -70,7 +71,7 @@ class PoseResult:
         return combined_index - self.n_receptor
 
     def to_dict(self):
-        return {
+        d = {
             "name": self.name,
             "counts": self.counts,
             "warnings": self.warnings,
@@ -78,11 +79,19 @@ class PoseResult:
             "n_receptor": self.n_receptor,
             "interactions": [i.to_dict() for i in self.interactions],
         }
+        if self.strain is not None:
+            d["strain"] = self.strain.to_dict()
+        return d
 
     def summary(self):
         parts = ["%s %d" % (k.replace("_", " "), v)
                  for k, v in sorted(self.counts.items())]
-        return "; ".join(parts) if parts else "no interactions detected"
+        out = "; ".join(parts) if parts else "no interactions detected"
+        if self.strain is not None:
+            c = self.strain.counts
+            if c["clashes"] or c["internal_clashes"] or c["strain_flags"]:
+                out += "  |  " + self.strain.summary()
+        return out
 
 
 class ReceptorContext:
@@ -192,5 +201,11 @@ class ReceptorContext:
         scores.update({k: v for k, v in ligand.meta.get("props", {}).items()
                        if isinstance(v, float)})
 
+        strain = None
+        if opts.detect_strain:
+            from .strain import analyze_strain
+            strain = analyze_strain(ms)
+
         return PoseResult(str(name).strip(), res.interactions, res.warnings,
-                          res.counts, scores, combined=ms, n_receptor=n_rec)
+                          res.counts, scores, combined=ms, n_receptor=n_rec,
+                          strain=strain)
