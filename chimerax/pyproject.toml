@@ -86,6 +86,10 @@ description = "Show the handbook entry for an atom"
 category = "Binding Analysis"
 description = "Text report of the current pose"
 
+[chimerax.command."hitpick autoexplain"]
+category = "Binding Analysis"
+description = "Explain an atom automatically when it is selected"
+
 [chimerax.command."hitpick clear"]
 category = "Binding Analysis"
 description = "Remove hitpick drawings"

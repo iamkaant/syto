@@ -194,7 +194,12 @@ def clear_atom_labels(session, all_atoms=None):
 
 
 def highlight(session, indices, all_atoms):
-    """Select the atoms of a moiety so the user can see what was clicked."""
+    """Select the atoms of a moiety so the user can see what was clicked.
+
+    Flags the change as ours: the handbook also listens for selection changes
+    to decide what the user clicked, and highlighting a moiety must not look
+    like a new click and recurse.
+    """
     from chimerax.atomic import Atoms
     try:
         sel = [all_atoms[int(i)] for i in indices
@@ -203,8 +208,14 @@ def highlight(session, indices, all_atoms):
         return 0
     if not sel:
         return 0
-    session.selection.clear()
-    Atoms(sel).selected = True
+    from .state import get_state
+    st = get_state(session)
+    st._suppress_selection = True
+    try:
+        session.selection.clear()
+        Atoms(sel).selected = True
+    finally:
+        st._suppress_selection = False
     return len(sel)
 
 

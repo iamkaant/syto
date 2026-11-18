@@ -50,10 +50,75 @@ def ensure_ui(session):
     except Exception as e:
         session.logger.info("hitpick: mouse mode unavailable (%s)" % e)
     try:
+        _install_selection_listener(session)
+    except Exception as e:
+        session.logger.info("hitpick: selection listener unavailable (%s)" % e)
+    try:
         from .viewdock_link import autohook
         autohook(session)
     except Exception as e:
         session.logger.info("hitpick: ViewDock link not established (%s)" % e)
+
+
+def _install_selection_listener(session):
+    """Explain an atom whenever the user selects exactly one.
+
+    Registering a mouse mode is not enough: a mode does nothing until it is
+    bound to a button, and silently rebinding the user's mouse would be
+    rude. Selecting an atom (ctrl-click, by default) already works out of the
+    box, so that is what drives the handbook.
+    """
+    from chimerax.core.selection import SELECTION_CHANGED
+    st = get_state(session)
+    if getattr(st, "_sel_handler", None) is not None:
+        return
+
+    def on_selection(trigger_name, data):
+        s = get_state(session)
+        if not s.options.handbook_on_click or s.molsys is None:
+            return
+        if getattr(s, "_suppress_selection", False):
+            return          # this selection is our own highlight, not a click
+        if s.handbook is None:
+            return
+        try:
+            sel = session.selection.items("atoms")
+        except Exception:
+            return
+        if not sel:
+            return
+        atoms = sel[0]
+        if len(atoms) != 1:
+            return           # a whole residue or more: not a moiety question
+        idx = s.atom_index(atoms[0])
+        if idx is None:
+            return
+        try:
+            hit = s.handbook.for_atom(s.molsys, idx)
+        except Exception as e:
+            session.logger.info("hitpick: %s" % e)
+            return
+        s.last_hit = hit
+        _log_hit(session, hit)
+        s.notify()
+
+    st._sel_handler = session.triggers.add_handler(SELECTION_CHANGED,
+                                                   on_selection)
+
+
+def hitpick_autoexplain(session, enable=True):
+    """Turn the explain-on-select behaviour on or off."""
+    ensure_ui(session)
+    st = get_state(session)
+    st.options.handbook_on_click = bool(enable)
+    session.logger.info("hitpick: explain-on-select is %s"
+                        % ("on" if enable else "off"))
+    return st.options.handbook_on_click
+
+
+hitpick_autoexplain_desc = CmdDesc(
+    optional=[("enable", BoolArg)],
+    synopsis="Explain an atom automatically when it is selected")
 
 
 # --------------------------------------------------------------------- setup
@@ -87,6 +152,10 @@ def hitpick_setup(session, receptor=None, ligand=None):
                     "tools/build_data.py in the source tree")
     else:
         log.info("hitpick: " + st.handbook.describe())
+
+    log.info("hitpick: select a single atom (ctrl-click) to see its handbook "
+             "entry. For a dedicated button: "
+             '<b>mousemode right "hit picking handbook"</b>', is_html=True)
 
     if ligand is not None:
         hitpick_analyze(session, ligand)
@@ -400,3 +469,5 @@ def register_commands(logger):
     register("hitpick explain", hitpick_explain_desc, hitpick_explain, logger=logger)
     register("hitpick report", hitpick_report_desc, hitpick_report, logger=logger)
     register("hitpick clear", hitpick_clear_desc, hitpick_clear, logger=logger)
+    register("hitpick autoexplain", hitpick_autoexplain_desc,
+             hitpick_autoexplain, logger=logger)

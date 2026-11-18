@@ -93,7 +93,11 @@ hitpick clear
 Open **Tools → Binding Analysis → Hit Picking Handbook** for the panel with
 per-type checkboxes and the clicked-atom entry.
 
-For click-to-explain in the 3D view:
+**Click-to-explain works out of the box**: select a single atom (ctrl-click)
+and its handbook entry appears in the log and the panel. Turn it off with
+`hitpick autoexplain false`.
+
+If you would rather have a dedicated mouse button than use selection:
 
 ```
 mousemode right "hit picking handbook"
