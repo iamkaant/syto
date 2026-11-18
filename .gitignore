@@ -17,3 +17,8 @@ core/hitpicking/data/handbook.json
 # local scratch
 scratch/
 *.log
+
+# vendored at build time by tools/vendor_core.py
+chimerax/src/_vendor/
+chimerax/dist/
+chimerax/build/

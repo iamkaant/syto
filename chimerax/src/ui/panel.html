@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hit Picking Handbook</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1d21; --muted: #6b7280; --line: #e3e6ea;
+    --card: #f7f8fa; --accent: #2563c9; --warn: #a2600a; --warn-bg: #fdf4e3;
+    --good: #1f8a4c;
+    --hbond: #5aa0ff; --salt: #eb6e3c; --stack: #be78e6; --cation: #f0b43c;
+    --halogen: #3cc8aa; --phobic: #aaaaaa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1e23; --fg: #e6e8eb; --muted: #9aa3ae; --line: #2d323a;
+      --card: #22262c; --accent: #6ba4f8; --warn: #e0b060; --warn-bg: #2e2718;
+      --good: #5fd08a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 12px 14px 32px;
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--fg);
+  }
+  h1 { font-size: 13px; letter-spacing: .04em; text-transform: uppercase;
+       color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  h2 { font-size: 12px; letter-spacing: .04em; text-transform: uppercase;
+       color: var(--muted); margin: 18px 0 8px; font-weight: 600;
+       border-top: 1px solid var(--line); padding-top: 12px; }
+  h2:first-of-type { border-top: none; }
+  .card { background: var(--card); border: 1px solid var(--line);
+          border-radius: 7px; padding: 10px 11px; margin-bottom: 9px; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .spread { justify-content: space-between; }
+  button {
+    font: inherit; background: var(--card); color: var(--fg); cursor: pointer;
+    border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  label.chk { display: flex; align-items: center; gap: 7px; padding: 3px 0;
+              cursor: pointer; user-select: none; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+  .muted { color: var(--muted); }
+  .tiny { font-size: 11.5px; }
+  .warn { background: var(--warn-bg); border-color: var(--warn);
+          color: var(--warn); }
+  .empty { color: var(--muted); font-style: italic; padding: 6px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  td { padding: 4px 3px; vertical-align: top;
+       border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  tr.ix { cursor: pointer; }
+  tr.ix:hover td { background: var(--card); }
+  .q { display: inline-block; width: 38px; height: 5px; border-radius: 3px;
+       background: var(--line); overflow: hidden; vertical-align: middle; }
+  .q > i { display: block; height: 100%; }
+  .pill { font-size: 10.5px; padding: 1px 6px; border-radius: 20px;
+          border: 1px solid var(--line); color: var(--muted); }
+  .flag { color: var(--warn); font-size: 11.5px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+         font-size: 11.5px; }
+  .entry { border-left: 2px solid var(--accent); padding-left: 9px;
+           margin: 9px 0; }
+  .entry h3 { font-size: 12.5px; margin: 0 0 3px; }
+  .val { font-variant-numeric: tabular-nums; }
+  .ref { font-size: 11px; color: var(--muted); word-break: break-all; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Hit Picking Handbook</h1>
+
+<div id="status" class="card tiny muted">Connecting&hellip;</div>
+
+<div class="row" style="gap:6px;margin-bottom:4px">
+  <button class="primary" onclick="hp('analyze')">Analyse pose</button>
+  <button onclick="hp('setup')">Re-read receptor</button>
+</div>
+
+<h2>Interactions shown</h2>
+<div class="card" id="toggles"></div>
+
+<h2>Display</h2>
+<div class="card">
+  <label class="chk"><input type="checkbox" id="opt-lengths"
+    onchange="hp('lengths',{on:this.checked?1:0})"> Lengths on interactions</label>
+  <label class="chk"><input type="checkbox" id="opt-angles"
+    onchange="hp('angles',{on:this.checked?1:0})"> Angles on interactions</label>
+  <div class="row" style="margin-top:7px;gap:6px">
+    <button onclick="hp('labels',{quantity:'pKBHX'})">Label pK<sub>BHX</sub></button>
+    <button onclick="hp('labels',{quantity:'off'})">Clear labels</button>
+  </div>
+</div>
+
+<h2>Current pose</h2>
+<div id="pose"></div>
+
+<h2>What you clicked</h2>
+<div id="hit"><p class="empty">Click an atom in the 3D view.</p></div>
+
+<script>
+// ---------------------------------------------------------------- bridge
+// ChimeraX: navigate to a custom scheme URL, caught by handle_scheme().
+// Web: the same calls go over postMessage to the Pyodide worker. The panel
+// itself does not know or care which host it is in.
+var HP_HOST = (window.hpHost || "chimerax");
+
+function hp(action, params) {
+  var q = [];
+  for (var k in (params || {})) {
+    q.push(encodeURIComponent(k) + "=" + encodeURIComponent(params[k]));
+  }
+  var url = "hitpick:/" + action + (q.length ? "?" + q.join("&") : "");
+  if (HP_HOST === "chimerax") {
+    window.location.href = url;
+  } else if (window.hpBridge) {
+    window.hpBridge.call(action, params || {});
+  }
+}
+
+var TYPES = [
+  ["hbond",             "Hydrogen bonds",        "var(--hbond)"],
+  ["hbond_charged",     "Charge-assisted H-bonds","var(--hbond)"],
+  ["salt_bridge",       "Salt bridges",          "var(--salt)"],
+  ["pi_stack_parallel", "Stacking (parallel)",   "var(--stack)"],
+  ["pi_stack_tshaped",  "Stacking (T-shaped)",   "var(--stack)"],
+  ["cation_pi",         "Cation&ndash;&pi;",     "var(--cation)"],
+  ["halogen_bond",      "Halogen bonds",         "var(--halogen)"],
+  ["weak_hbond",        "Weak C&ndash;H&middot;&middot;&middot;O", "var(--phobic)"],
+  ["hydrophobic",       "Hydrophobic contacts",  "var(--phobic)"]
+];
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+    return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"})[c];
+  });
+}
+
+function qbar(q) {
+  var pct = Math.round(Math.max(0, Math.min(1, q)) * 100);
+  var col = q > 0.66 ? "var(--good)" : (q > 0.4 ? "var(--cation)" : "var(--salt)");
+  return '<span class="q"><i style="width:' + pct + '%;background:' + col + '"></i></span>';
+}
+
+// ------------------------------------------------------------ rendering
+
+window.hpSetState = function (s) {
+  var st = document.getElementById("status");
+  if (!s.ready) {
+    st.className = "card tiny warn";
+    st.innerHTML = "No binding site prepared. Run <code>hitpick setup</code>.";
+  } else {
+    st.className = "card tiny muted";
+    st.innerHTML = (s.handbook ? esc(s.handbook) : "handbook not built")
+      + (s.viewdock ? " &middot; linked to ViewDock" : "");
+  }
+
+  var enabled = (s.options && s.options.enabled_nci) || [];
+  var html = "";
+  TYPES.forEach(function (t) {
+    var on = enabled.indexOf(t[0]) >= 0;
+    html += '<label class="chk"><input type="checkbox" ' + (on ? "checked" : "")
+      + ' onchange="hp(\'toggle\',{kind:\'' + t[0] + '\',on:this.checked?1:0})">'
+      + '<span class="swatch" style="background:' + t[2] + '"></span>'
+      + t[1] + '</label>';
+  });
+  document.getElementById("toggles").innerHTML = html;
+
+  if (s.options) {
+    document.getElementById("opt-lengths").checked = !!s.options.show_lengths;
+    document.getElementById("opt-angles").checked = !!s.options.show_angles;
+  }
+
+  renderPose(s.pose);
+  renderHit(s.hit);
+};
+
+function renderPose(p) {
+  var el = document.getElementById("pose");
+  if (!p) { el.innerHTML = '<p class="empty">Nothing analysed yet.</p>'; return; }
+  var h = '<div class="card"><div class="row spread"><b>' + esc(p.name) + '</b>'
+        + '<span class="pill">' + (p.interactions || []).length + ' shown</span></div>';
+  (p.warnings || []).forEach(function (w) {
+    h += '<div class="flag" style="margin-top:6px">' + esc(w) + '</div>';
+  });
+  h += '</div>';
+
+  if (!p.interactions || !p.interactions.length) {
+    h += '<p class="empty">No interactions of the selected types.</p>';
+  } else {
+    h += '<table>';
+    p.interactions.forEach(function (i) {
+      var ang = [];
+      for (var k in (i.angles || {})) {
+        if (i.angles[k] !== null) ang.push(k + " " + i.angles[k] + "&deg;");
+      }
+      h += '<tr class="ix" onclick="hp(\'highlight\',{atoms:\''
+        + (i.lig_atoms || []).concat(i.rec_atoms || []).join(",") + '\'})">'
+        + '<td style="width:40px">' + qbar(i.quality) + '</td>'
+        + '<td><b>' + esc(i.kind.replace(/_/g, " ")) + '</b>'
+        + ' <span class="muted val">' + i.distance + '&nbsp;&Aring;</span>'
+        + (ang.length ? ' <span class="muted tiny">' + ang.join(", ") + '</span>' : "")
+        + '<br><span class="tiny muted">' + esc(i.label) + '</span>'
+        + (i.flags || []).map(function (f) {
+            return '<br><span class="flag">! ' + esc(f) + '</span>'; }).join("")
+        + '</td></tr>';
+    });
+    h += '</table>';
+  }
+  el.innerHTML = h;
+}
+
+function renderHit(hit) {
+  var el = document.getElementById("hit");
+  if (!hit) {
+    el.innerHTML = '<p class="empty">Click an atom in the 3D view.</p>';
+    return;
+  }
+  var h = '<div class="card"><b>' + esc(hit.title) + '</b></div>';
+
+  (hit.warnings || []).forEach(function (w) {
+    h += '<div class="card warn tiny">' + esc(w) + '</div>';
+  });
+
+  (hit.annotations || []).forEach(function (a) {
+    h += '<div class="card"><div class="row spread">'
+      + '<b>' + esc(a.quantity) + '</b>'
+      + '<span class="val">median <b>' + a.median + '</b></span></div>'
+      + '<div class="tiny muted val">range ' + a.min + " to " + a.max
+      + " over " + a.n + " compounds"
+      + (a.n_flagged ? ' &middot; <span class="flag">' + a.n_flagged
+         + ' flagged for review</span>' : "") + '</div>'
+      + '<div class="tiny muted">' + esc(a.entry_title) + '</div></div>';
+  });
+
+  (hit.entries || []).slice(0, 6).forEach(function (e) {
+    h += '<div class="entry"><h3>' + esc(e.title || e.id) + '</h3>';
+    if (e.summary) {
+      h += '<p class="tiny">' + esc(e.summary) + '</p>';
+    }
+    (e.practical_notes || []).forEach(function (n) {
+      h += '<p class="tiny muted">&bull; ' + esc(n) + '</p>';
+    });
+    var g = e.geometry || {};
+    if (g.d_ideal) {
+      h += '<p class="tiny val muted">ideal ' + g.d_ideal + '&nbsp;&Aring;'
+        + (g.d_min ? " (" + g.d_min + "&ndash;" + g.d_max + ")" : "") + '</p>';
+    }
+    if (g.directionality) {
+      h += '<p class="tiny muted">' + esc(g.directionality) + '</p>';
+    }
+    var refs = {};
+    (e.values || []).forEach(function (v) {
+      if (v.ref && v.ref.doi) refs[v.ref.doi] = 1;
+    });
+    if (g.ref && g.ref.doi) refs[g.ref.doi] = 1;
+    var keys = Object.keys(refs);
+    if (keys.length) {
+      h += '<p class="ref">' + keys.map(function (d) {
+        return '<a href="https://doi.org/' + esc(d) + '" target="_blank">'
+          + esc(d) + '</a>'; }).join(" &middot; ") + '</p>';
+    }
+    h += '</div>';
+  });
+  el.innerHTML = h;
+}
+
+hp("ready");
+</script>
+</body>
+</html>

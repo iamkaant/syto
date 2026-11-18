@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hitpicking"
+version = "0.1.0"
+description = "Shared engine for the hit-picking helper: chemistry perception, scored non-covalent interactions, and a citation-backed interaction handbook"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Andrii Kyrylchuk" }]
+
+# numpy ONLY. No RDKit, no scipy, no torch, no pandas: this package has to
+# import cleanly inside ChimeraX's Python and inside Pyodide.
+dependencies = ["numpy>=1.21"]
+
+[project.optional-dependencies]
+# Development extras. RDKit is used solely to cross-check perception in the
+# test suite; nothing in the package imports it.
+dev = ["pytest>=7", "rdkit", "pyyaml"]
+
+[tool.setuptools]
+packages = [
+    "hitpicking",
+    "hitpicking.io",
+    "hitpicking.perceive",
+    "hitpicking.nci",
+    "hitpicking.handbook",
+]
+
+[tool.setuptools.package-data]
+"hitpicking" = ["data/*.json"]

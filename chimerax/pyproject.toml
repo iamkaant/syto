@@ -1,0 +1,87 @@
+[build-system]
+requires = ["ChimeraX-BundleBuilder>=1.3.0"]
+build-backend = "chimerax.bundle_builder.cx_pep517"
+
+[project]
+name = "ChimeraX-HitPickingTool"
+version = "0.1.0"
+license = { text = "MIT" }
+authors = [{ name = "Andrii Kyrylchuk" }]
+description = "Hit-picking helper: scored non-covalent interactions and a contextual molecular-interaction handbook, alongside ViewDock"
+dependencies = ["ChimeraX-Core>=1.9"]
+dynamic = ["classifiers", "requires-python"]
+
+[project.readme]
+content-type = "text/markdown"
+text = """
+Analyses one docked pose at a time: detects and scores hydrogen bonds, salt
+bridges, pi-stacking, cation-pi and halogen bonds against published geometric
+criteria, and shows a citation-backed handbook entry for whatever you click.
+
+The chemistry engine is the shared `hitpicking` package, used unchanged by the
+web front end, so both give identical answers.
+"""
+
+[chimerax]
+categories = ["Binding Analysis"]
+classifiers = []
+min-session-version = 1
+max-session-version = 1
+custom-init = true
+
+[chimerax.package-data]
+"src/ui" = ["*.html", "*.css", "*.js"]
+"src/_vendor" = ["README.txt"]
+"src/_vendor/hitpicking" = ["*.py", "data/*.json"]
+"src/_vendor/hitpicking/io" = ["*.py"]
+"src/_vendor/hitpicking/perceive" = ["*.py"]
+"src/_vendor/hitpicking/nci" = ["*.py"]
+"src/_vendor/hitpicking/handbook" = ["*.py"]
+
+[chimerax.tool."Hit Picking Handbook"]
+category = "Binding Analysis"
+description = "Contextual handbook and interaction panel for hit picking"
+
+[chimerax.command."hitpick setup"]
+category = "Binding Analysis"
+description = "Prepare a binding site for hit picking"
+
+[chimerax.command."hitpick analyze"]
+category = "Binding Analysis"
+description = "Analyse a docked pose and draw its interactions"
+
+[chimerax.command."hitpick analyse"]
+category = "Binding Analysis"
+description = "Analyse a docked pose and draw its interactions"
+
+[chimerax.command."hitpick show"]
+category = "Binding Analysis"
+description = "Enable interaction types"
+
+[chimerax.command."hitpick hide"]
+category = "Binding Analysis"
+description = "Disable interaction types"
+
+[chimerax.command."hitpick lengths"]
+category = "Binding Analysis"
+description = "Show or hide interaction lengths"
+
+[chimerax.command."hitpick angles"]
+category = "Binding Analysis"
+description = "Show or hide interaction angles"
+
+[chimerax.command."hitpick labels"]
+category = "Binding Analysis"
+description = "Label atoms with handbook values such as pKBHX"
+
+[chimerax.command."hitpick explain"]
+category = "Binding Analysis"
+description = "Show the handbook entry for an atom"
+
+[chimerax.command."hitpick report"]
+category = "Binding Analysis"
+description = "Text report of the current pose"
+
+[chimerax.command."hitpick clear"]
+category = "Binding Analysis"
+description = "Remove hitpick drawings"
