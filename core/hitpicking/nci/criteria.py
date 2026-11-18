@@ -31,10 +31,18 @@ class Criterion:
     """
 
     __slots__ = ("key", "label", "d_min", "d_ideal", "d_max", "angles",
-                 "energy", "refs", "curation_status", "notes")
+                 "energy", "refs", "curation_status", "notes",
+                 "distance_measure")
 
     def __init__(self, key, label, d_min, d_ideal, d_max, angles=None,
-                 energy=None, refs=(), curation_status=NEEDS_REVIEW, notes=""):
+                 energy=None, refs=(), curation_status=NEEDS_REVIEW, notes="",
+                 distance_measure="atoms"):
+        # Which distance the limits above refer to. Getting this wrong is not
+        # a detail: for parallel stacking the literature 3.4-3.8 A is the
+        # separation between the ring PLANES, while for T-shaped it is the
+        # centroid-to-centroid distance, and the two diverge as soon as the
+        # rings are laterally displaced.
+        self.distance_measure = distance_measure
         self.key = key
         self.label = label
         self.d_min = d_min
@@ -50,6 +58,7 @@ class Criterion:
 
     def to_dict(self):
         return {"key": self.key, "label": self.label,
+                "distance_measure": self.distance_measure,
                 "d_min": self.d_min, "d_ideal": self.d_ideal, "d_max": self.d_max,
                 "angles": self.angles, "energy": self.energy,
                 "refs": list(self.refs), "curation_status": self.curation_status,
@@ -134,7 +143,13 @@ SALT_BRIDGE = Criterion(
 
 PI_STACK_PARALLEL = Criterion(
     "pi_stack_parallel", "pi-stacking (parallel-displaced)",
-    d_min=3.20, d_ideal=3.80, d_max=5.50,
+    # NOTE these are the PERPENDICULAR separation of the two ring planes, not
+    # the centroid-to-centroid distance. Scoring the centroid distance here
+    # accepted rings 5 A apart as stacked (because a 5 A centroid separation
+    # sits inside a 5.5 A window) while rejecting a perfectly good 3.4 A stack
+    # that happened to be laterally displaced by 3 A.
+    d_min=2.90, d_ideal=3.50, d_max=4.20,
+    distance_measure="interplanar_separation",
     angles={
         # angle between the two ring planes; 0 = coplanar
         "interplanar": (30.0, 0.0),
@@ -142,15 +157,25 @@ PI_STACK_PARALLEL = Criterion(
     energy=(0.5, 1.5, 3.0),
     refs=("10.1074/jbc.273.25.15458", "10.1021/jm100112j"),
     notes=("Perfectly face-to-face (sandwich) stacking is NOT the minimum: "
-           "rings prefer a lateral offset of roughly 1.5 A. Offset is scored "
-           "separately from the centroid distance."),
+           "rings prefer a lateral offset of roughly 1.5 A, which is scored "
+           "separately. The reported distance is the plane separation; the "
+           "centroid distance is given alongside it."),
 )
-# Preferred lateral offset window (A) for parallel stacking.
-PI_STACK_OFFSET = (0.0, 1.5, 3.0)
+# Preferred lateral offset window (A) for parallel stacking. Parallel-displaced
+# geometries reach ~3 A of offset while still stacking, so the window runs
+# wider than the ~1.5 A optimum.
+PI_STACK_OFFSET = (0.0, 1.5, 3.5)
+# A zero-offset sandwich is a real stacking geometry, just a less favourable
+# one than parallel-displaced, so it scores here rather than at either
+# extreme of full marks or rejection.
+PI_STACK_OFFSET_FLOOR = 0.45
 
 PI_STACK_TSHAPED = Criterion(
     "pi_stack_tshaped", "pi-stacking (T-shaped / edge-to-face)",
+    # Here the centroid-to-centroid distance IS the right measure: the rings
+    # are perpendicular, so there is no meaningful plane separation.
     d_min=4.00, d_ideal=5.00, d_max=6.00,
+    distance_measure="centroid",
     angles={"interplanar": (60.0, 90.0)},
     energy=(0.5, 1.2, 2.5),
     refs=("10.1074/jbc.273.25.15458", "10.1021/jm100112j"),
@@ -164,7 +189,9 @@ PI_STACK_TSHAPED = Criterion(
 
 CATION_PI = Criterion(
     "cation_pi", "Cation-pi",
+    # cation to ring centroid
     d_min=3.00, d_ideal=4.30, d_max=6.00,
+    distance_measure="centroid",
     angles={
         # angle between the ring normal and the centroid->cation vector;
         # 0 deg means the cation sits directly over the ring face.

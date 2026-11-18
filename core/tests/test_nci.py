@@ -251,3 +251,71 @@ def test_results_are_json_serialisable():
     r = ctx.analyze(read_mol2(LIG, limit=1)[0])
     blob = json.dumps(r.to_dict())
     assert json.loads(blob)["name"]
+
+
+# ------------------------------------- what distance does stacking measure?
+
+def _stack(separation, offset, tilt=0.0):
+    """Two rings with a chosen PLANE separation and lateral offset."""
+    return _stacked_rings(sep=separation, offset=offset, tilt=tilt)
+
+
+def test_parallel_stacking_scores_plane_separation_not_centroid_distance():
+    """The literature 3.4-3.8 A for parallel stacking is between the PLANES.
+
+    Scoring the centroid distance instead accepted rings 5 A apart as a good
+    stack (a 5 A centroid separation sits inside a 5.5 A window) while
+    rejecting a real 3.4 A stack that happened to be displaced by 3 A.
+    """
+    assert C.PI_STACK_PARALLEL.distance_measure == "interplanar_separation"
+
+    # planes too far apart to stack, however they are aligned
+    for sep in (5.0, 5.4, 6.0):
+        res = detect_interactions(_stack(sep, 0.0),
+                                  enabled={"pi_stack_parallel"})
+        assert res.by_kind("pi_stack_parallel") == [], \
+            "rings %.1f A apart must not be a parallel stack" % sep
+
+    # a genuine stack that is laterally displaced is still a stack
+    hits = detect_interactions(_stack(3.4, 3.0),
+                              enabled={"pi_stack_parallel"}).by_kind("pi_stack_parallel")
+    assert hits, "a displaced 3.4 A stack was missed"
+    assert abs(hits[0].distance - 3.4) < 0.05, "reported distance is the separation"
+    assert hits[0].angles["centroid"] > hits[0].distance, \
+        "the centroid distance is reported alongside, and is larger"
+
+
+def test_tshaped_stacking_uses_centroid_distance():
+    """Perpendicular rings have no meaningful plane separation."""
+    assert C.PI_STACK_TSHAPED.distance_measure == "centroid"
+    hits = detect_interactions(_stack(0.0, 5.0, tilt=90.0),
+                               enabled={"pi_stack_tshaped"}).by_kind("pi_stack_tshaped")
+    assert hits
+    assert abs(hits[0].distance - 5.0) < 0.1
+
+
+def test_offset_ranking_matches_the_chemistry():
+    """Parallel-displaced beats the sandwich, which is still a real contact."""
+    def q(offset):
+        hits = detect_interactions(_stack(3.4, offset),
+                                   enabled={"pi_stack_parallel"}).by_kind("pi_stack_parallel")
+        return hits[0].quality if hits else 0.0
+
+    sandwich, ideal, wide = q(0.0), q(1.5), q(3.0)
+    assert ideal > sandwich > 0, (sandwich, ideal)
+    assert ideal > wide > 0, (wide, ideal)
+    # the sandwich is penalised but not thrown away
+    assert sandwich > 0.5
+
+
+def test_sandwich_is_flagged_for_the_user():
+    hits = detect_interactions(_stack(3.4, 0.0),
+                               enabled={"pi_stack_parallel"}).by_kind("pi_stack_parallel")
+    assert hits and any("sandwich" in f for f in hits[0].flags)
+
+
+def test_every_criterion_declares_what_its_distance_means():
+    for key, crit in C.ALL.items():
+        assert crit.distance_measure in (
+            "atoms", "centroid", "interplanar_separation"), (key,
+                                                             crit.distance_measure)

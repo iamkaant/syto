@@ -56,12 +56,23 @@ def angle_score(a, limit, ideal):
         return (limit - a) / (limit - ideal)
 
 
-def _window_score(v, lo, ideal, hi):
+def _window_score(v, lo, ideal, hi, floor=0.0):
+    """Triangular window: 1.0 at `ideal`, falling to `floor` at lo and hi.
+
+    `floor` exists for quantities whose extreme is unfavourable but still
+    real. A face-to-face sandwich has zero lateral offset and is a genuine
+    stacking geometry, just a worse one than parallel-displaced, so it should
+    score below the optimum rather than either scoring full marks (which the
+    old code did, because it returned 1.0 whenever v equalled lo) or being
+    rejected outright.
+    """
     if v < lo or v > hi:
         return 0.0
     if v <= ideal:
-        return 1.0 if ideal == lo else (v - lo) / (ideal - lo) if v > lo else 1.0
-    return (hi - v) / (hi - ideal) if hi > ideal else 1.0
+        frac = 1.0 if ideal <= lo else (v - lo) / (ideal - lo)
+    else:
+        frac = 1.0 if hi <= ideal else (hi - v) / (hi - ideal)
+    return floor + (1.0 - floor) * frac
 
 
 class Interaction:
@@ -329,17 +340,27 @@ def detect_pi_stacking(ms, feats, lig_mask, rec_mask):
         for rr in rec_rings:
             c2, n2 = ms.ring_plane(rr.atoms)
             v = c2 - c1
-            d = float(np.linalg.norm(v))
-            if d > max(C.PI_STACK_PARALLEL.d_max, C.PI_STACK_TSHAPED.d_max):
+            centroid_d = float(np.linalg.norm(v))
+            if centroid_d > max(C.PI_STACK_PARALLEL.d_max
+                                + C.PI_STACK_OFFSET[2],
+                                C.PI_STACK_TSHAPED.d_max):
                 continue
             cosang = abs(float(np.dot(n1, n2)))
             inter = float(np.degrees(np.arccos(min(1.0, max(-1.0, cosang)))))
-            # lateral offset: component of the centroid vector in the ring plane
-            along = abs(float(np.dot(v, n1)))
-            offset = float(np.sqrt(max(d * d - along * along, 0.0)))
+            # Separate the centroid vector into the part perpendicular to the
+            # ring plane and the part lying in it. For parallel stacking these
+            # are two independent facts - how close the planes are, and how
+            # far the rings slide past each other - and conflating them into
+            # one centroid distance is what let rings 5 A apart score as a
+            # good stack.
+            separation = abs(float(np.dot(v, n1)))
+            offset = float(np.sqrt(max(centroid_d ** 2 - separation ** 2, 0.0)))
 
             for crit, use_offset in ((C.PI_STACK_PARALLEL, True),
                                      (C.PI_STACK_TSHAPED, False)):
+                d = (separation
+                     if crit.distance_measure == "interplanar_separation"
+                     else centroid_d)
                 ds = distance_score(d, crit)
                 if ds <= 0:
                     continue
@@ -350,7 +371,8 @@ def detect_pi_stacking(ms, feats, lig_mask, rec_mask):
                 flags = []
                 if use_offset:
                     lo, ideal, hi = C.PI_STACK_OFFSET
-                    os_ = _window_score(offset, lo, ideal, hi)
+                    os_ = _window_score(offset, lo, ideal, hi,
+                                        floor=C.PI_STACK_OFFSET_FLOOR)
                     comp["offset"] = os_
                     if os_ <= 0:
                         continue
@@ -361,7 +383,8 @@ def detect_pi_stacking(ms, feats, lig_mask, rec_mask):
                 q = float(np.prod(vals)) ** (1.0 / len(vals))
                 out.append(Interaction(
                     crit.key, crit, lr.atoms, rr.atoms, d,
-                    {"interplanar": inter, "offset": offset}, q, comp, flags,
+                    {"interplanar": inter, "offset": offset,
+                     "centroid": centroid_d}, q, comp, flags,
                     (lr.moiety_id, rr.moiety_id),
                     label="ring %s ... %s" % (
                         ms.atom_label(lr.atoms[0]), ms.atom_label(rr.atoms[0])),
