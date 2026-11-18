@@ -247,7 +247,7 @@ window.hpSetState = function (s) {
 
   window.hpShowScale = s.options ? (s.options.show_scale !== false) : true;
   renderPose(s.pose);
-  renderHit(s.hit, s.scale);
+  renderHit(s.hit, s.scale, s.torsion);
 };
 
 function renderPose(p) {
@@ -378,7 +378,72 @@ function renderScale(sc) {
   return p.join("");
 }
 
-function renderHit(hit, scale) {
+function renderTorsion(tp) {
+  if (!tp || !tp.curve || !tp.curve.length) return "";
+  var W = 430, H = 150, L = 42, R = 12, T = 12, B = 30;
+  var xs = tp.curve.map(function (p) { return p.angle; });
+  var hiY = Math.max.apply(null, tp.curve.map(function (p) { return p.q3; }));
+  hiY = Math.max(hiY, 1);
+  var loX = Math.min.apply(null, xs), hiX = Math.max.apply(null, xs);
+  function X(a) { return L + (a - loX) / ((hiX - loX) || 1) * (W - L - R); }
+  function Y(e) { return T + (1 - e / hiY) * (H - T - B); }
+
+  var p = ['<div class="scale"><svg viewBox="0 0 ' + W + " " + H
+           + '" preserveAspectRatio="xMidYMin meet">'];
+
+  // interquartile band: the spread matters as much as the median
+  var up = tp.curve.map(function (c) { return X(c.angle) + "," + Y(c.q3); });
+  var dn = tp.curve.slice().reverse().map(function (c) {
+    return X(c.angle) + "," + Y(c.q1); });
+  p.push('<polygon points="' + up.concat(dn).join(" ")
+    + '" fill="var(--accent)" opacity="0.14"/>');
+
+  // median curve
+  p.push('<polyline fill="none" stroke="var(--accent)" stroke-width="1.8" '
+    + 'points="' + tp.curve.map(function (c) {
+        return X(c.angle) + "," + Y(c.median); }).join(" ") + '"/>');
+
+  // axes
+  p.push('<line x1="' + L + '" y1="' + Y(0) + '" x2="' + (W - R) + '" y2="'
+    + Y(0) + '" stroke="var(--line)"/>');
+  for (var a = loX; a <= hiX; a += 30) {
+    p.push('<text class="ax" x="' + X(a) + '" y="' + (H - 14)
+      + '" text-anchor="middle">' + a + "</text>");
+  }
+  [0, hiY / 2, hiY].forEach(function (e) {
+    p.push('<text class="ax" x="' + (L - 5) + '" y="' + (Y(e) + 3)
+      + '" text-anchor="end">' + e.toFixed(1) + "</text>");
+  });
+  p.push('<text class="ax" x="' + ((L + W - R) / 2) + '" y="' + (H - 2)
+    + '" text-anchor="middle">' + esc(tp.x_label) + "</text>");
+
+  // where this bond sits
+  if (tp.marker) {
+    var mx = X(tp.marker.angle);
+    p.push('<line x1="' + mx + '" y1="' + T + '" x2="' + mx + '" y2="' + Y(0)
+      + '" stroke="var(--salt)" stroke-width="1.5" stroke-dasharray="3 2"/>');
+    if (tp.marker.energy !== null && tp.marker.energy !== undefined) {
+      p.push('<circle cx="' + mx + '" cy="' + Y(tp.marker.energy)
+        + '" r="3" fill="var(--salt)"/>');
+    }
+  }
+  p.push("</svg></div>");
+
+  var note = esc(tp.label) + " &middot; " + tp.n_scans + " QM scans";
+  if (tp.marker) {
+    note += " &middot; measured " + tp.marker.measured + "&deg;";
+    if (tp.marker.energy !== null && tp.marker.energy !== undefined) {
+      note += ", costing <b>" + tp.marker.energy + " kcal/mol</b>";
+    }
+  }
+  if (!tp.exact) note += ' &middot; <span class="flag">indicative only</span>';
+  p.push('<div class="scale-note">' + note
+    + " &middot; band is the interquartile range &middot; gas-phase QM, an "
+    + "intrinsic cost rather than a verdict</div>");
+  return p.join("");
+}
+
+function renderHit(hit, scale, torsion) {
   var el = document.getElementById("hit");
   if (!hit) {
     el.innerHTML = '<p class="empty">Click an atom in the 3D view.</p>';
@@ -389,6 +454,10 @@ function renderHit(hit, scale) {
   var sv = (window.hpShowScale === false) ? "" : renderScale(scale);
   if (sv) {
     h += '<h2 style="border:none;padding-top:4px">Basicity scale</h2>' + sv;
+  }
+  var tv = (window.hpShowScale === false) ? "" : renderTorsion(torsion);
+  if (tv) {
+    h += '<h2 style="border:none;padding-top:4px">Torsion profile</h2>' + tv;
   }
 
   (hit.warnings || []).forEach(function (w) {

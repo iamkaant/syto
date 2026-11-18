@@ -443,6 +443,64 @@ hitpick_panel_desc = CmdDesc(
     synopsis="Detach or re-dock the handbook panel")
 
 
+def hitpick_torsionprofile(session, all=False):
+    """Plot the QM energy profile for the torsions of this pose."""
+    ensure_ui(session)
+    st = get_state(session)
+    if st.result is None or st.result.strain is None:
+        raise UserError("nothing analysed yet; run: hitpick analyze")
+    from hitpicking.strain import torsions as T
+    if T.qm_reference() is None:
+        raise UserError(
+            "no QM torsion reference built. Run tools/fetch_qm_torsions.py "
+            "then tools/build_torsion_profiles.py")
+
+    ts = st.result.strain.torsions
+    shown = 0
+    seen = set()
+    ms = st.molsys
+    for t in sorted(ts, key=lambda x: (not x.flagged, x.subtype or "")):
+        if not (all or t.flagged):
+            continue
+        key = (t.bond_type, t.subtype, t.ortho_substituted)
+        if key in seen and not all:
+            continue
+        seen.add(key)
+        view = T.profile_view(t.bond_type, t.subtype, t.ortho_substituted,
+                              t.angle)
+        if view is None:
+            continue
+        session.logger.info(
+            "<b>%s &mdash; %s</b>"
+            % (view["label"], "%s - %s" % (ms.atom_label(t.bond[0]),
+                                           ms.atom_label(t.bond[1]))),
+            is_html=True)
+        for line in T.profile_text(view):
+            session.logger.info(line.replace(" ", "&nbsp;"), is_html=True)
+        shown += 1
+    if not shown:
+        session.logger.info(
+            "hitpick: no torsion in this pose has a QM profile"
+            + ("" if all else " among the flagged ones; try "
+               "'hitpick torsionprofile true'"))
+    else:
+        qm = T.qm_reference()
+        src = (qm.get("attribution", {}) or {})
+        session.logger.info(
+            "relaxed QM torsion drives from %s, %s"
+            % (src.get("source", "QCArchive"),
+               src.get("dataset_licence", "see attribution")))
+        session.logger.info(
+            "gas-phase and intrinsic: a protein may well pay a couple of "
+            "kcal/mol for a better contact.")
+    return {"profiles": shown}
+
+
+hitpick_torsionprofile_desc = CmdDesc(
+    optional=[("all", BoolArg)],
+    synopsis="Plot the QM energy profile for this pose's torsions")
+
+
 def hitpick_hover(session, show=True):
     """Put hitpick detail in ChimeraX's hover balloon, or give it back."""
     ensure_ui(session)
@@ -491,8 +549,9 @@ def hitpick_torsions(session, all=False):
             continue
         shown += 1
         mark = "!" if t.flagged else " "
-        log.info("  %s %-16s %7.1f deg   %s - %s"
-                 % (mark, t.subtype or t.bond_type, t.angle,
+        cost = ("  %+.1f kcal/mol" % t.energy) if t.energy is not None else ""
+        log.info("  %s %-16s %7.1f deg%s   %s - %s"
+                 % (mark, t.subtype or t.bond_type, t.angle, cost,
                     ms.atom_label(t.bond[0]), ms.atom_label(t.bond[1])))
         if t.note:
             log.info("      %s" % t.note)
@@ -777,6 +836,8 @@ def register_commands(logger):
     register("hitpick torsions", hitpick_torsions_desc, hitpick_torsions,
              logger=logger)
     register("hitpick hover", hitpick_hover_desc, hitpick_hover, logger=logger)
+    register("hitpick torsionprofile", hitpick_torsionprofile_desc,
+             hitpick_torsionprofile, logger=logger)
     register("hitpick panel", hitpick_panel_desc, hitpick_panel, logger=logger)
     register("hitpick width", hitpick_width_desc, hitpick_width, logger=logger)
     register("hitpick scaleplot", hitpick_scaleplot_desc, hitpick_scaleplot,

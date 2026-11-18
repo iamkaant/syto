@@ -453,6 +453,124 @@ def analyze_torsions(ms, ligand_only=True):
     return out
 
 
+# ---------------------------------------------------------------- display
+
+
+def profile_view(bond_type, subtype, ortho, angle=None):
+    """The QM energy profile for this bond class, ready to plot.
+
+    The analogue of the basicity scale: a single number says little, and the
+    shape is the useful part. A flat-bottomed curve means the angle barely
+    matters; a steep one means it does.
+    """
+    found = _qm_class(bond_type, subtype, ortho)
+    if not found:
+        return None
+    cls, exact = found
+    curve = []
+    for k in sorted(cls["curve"], key=lambda x: int(x)):
+        s = cls["curve"][k]
+        curve.append({"angle": int(k), "median": s["median"],
+                      "q1": s["q1"], "q3": s["q3"], "n": s["n"]})
+    if not curve:
+        return None
+    marker = None
+    if angle is not None:
+        folded = _fold_for_class(angle, bond_type)
+        cost = qm_cost(bond_type, subtype, ortho, angle)
+        marker = {"angle": round(folded, 1),
+                  "measured": round(float(angle), 1),
+                  "energy": None if cost is None else round(cost[0], 2)}
+    name = "%s|%s|%s" % (cls["bond_type"], cls["subtype"] or "-",
+                         "ortho" if cls["ortho_substituted"] else "no-ortho")
+    qm = qm_reference() or {}
+    return {
+        "class": name,
+        "label": "%s%s" % (cls["subtype"] or cls["bond_type"],
+                           ", ortho-substituted" if cls["ortho_substituted"]
+                           else ""),
+        "coordinate": cls.get("coordinate", ""),
+        "x_label": ("degrees from eclipsed" if bond_type == SP3_SP3
+                    else "degrees out of plane"),
+        "n_scans": cls["n_scans"],
+        "curve": curve,
+        "marker": marker,
+        "exact": exact,
+        "barrier": cls.get("barrier", {}),
+        "preferred_angle": cls.get("preferred_angle", {}),
+        "units": "kcal/mol",
+        "source": (qm.get("attribution", {}) or {}).get("source", ""),
+    }
+
+
+def profile_text(view, width=46, height=11):
+    """An ASCII plot of a torsion profile, for the log.
+
+    Same idea as the text basicity scale: the shape, with your angle marked.
+    """
+    if not view:
+        return []
+    curve = view["curve"]
+    xs = [p["angle"] for p in curve]
+    ys = [p["median"] for p in curve]
+    lo_x, hi_x = min(xs), max(xs)
+    hi_y = max(max(ys), 0.5)
+    span_x = (hi_x - lo_x) or 1
+
+    def cx(a):
+        return int(round((a - lo_x) / span_x * (width - 1)))
+
+    def cy(e):
+        return int(round((1.0 - e / hi_y) * (height - 1)))
+
+    grid = [[" "] * width for _ in range(height)]
+    # interquartile band first, so the median line draws over it
+    for p in curve:
+        x = cx(p["angle"])
+        y1, y2 = sorted((cy(p["q1"]), cy(p["q3"])))
+        for y in range(y1, y2 + 1):
+            if 0 <= y < height:
+                grid[y][x] = ":"
+    for p in curve:
+        x, y = cx(p["angle"]), cy(p["median"])
+        if 0 <= y < height:
+            grid[y][x] = "*"
+
+    marker = view.get("marker")
+    mx = cx(marker["angle"]) if marker else None
+    if mx is not None:
+        for y in range(height):
+            if grid[y][mx] == " ":
+                grid[y][mx] = "|"
+
+    out = []
+    out.append("    %s  %s" % (view["label"],
+                               "" if view["exact"] else "(indicative only)"))
+    for y, row in enumerate(grid):
+        energy = hi_y * (1.0 - y / float(height - 1))
+        label = "%5.1f" % energy if y % 2 == 0 else "     "
+        out.append("  %s |%s" % (label, "".join(row)))
+    axis = ["-"] * width
+    out.append("        +%s" % "".join(axis))
+    ticks = [" "] * width
+    for a in range(lo_x, hi_x + 1, 30):
+        lab = str(a)
+        # keep the last tick inside the plot: "90" was rendering as "9"
+        x = min(cx(a), width - len(lab))
+        for k, ch in enumerate(lab):
+            if 0 <= x + k < width:
+                ticks[x + k] = ch
+    out.append("         %s" % "".join(ticks))
+    out.append("         %s (kcal/mol on the left, %d scans)"
+               % (view["x_label"], view["n_scans"]))
+    if marker:
+        e = marker["energy"]
+        out.append("    measured %+.0f deg -> %s deg from the minimum%s"
+                   % (marker["measured"], marker["angle"],
+                      "" if e is None else ", costing %.1f kcal/mol" % e))
+    return out
+
+
 def torsion_summary(torsions):
     flagged = [t for t in torsions if t.flagged]
     unjudged = [t for t in torsions if t.assessment == UNJUDGED]

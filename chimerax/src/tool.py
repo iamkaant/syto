@@ -93,6 +93,7 @@ class HandbookTool(HtmlToolInstance):
             }
         if st.last_hit is not None:
             snap["hit"] = st.last_hit.to_dict()
+            snap["torsion"] = self._torsion_profile(st)
             if hb is not None and st.options.show_scale:
                 try:
                     snap["scale"] = hb.scale(
@@ -174,6 +175,37 @@ class HandbookTool(HtmlToolInstance):
                     run(session, c)
         except Exception as e:
             session.logger.warning("hitpick panel: %s" % e)
+
+    def _torsion_profile(self, st):
+        """The QM profile for a clicked bond, or for the worst torsion."""
+        if st.result is None or st.result.strain is None:
+            return None
+        if not st.options.show_scale:
+            return None
+        from hitpicking.strain import torsions as T
+        if T.qm_reference() is None:
+            return None
+        ts = st.result.strain.torsions
+        if not ts:
+            return None
+        chosen = None
+        hit = st.last_hit
+        if hit is not None and hit.atom is not None:
+            # a torsion whose central bond touches the clicked atom
+            for t in ts:
+                if hit.atom in t.bond:
+                    chosen = t
+                    break
+        if chosen is None:
+            flagged = [t for t in ts if t.flagged]
+            chosen = flagged[0] if flagged else None
+        if chosen is None:
+            return None
+        try:
+            return T.profile_view(chosen.bond_type, chosen.subtype,
+                                  chosen.ortho_substituted, chosen.angle)
+        except Exception:
+            return None
 
     def float_window(self, floating=True):
         """Detach the panel so it can be widened into two columns."""

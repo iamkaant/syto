@@ -122,6 +122,10 @@ description = "Detach or re-dock the handbook panel"
 category = "Binding Analysis"
 description = "Set the thickness of interaction and clash lines"
 
+[chimerax.command."hitpick torsionprofile"]
+category = "Binding Analysis"
+description = "Plot the QM energy profile for this pose's torsions"
+
 [chimerax.command."hitpick clear"]
 category = "Binding Analysis"
 description = "Remove hitpick drawings"
