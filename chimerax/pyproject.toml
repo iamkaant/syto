@@ -98,6 +98,14 @@ description = "Show where the clicked atom sits on the basicity scale"
 category = "Binding Analysis"
 description = "Show or hide van der Waals clashes"
 
+[chimerax.command."hitpick limits"]
+category = "Binding Analysis"
+description = "Show the literature limits alongside each measured value"
+
+[chimerax.command."hitpick scaleplot"]
+category = "Binding Analysis"
+description = "Show or hide the basicity scale plot in the panel"
+
 [chimerax.command."hitpick clear"]
 category = "Binding Analysis"
 description = "Remove hitpick drawings"

@@ -74,6 +74,14 @@
   .scale .lbl.on { fill: var(--fg); font-weight: 600; }
   .scale .ax { font-size: 8px; fill: var(--muted); }
   .scale-note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .band { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+          margin-right: 4px; vertical-align: middle; }
+  .band.good { background: #1e8c46; }
+  .band.marginal { background: #c88214; }
+  .band.edge { background: #c83228; }
+  .lim { color: var(--muted); font-size: 11px; }
+  .legend { font-size: 11px; color: var(--muted); margin: 4px 0 0; }
+  .legend span { margin-right: 10px; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -96,10 +104,21 @@
     onchange="hp('lengths',{on:this.checked?1:0})"> Lengths on interactions</label>
   <label class="chk"><input type="checkbox" id="opt-angles"
     onchange="hp('angles',{on:this.checked?1:0})"> Angles on interactions</label>
+  <label class="chk"><input type="checkbox" id="opt-limits"
+    onchange="hp('limits',{on:this.checked?1:0})">
+    Show the limits in the labels</label>
   <label class="chk"><input type="checkbox" id="opt-clashes"
     onchange="hp('clashes',{on:this.checked?1:0})">
     <span class="swatch" style="background:#e64646"></span>
     Clashes and strain</label>
+  <label class="chk"><input type="checkbox" id="opt-scale"
+    onchange="hp('scaleplot',{on:this.checked?1:0})">
+    Basicity scale plot</label>
+  <div class="legend">
+    <span><i class="band good"></i>within limits</span>
+    <span><i class="band marginal"></i>off ideal</span>
+    <span><i class="band edge"></i>only just inside</span>
+  </div>
   <div class="row" style="margin-top:7px;gap:6px">
     <button onclick="hp('labels',{quantity:'pKBHX'})">Label pK<sub>BHX</sub></button>
     <button onclick="hp('labels',{quantity:'off'})">Clear labels</button>
@@ -185,8 +204,13 @@ window.hpSetState = function (s) {
     document.getElementById("opt-angles").checked = !!s.options.show_angles;
     var oc = document.getElementById("opt-clashes");
     if (oc) oc.checked = !!s.options.show_clashes;
+    var ol = document.getElementById("opt-limits");
+    if (ol) ol.checked = !!s.options.show_limits;
+    var os = document.getElementById("opt-scale");
+    if (os) os.checked = s.options.show_scale !== false;
   }
 
+  window.hpShowScale = s.options ? (s.options.show_scale !== false) : true;
   renderPose(s.pose);
   renderHit(s.hit, s.scale);
 };
@@ -222,16 +246,28 @@ function renderPose(p) {
   } else {
     h += '<table>';
     p.interactions.forEach(function (i) {
-      var ang = [];
+      var terms = [];
+      var lim = i.limits || {};
+      function band(v) {
+        return v >= 0.55 ? "good" : (v >= 0.25 ? "marginal" : "edge");
+      }
+      var dband = band((i.components || {}).distance != null
+                       ? i.components.distance : i.quality);
+      terms.push('<i class="band ' + dband + '"></i>' + i.distance
+        + "&nbsp;&Aring;"
+        + (lim.distance ? ' <span class="lim">[' + lim.distance + "]</span>" : ""));
       for (var k in (i.angles || {})) {
-        if (i.angles[k] !== null) ang.push(k + " " + i.angles[k] + "&deg;");
+        if (i.angles[k] === null) continue;
+        var b = band((i.components || {})[k] != null ? i.components[k] : 1);
+        terms.push('<i class="band ' + b + '"></i>' + esc(k) + " "
+          + i.angles[k] + "&deg;"
+          + (lim[k] ? ' <span class="lim">[' + lim[k] + "]</span>" : ""));
       }
       h += '<tr class="ix" onclick="hp(\'highlight\',{atoms:\''
         + (i.lig_atoms || []).concat(i.rec_atoms || []).join(",") + '\'})">'
         + '<td style="width:40px">' + qbar(i.quality) + '</td>'
-        + '<td><b>' + esc(i.kind.replace(/_/g, " ")) + '</b>'
-        + ' <span class="muted val">' + i.distance + '&nbsp;&Aring;</span>'
-        + (ang.length ? ' <span class="muted tiny">' + ang.join(", ") + '</span>' : "")
+        + '<td><b>' + esc(i.kind.replace(/_/g, " ")) + '</b><br>'
+        + '<span class="val tiny">' + terms.join(" &nbsp; ") + "</span>"
         + '<br><span class="tiny muted">' + esc(i.label) + '</span>'
         + (i.flags || []).map(function (f) {
             return '<br><span class="flag">! ' + esc(f) + '</span>'; }).join("")
@@ -315,7 +351,7 @@ function renderHit(hit, scale) {
   }
   var h = '<div class="card"><b>' + esc(hit.title) + '</b></div>';
 
-  var sv = renderScale(scale);
+  var sv = (window.hpShowScale === false) ? "" : renderScale(scale);
   if (sv) {
     h += '<h2 style="border:none;padding-top:4px">Basicity scale</h2>' + sv;
   }

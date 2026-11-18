@@ -93,6 +93,19 @@ class Interaction:
         self.key_pair = (tuple(sorted(key_pair)) if key_pair else None)
 
     @property
+    def limits(self):
+        """The literature envelope each measured term is judged against.
+
+        Carried alongside the values so a front end can show "2.80 [2.4-3.5]"
+        without having to know the criteria tables.
+        """
+        c = self.criterion
+        out = {"distance": "%g-%g" % (round(c.d_min, 2), round(c.d_max, 2))}
+        for name, (limit, ideal) in (c.angles or {}).items():
+            out[name] = ("%g+" % limit) if ideal >= limit else ("<%g" % limit)
+        return out
+
+    @property
     def energy_estimate(self):
         """(low, typical, high) kcal/mol scaled by geometric quality.
 
@@ -120,6 +133,7 @@ class Interaction:
                            if v is not None},
             "energy_estimate": self.energy_estimate,
             "flags": list(self.flags),
+            "limits": self.limits,
             "moiety_ids": list(self.moiety_ids),
             "curation_status": self.criterion.curation_status,
             "water_mediated": self.water_mediated,

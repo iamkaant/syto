@@ -301,17 +301,20 @@ def _redraw(session, st):
     render.draw_interactions(
         session, st.result.interactions, st.all_atoms,
         show_lengths=st.options.show_lengths,
-        show_angles=st.options.show_angles)
+        show_angles=st.options.show_angles,
+        show_limits=st.options.show_limits)
     render.label_interactions(session,
                               show_lengths=st.options.show_lengths,
-                              show_angles=st.options.show_angles)
+                              show_angles=st.options.show_angles,
+                              show_limits=st.options.show_limits)
     if st.options.show_clashes:
         drawn = render.draw_clashes(session, st.result.strain, st.all_atoms,
                                     show_overlap=st.options.show_lengths)
         if drawn and st.options.show_lengths:
             render.label_interactions(
                 session, show_lengths=st.options.show_lengths,
-                show_angles=st.options.show_angles)
+                show_angles=st.options.show_angles,
+                show_limits=st.options.show_limits)
     else:
         render.clear_groups(session, render.CLASH_KINDS)
     if st.options.show_strain_labels and st.options.annotate_atom_values is False:
@@ -384,6 +387,42 @@ def hitpick_lengths(session, show=True):
 
 hitpick_lengths_desc = CmdDesc(optional=[("show", BoolArg)],
                                synopsis="Show or hide interaction lengths")
+
+
+def hitpick_limits(session, show=True):
+    """Put the literature limits in the label text, not just in its colour."""
+    ensure_ui(session)
+    st = get_state(session)
+    st.options.show_limits = bool(show)
+    if st.result is not None:
+        _redraw(session, st)
+    session.logger.info(
+        "hitpick: limits are %s in the labels. Label colour always shows "
+        "how the geometry sits in its envelope: green comfortably inside, "
+        "amber well off ideal, red only just inside."
+        % ("shown" if show else "hidden"))
+    return st.options.show_limits
+
+
+hitpick_limits_desc = CmdDesc(
+    optional=[("show", BoolArg)],
+    synopsis="Show the literature limits alongside each measured value")
+
+
+def hitpick_scaleplot(session, show=True):
+    """Show or hide the basicity scale plot in the panel."""
+    ensure_ui(session)
+    st = get_state(session)
+    st.options.show_scale = bool(show)
+    st.notify()
+    session.logger.info("hitpick: basicity scale plot is %s"
+                        % ("shown" if show else "hidden"))
+    return st.options.show_scale
+
+
+hitpick_scaleplot_desc = CmdDesc(
+    optional=[("show", BoolArg)],
+    synopsis="Show or hide the basicity scale plot in the panel")
 
 
 def hitpick_clashes(session, show=True):
@@ -608,4 +647,8 @@ def register_commands(logger):
              hitpick_autoexplain, logger=logger)
     register("hitpick scale", hitpick_scale_desc, hitpick_scale, logger=logger)
     register("hitpick clashes", hitpick_clashes_desc, hitpick_clashes,
+             logger=logger)
+    register("hitpick limits", hitpick_limits_desc, hitpick_limits,
+             logger=logger)
+    register("hitpick scaleplot", hitpick_scaleplot_desc, hitpick_scaleplot,
              logger=logger)

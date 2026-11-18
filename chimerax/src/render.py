@@ -73,7 +73,7 @@ def _quality_style(quality, kind):
 
 
 def draw_interactions(session, interactions, all_atoms, show_lengths=True,
-                      show_angles=False, min_quality=0.0):
+                      show_angles=False, min_quality=0.0, show_limits=False):
     """Draw each interaction as a pseudobond, grouped by type.
 
     Ring-centroid interactions (stacking, cation-pi) have no single atom to
@@ -109,7 +109,8 @@ def draw_interactions(session, interactions, all_atoms, show_lengths=True,
             pb.color = rgba
             try:
                 pb._hitpick_text = interaction_label_text(
-                    it, show_lengths, show_angles)
+                    it, show_lengths, show_angles, show_limits)
+                pb._hitpick_band = interaction_band(it)
                 pb.hitpick_kind = kind
             except Exception:
                 pass
@@ -171,21 +172,69 @@ def _register_attrs(session):
     _ATTR_REGISTERED.add(session)
 
 
+# How a geometric term is doing against its literature envelope. The score
+# is already 1.0 at the ideal and 0 at the limit, so these are just names for
+# bands of it.
+GOOD, MARGINAL, EDGE = "good", "marginal", "edge"
+BAND_COLORS = {
+    GOOD:     (30, 140, 70),      # comfortably inside the limits
+    MARGINAL: (200, 130, 20),     # inside, but well off ideal
+    EDGE:     (200, 50, 40),      # only just inside; treat with suspicion
+}
+BAND_CUTOFFS = (0.55, 0.25)       # >=0.55 good, >=0.25 marginal, else edge
+
+
+def quality_band(value):
+    if value >= BAND_CUTOFFS[0]:
+        return GOOD
+    if value >= BAND_CUTOFFS[1]:
+        return MARGINAL
+    return EDGE
+
+
+def interaction_band(it):
+    """The band of the WORST term, which is what decides whether to trust it.
+
+    A hydrogen bond at a perfect distance but 125 degrees off linear is not a
+    good hydrogen bond, and averaging would hide that.
+    """
+    comps = [v for v in it.components.values() if v is not None]
+    return quality_band(min(comps)) if comps else quality_band(it.quality)
+
+
+def _fmt_range(lo, hi):
+    return "%g-%g" % (round(lo, 2), round(hi, 2))
+
+
 def interaction_label_text(it, show_lengths=True, show_angles=False,
-                           show_quality=True):
-    """The text drawn on one interaction line."""
+                           show_limits=False, show_quality=False):
+    """The text drawn on one interaction line.
+
+    Deliberately terse. Colour carries whether the geometry is within its
+    limits, so the text does not have to; `show_limits` adds the envelope in
+    brackets for anyone who wants the numbers on screen.
+    """
+    crit = it.criterion
     parts = []
     if show_lengths:
-        parts.append("%.2f" % it.distance)
+        if show_limits:
+            parts.append("%.2f[%s]" % (it.distance,
+                                       _fmt_range(crit.d_min, crit.d_max)))
+        else:
+            parts.append("%.2f" % it.distance)
     if show_angles:
         for k, v in it.angles.items():
             if v is None or v != v:          # NaN: not measurable
                 continue
-            parts.append("%s%.0f" % (_short_angle(k), v))
+            name = _short_angle(k)
+            if show_limits and k in crit.angles:
+                limit, ideal = crit.angles[k]
+                bound = ("%g+" % limit) if ideal >= limit else ("<%g" % limit)
+                parts.append("%s%.0f[%s]" % (name, v, bound))
+            else:
+                parts.append("%s%.0f" % (name, v))
     if show_quality:
         parts.append("q%.2f" % it.quality)
-    # Single spaces: these labels sit on top of the structure and several of
-    # them land near each other, so every character costs legibility.
     return " ".join(parts)
 
 
@@ -284,7 +333,8 @@ def label_strain(session, strain, all_atoms):
 
 
 def label_interactions(session, interactions=None, all_atoms=None,
-                       show_lengths=True, show_angles=False):
+                       show_lengths=True, show_angles=False,
+                       show_limits=False):
     """Label each interaction line with its own geometry.
 
     Uses one label call over a per-pseudobond attribute, so distance AND
@@ -320,16 +370,27 @@ def label_interactions(session, interactions=None, all_atoms=None,
             except Exception:
                 continue
         kind = m.name[len(GROUP_PREFIX):].replace(" ", "_")
-        r, g, b = TYPE_COLORS.get(kind, (60, 60, 60))
-        try:
-            label(session, Objects(pseudobonds=pbs), "pseudobonds",
-                  attribute=LABEL_ATTR,
-                  color=_readable_text_color(session, (r, g, b)),
-                  bg_color=_label_backdrop(session),
-                  height=LABEL_HEIGHT)
-            n += len(pbs)
-        except Exception as e:
-            session.logger.info("hitpick: could not label %s (%s)" % (m.name, e))
+        # One label call per band, so the colour can say whether THIS
+        # interaction's geometry is within its limits rather than merely
+        # repeating what the line colour already says about its type.
+        by_band = {}
+        for pb in pbs:
+            by_band.setdefault(getattr(pb, "_hitpick_band", GOOD), []).append(pb)
+        for band, group in by_band.items():
+            rgb = BAND_COLORS.get(band, TYPE_COLORS.get(kind, (60, 60, 60)))
+            if kind in CLASH_KINDS:
+                rgb = TYPE_COLORS[kind]
+            from chimerax.atomic import Pseudobonds
+            try:
+                label(session, Objects(pseudobonds=Pseudobonds(group)),
+                      "pseudobonds", attribute=LABEL_ATTR,
+                      color=_readable_text_color(session, rgb),
+                      bg_color=_label_backdrop(session),
+                      height=LABEL_HEIGHT)
+                n += len(group)
+            except Exception as e:
+                session.logger.info("hitpick: could not label %s (%s)"
+                                    % (m.name, e))
     return n
 
 

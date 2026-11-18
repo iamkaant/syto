@@ -91,7 +91,7 @@ class HandbookTool(HtmlToolInstance):
             }
         if st.last_hit is not None:
             snap["hit"] = st.last_hit.to_dict()
-            if hb is not None:
+            if hb is not None and st.options.show_scale:
                 try:
                     snap["scale"] = hb.scale(
                         "pKBHX", st.last_hit.moiety_ids,
@@ -134,6 +134,12 @@ class HandbookTool(HtmlToolInstance):
             elif path == "clashes":
                 from .cmd import hitpick_clashes
                 hitpick_clashes(session, one("on") == "1")
+            elif path == "limits":
+                from .cmd import hitpick_limits
+                hitpick_limits(session, one("on") == "1")
+            elif path == "scaleplot":
+                from .cmd import hitpick_scaleplot
+                hitpick_scaleplot(session, one("on") == "1")
             elif path == "labels":
                 from .cmd import hitpick_labels
                 hitpick_labels(session, one("quantity", "pKBHX"))

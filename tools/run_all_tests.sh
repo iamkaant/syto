@@ -6,6 +6,23 @@ CX="${CHIMERAX_APP:-/Applications/ChimeraX-1.12.app}/Contents/bin/ChimeraX"
 PY="${HITPICK_PYTHON:-/Users/ak87/miniforge3/envs/admet_ai/bin/python}"
 fail=0
 
+# Install FIRST. The ChimeraX scripts import the INSTALLED bundle, so without
+# this they happily test a stale copy: an edit that deleted three functions
+# from render.py passed the whole suite because the installed bundle still
+# had them.
+echo "=== installing the bundle under test ==="
+bash "$ROOT/tools/install_bundle.sh" >/dev/null 2>&1 || {
+  echo "   install FAILED"; exit 1; }
+INST="$HOME/Library/Application Support/ChimeraX/1.12/lib/python/site-packages/chimerax/hitpickingtool"
+if [ -d "$INST" ]; then
+  for f in render.py cmd.py viewdock_link.py; do
+    if ! diff -q "$ROOT/chimerax/src/$f" "$INST/$f" >/dev/null 2>&1; then
+      echo "   WARNING: installed $f differs from the source tree"
+      fail=1
+    fi
+  done
+fi
+
 echo "=== core unit tests ==="
 "$PY" -m pytest "$ROOT/core/tests" -q || fail=1
 
