@@ -1,0 +1,379 @@
+# Hydrogen-bond acceptor handbook entries.
+#
+# ----------------------------------------------------------------------------
+# READ THIS BEFORE EDITING
+# ----------------------------------------------------------------------------
+# Every numeric value must carry `ref` (a DOI) and `locator` (table/figure/page).
+# tools/build_data.py FAILS the build on a value that has neither.
+#
+# `curation_status` is one of:
+#   verified      - read directly from the cited source by a human
+#   needs_review  - anything else. Renders with a warning marker in both UIs.
+#   pending       - the field exists but has no value yet; nothing is displayed
+#
+# pKBHX values are deliberately `pending` in this seed. The defining source
+# (Laurence et al. 2009, DOI 10.1021/jm801331y) is paywalled and was not
+# accessible when this file was written, and inventing or half-remembering a
+# basicity scale would make the tool confidently wrong in the exact place
+# users will trust it most. Run docs/LITERATURE_EXTRACTION_PROMPT.md in a
+# browser-enabled session to fill them in.
+#
+# What IS safe to state now is the *ordering* of acceptor families, which is
+# textbook-level consensus and is what a user at a party actually needs:
+# "is this nitrogen a better acceptor than that carbonyl?" `basicity_rank` is
+# an ordinal (higher = stronger acceptor), NOT an energy and NOT a pKBHX.
+# ----------------------------------------------------------------------------
+
+schema_version: 1
+kind: acceptors
+
+defaults:
+  interaction_type: hbond
+  pkbhx_ref: &pkbhx_ref
+    doi: "10.1021/jm801331y"
+    locator: "PENDING - see docs/LITERATURE_EXTRACTION_PROMPT.md"
+  geometry_ref: &geom_ref
+    doi: "10.1021/jm100112j"
+    locator: "general H-bond geometry discussion"
+
+entries:
+
+  - id: pyridine_n
+    title: Pyridine-type aromatic nitrogen
+    moiety_ids: [pyridine_n]
+    summary: >
+      An aromatic nitrogen with no hydrogen and two ring neighbours. Its lone
+      pair lies in the ring plane, pointing outward, and is one of the best
+      acceptors commonly available in a drug-like molecule.
+    basicity_rank: 8
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+        note: >
+          Strongly substituent dependent. Electron-donating groups raise it;
+          2-substitution attenuates it sterically; an adjacent ring nitrogen
+          (pyrimidine, pyrazine) lowers it substantially.
+    geometry:
+      d_ideal: 2.90
+      d_min: 2.60
+      d_max: 3.40
+      directionality: >
+        Highly directional. The donor should approach along the in-plane lone
+        pair, i.e. roughly along the external bisector of the C-N-C angle.
+      ref: *geom_ref
+    practical_notes:
+      - "Check the protonation state. A basic pyridine near an acidic residue
+         may be protonated, which turns it from an acceptor into a donor."
+      - "If it is buried and NOT making a hydrogen bond, that is a real cost -
+         this is the classic 'buried polarity' the hit-picking checklist warns
+         about."
+    curation_status: needs_review
+
+  - id: amine_n_aliphatic
+    title: Aliphatic amine nitrogen
+    moiety_ids: [amine_n_primary, amine_n_secondary, amine_n_tertiary]
+    summary: >
+      An sp3 nitrogen whose lone pair is NOT conjugated. In its neutral form it
+      is among the strongest acceptors in medicinal chemistry; at pH 7 most
+      aliphatic amines are protonated, at which point they donate and form salt
+      bridges instead.
+    basicity_rank: 9
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry:
+      d_ideal: 2.90
+      d_min: 2.60
+      d_max: 3.40
+      ref: *geom_ref
+    practical_notes:
+      - "Protonation state dominates everything else here. Check the pKa."
+      - "If protonated, look for a counter-charge: an unpaired buried cation is
+         a serious liability."
+    curation_status: needs_review
+
+  - id: carbonyl_o
+    title: Ketone / aldehyde carbonyl oxygen
+    moiety_ids: [carbonyl_o]
+    summary: >
+      A terminal sp2 oxygen on a carbon bearing no nitrogen. A dependable,
+      moderately strong acceptor with two in-plane lone pairs.
+    basicity_rank: 6
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry:
+      d_ideal: 2.85
+      d_min: 2.60
+      d_max: 3.40
+      directionality: >
+        Two lone pairs at roughly +/-120 deg from the C=O axis, in the sp2
+        plane. Donors approaching perpendicular to that plane are poorly
+        placed, which the geometry score penalises.
+      ref: *geom_ref
+    curation_status: needs_review
+
+  - id: amide_o
+    title: Amide carbonyl oxygen
+    moiety_ids: [amide_o]
+    summary: >
+      The carbonyl oxygen of an amide. Resonance donation from the nitrogen
+      raises the electron density on this oxygen, making it a BETTER acceptor
+      than a ketone carbonyl - while the amide nitrogen itself becomes a very
+      poor acceptor. This split is the single most useful thing to know about
+      an amide.
+    basicity_rank: 7
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry:
+      d_ideal: 2.85
+      d_min: 2.60
+      d_max: 3.40
+      ref: *geom_ref
+    see_also: [amide_n_not_acceptor]
+    curation_status: needs_review
+
+  - id: sulfoxide_o
+    title: Sulfoxide oxygen
+    moiety_ids: [sulfoxide_o]
+    summary: >
+      A strongly basic, highly polarised S=O oxygen. Among the strongest
+      neutral acceptors encountered in drug-like matter.
+    basicity_rank: 9
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry: {d_ideal: 2.80, d_min: 2.55, d_max: 3.35, ref: *geom_ref}
+    curation_status: needs_review
+
+  - id: phosphine_oxide_o
+    title: Phosphine oxide / phosphoryl oxygen
+    moiety_ids: [phosphine_oxide_o]
+    summary: >
+      P=O oxygen. The strongest neutral acceptor family in common use.
+    basicity_rank: 10
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry: {d_ideal: 2.80, d_min: 2.55, d_max: 3.35, ref: *geom_ref}
+    curation_status: needs_review
+
+  - id: sulfone_o
+    title: Sulfone oxygen
+    moiety_ids: [sulfone_o]
+    summary: >
+      One of the two oxygens of an SO2 group. Markedly WEAKER than a sulfoxide
+      oxygen: the second oxygen withdraws density from the first.
+    basicity_rank: 3
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry: {d_ideal: 2.95, d_min: 2.65, d_max: 3.45, ref: *geom_ref}
+    practical_notes:
+      - "Commonly over-credited. A sulfone is mostly there for conformation and
+         solubility, not for its hydrogen bonds."
+    curation_status: needs_review
+
+  - id: ether_o
+    title: Ether oxygen
+    moiety_ids: [ether_o, furan_o]
+    summary: >
+      A dialkyl ether oxygen is a weak-to-moderate acceptor. An aryl ether is
+      weaker still, and a furan-type ring oxygen is weaker again: its lone pair
+      is part of the aromatic sextet.
+    basicity_rank: 4
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry: {d_ideal: 2.90, d_min: 2.60, d_max: 3.40, ref: *geom_ref}
+    practical_notes:
+      - "Often drawn as making a hydrogen bond when it is really just nearby.
+         Check the angle before believing it."
+    curation_status: needs_review
+
+  - id: ester_o
+    title: Ester -O- oxygen
+    moiety_ids: [ester_o]
+    summary: >
+      The sp3-like oxygen of an ester linkage. A poor acceptor: its lone pair
+      is delocalised into the carbonyl. The ester's CARBONYL oxygen is the
+      acceptor worth counting.
+    basicity_rank: 2
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry: {d_ideal: 3.00, d_min: 2.65, d_max: 3.45, ref: *geom_ref}
+    curation_status: needs_review
+
+  - id: alcohol_oh
+    title: Hydroxyl oxygen
+    moiety_ids: [alcohol_oh, phenol_oh]
+    summary: >
+      A hydroxyl is both donor and acceptor. As an acceptor it is moderate; a
+      phenol OH is a weaker acceptor but a stronger donor than an aliphatic
+      alcohol.
+    basicity_rank: 5
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry: {d_ideal: 2.80, d_min: 2.55, d_max: 3.35, ref: *geom_ref}
+    practical_notes:
+      - "Being able to do both is why hydroxyls are so often conserved. Check
+         whether it is satisfying BOTH roles in this pose."
+    curation_status: needs_review
+
+  - id: nitrile_n
+    title: Nitrile nitrogen
+    moiety_ids: [nitrile_n]
+    summary: >
+      An sp nitrogen. A modest acceptor, but exceptionally directional: the
+      lone pair lies exactly along the C-N axis.
+    basicity_rank: 4
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry:
+      d_ideal: 2.90
+      d_min: 2.60
+      d_max: 3.40
+      directionality: >
+        The donor must lie close to the C-N axis extended. Off-axis approach
+        loses the interaction quickly.
+      ref: *geom_ref
+    curation_status: needs_review
+
+  - id: carboxylate_o
+    title: Carboxylate oxygen (anionic)
+    moiety_ids: [carboxylate_o]
+    summary: >
+      A deprotonated carboxylate oxygen. A very strong acceptor, forming short
+      charge-assisted hydrogen bonds and salt bridges.
+    basicity_rank: 10
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+        note: "The pKBHX scale is defined for neutral bases; anionic acceptors
+               sit off the top of it."
+    geometry: {d_ideal: 2.70, d_min: 2.45, d_max: 3.30, ref: *geom_ref}
+    practical_notes:
+      - "Desolvating a carboxylate is expensive. A buried one that is not well
+         paired is a red flag, not a win."
+    curation_status: needs_review
+
+  - id: thioether_s
+    title: Thioether sulfur
+    moiety_ids: [thioether_s, thiol_s]
+    summary: >
+      A weak, diffuse acceptor. Sulfur's polarisability means it contributes
+      more through dispersion and sulfur-aromatic contacts than through
+      classical hydrogen bonding.
+    basicity_rank: 2
+    values:
+      - quantity: pKBHX
+        value: null
+        curation_status: pending
+        ref: *pkbhx_ref
+    geometry: {d_ideal: 3.30, d_min: 3.00, d_max: 3.90, ref: *geom_ref}
+    curation_status: needs_review
+
+  # --------------------------------------------------------------------
+  # The negative entries. These exist so the tool can actively contradict
+  # a common misreading, which is most of its value at a hit-picking party.
+  # --------------------------------------------------------------------
+
+  - id: amide_n_not_acceptor
+    title: "Amide nitrogen - NOT an acceptor"
+    moiety_ids: [amide_nh]
+    is_negative: true
+    summary: >
+      An amide nitrogen's lone pair is delocalised into the carbonyl. It is
+      planar, it is not basic, and it does not accept a hydrogen bond. It is a
+      good DONOR. If a pose appears to show something donating to an amide
+      nitrogen, that is a misread.
+    basicity_rank: 0
+    geometry: {ref: *geom_ref}
+    practical_notes:
+      - "The oxygen of the same amide is a good acceptor. Look there instead."
+    curation_status: needs_review
+
+  - id: sulfonamide_n_not_acceptor
+    title: "Sulfonamide nitrogen - NOT an acceptor"
+    moiety_ids: [sulfonamide_n]
+    is_negative: true
+    summary: >
+      As with an amide, the lone pair is delocalised onto the sulfonyl oxygens.
+      Not an acceptor. The N-H, where present, is an unusually acidic donor.
+    basicity_rank: 0
+    geometry: {ref: *geom_ref}
+    curation_status: needs_review
+
+  - id: pyrrole_nh_not_acceptor
+    title: "Pyrrole-type NH - NOT an acceptor"
+    moiety_ids: [pyrrole_nh]
+    is_negative: true
+    summary: >
+      An aromatic nitrogen bearing a hydrogen contributes its lone pair to the
+      aromatic sextet. It donates; it does not accept. Contrast with a
+      pyridine-type ring nitrogen, which has no hydrogen and is an excellent
+      acceptor. In imidazole BOTH kinds are present in the same ring - which
+      one is which depends on the tautomer.
+    basicity_rank: 0
+    geometry: {ref: *geom_ref}
+    see_also: [pyridine_n]
+    curation_status: needs_review
+
+  - id: organic_f
+    title: "Organic fluorine - a very poor acceptor"
+    moiety_ids: [organic_f]
+    is_negative: true
+    summary: >
+      Covalently bound fluorine is an extremely weak hydrogen-bond acceptor.
+      Short C-F...H contacts in a structure are usually dipolar or incidental,
+      not hydrogen bonds, and should not be counted as such. Fluorine also
+      forms NO halogen bond: it has no sigma hole.
+    basicity_rank: 1
+    geometry: {ref: *geom_ref}
+    practical_notes:
+      - "Fluorine earns its place through metabolic blocking, pKa modulation,
+         conformational control and lipophilicity - not hydrogen bonds."
+    curation_status: needs_review
+
+  - id: nitro_o
+    title: "Nitro oxygen - a poor acceptor"
+    moiety_ids: [nitro_o]
+    is_negative: true
+    summary: >
+      The oxygens of a nitro group are poor acceptors despite their formal
+      negative charge: the charge is delocalised and the group is strongly
+      electron withdrawing. A nitro group is also a medicinal-chemistry
+      liability in its own right.
+    basicity_rank: 1
+    geometry: {ref: *geom_ref}
+    practical_notes:
+      - "Flag nitro groups at hit picking: toxicity and reduction liabilities."
+    curation_status: needs_review

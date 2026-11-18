@@ -27,6 +27,46 @@ from ..elements import SIGMA_HOLE_HALOGENS
 
 ACCEPTOR_NONE = None
 
+# ---------------------------------------------------------------------------
+# The registry of every moiety id this module can emit.
+#
+# This is the contract between perception and the handbook: tools/build_data.py
+# rejects any handbook entry naming an id that is not here, and a test asserts
+# perception never emits one that is not here either. Add to both sides
+# deliberately, never by accident.
+# ---------------------------------------------------------------------------
+
+ACCEPTOR_IDS = frozenset({
+    "carboxylate_o", "phosphate_sulfonate_o", "amide_o", "carbonyl_o",
+    "sulfoxide_o", "sulfone_o", "n_oxide_o", "nitro_o", "phosphine_oxide_o",
+    "phenol_oh", "alcohol_oh", "furan_o", "ester_o", "ether_o", "water_o",
+    "generic_o", "pyridine_n", "nitrile_n", "imine_n", "amine_n_tertiary",
+    "amine_n_secondary", "amine_n_primary", "aniline_n", "thiocarbonyl_s",
+    "thioether_s", "thiol_s", "organic_f",
+})
+
+DONOR_IDS = frozenset({
+    "ammonium_n", "charged_n_donor", "pyrrole_nh", "amide_nh", "amine_nh",
+    "carboxylic_oh", "water_oh", "phenol_oh_donor", "alcohol_oh_donor",
+    "thiol_sh",
+})
+
+GROUP_IDS = frozenset({
+    "carboxylate", "guanidinium", "ammonium", "imidazolium", "amidinium",
+    "sulfonate", "phosphate",
+})
+
+RING_IDS = frozenset({"aromatic_ring_6", "aromatic_ring_5", "heteroaromatic_ring"})
+
+HALOGEN_IDS = frozenset({"halogen_cl", "halogen_br", "halogen_i"})
+
+OTHER_IDS = frozenset({"hydrophobic", "sulfonamide_n"})
+
+MOIETY_IDS = (ACCEPTOR_IDS | DONOR_IDS | GROUP_IDS | RING_IDS
+              | HALOGEN_IDS | OTHER_IDS)
+
+
+
 
 class Feature:
     """One perceived feature: a moiety instance on specific atoms."""

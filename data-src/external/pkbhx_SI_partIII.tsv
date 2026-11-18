@@ -1,0 +1,326 @@
+# Source: Laurence et al. J. Med. Chem. 2009, 52, 4073, Supporting Information jm801331y_si_001.pdf; DOI 10.1021/jm801331y
+# pKBHX: 4-fluorophenol, CCl4, 298 K (FTIR). Names as printed in the SI. Parsed with pdftotext -layout; pages S11,S12,S15,S16 visually checked.
+name	pKBHX	site	locator	doi
+Pyrene	-0.56		SI part II tableI, p. S11	10.1021/jm801331y
+Tripropargylamine	0.83	N	SI part II tableI, p. S11	10.1021/jm801331y
+Phenanthrene	-0.53		SI part II tableI, p. S11	10.1021/jm801331y
+N,N-Diisopropylethylamine	1.05		SI part II tableI, p. S11	10.1021/jm801331y
+Benzene	-0.49		SI part II tableI, p. S11	10.1021/jm801331y
+1,2,2,6,6-Pentamethylpiperidine	1.23		SI part II tableI, p. S11	10.1021/jm801331y
+Naphtalene	-0.48		SI part II tableI, p. S11	10.1021/jm801331y
+Hexamethylenetetramine	1.33		SI part II tableI, p. S11	10.1021/jm801331y
+Biphenyl	-0.47		SI part II tableI, p. S11	10.1021/jm801331y
+N-Ethyl-N-methylbenzylamine	1.47		SI part II tableI, p. S11	10.1021/jm801331y
+Methylbenzene, toluene	-0.36		SI part II tableI, p. S11	10.1021/jm801331y
+Tri-n-butylamine	1.55		SI part II tableI, p. S11	10.1021/jm801331y
+1,3-Dimethylbenzene, m-xylene	-0.28		SI part II tableI, p. S11	10.1021/jm801331y
+N-Methylmorpholine	1.56	N	SI part II tableI, p. S11	10.1021/jm801331y
+Hexamethylbenzene	0.02		SI part II tableI, p. S11	10.1021/jm801331y
+1,3,5-Trimethylhexahydrotriazine	1.58		SI part II tableI, p. S11	10.1021/jm801331y
+Thiophene	-0.50		SI part II tableI, p. S11	10.1021/jm801331y
+N,N-Dimethylbenzylamine	1.59		SI part II tableI, p. S11	10.1021/jm801331y
+N-Methyl-1,2,3,4-tetrahydroisoquinoline	1.80		SI part II tableI, p. S11	10.1021/jm801331y
+Cyclohexene	-0.82		SI part II tableI, p. S11	10.1021/jm801331y
+N,N’-Dimethylpiperazine	1.88		SI part II tableI, p. S11	10.1021/jm801331y
+1-Heptene	-0.67		SI part II tableI, p. S11	10.1021/jm801331y
+Triethylamine	1.98		SI part II tableI, p. S11	10.1021/jm801331y
+N-Methyl-1,2,3,6-tetrahydropyridine	2.02		SI part II tableI, p. S11	10.1021/jm801331y
+1-Hexyne	-0.22		SI part II tableI, p. S11	10.1021/jm801331y
+N,N,N',N'-Tetramethylethylenediamine	2.02		SI part II tableI, p. S11	10.1021/jm801331y
+2-Hexyne	-0.09		SI part II tableI, p. S11	10.1021/jm801331y
+N-Methylpiperidine	2.11		SI part II tableI, p. S11	10.1021/jm801331y
+Trimethylamine	2.13		SI part II tableI, p. S11	10.1021/jm801331y
+2,2,2-Trifluoroethylamine	0.71		SI part II tableI, p. S11	10.1021/jm801331y
+N,N-Dimethylcyclohexylamine	2.15		SI part II tableI, p. S11	10.1021/jm801331y
+Ammonia	1.74		SI part II tableI, p. S11	10.1021/jm801331y
+N,N-Dimethylethylamine	2.17		SI part II tableI, p. S11	10.1021/jm801331y
+Benzylamine	1.88		SI part II tableI, p. S11	10.1021/jm801331y
+N-Methylpyrrolidine	2.19		SI part II tableI, p. S11	10.1021/jm801331y
+Allylamine	1.94		SI part II tableI, p. S11	10.1021/jm801331y
+Diazabicyclooctane (DABCO)	2.33		SI part II tableI, p. S11	10.1021/jm801331y
+Phenethylamine	2.16		SI part II tableI, p. S11	10.1021/jm801331y
+Tropane	2.39		SI part II tableI, p. S11	10.1021/jm801331y
+Ethylamine	2.17		SI part II tableI, p. S11	10.1021/jm801331y
+Quinuclidine	2.71		SI part II tableI, p. S11	10.1021/jm801331y
+Methylamine	2.20		SI part II tableI, p. S11	10.1021/jm801331y
+n-Butylamine	2.21		SI part II tableI, p. S11	10.1021/jm801331y
+2,6-Difluoropyridine	0.14		SI part II tableI, p. S11	10.1021/jm801331y
+Isopropylamine	2.22		SI part II tableI, p. S11	10.1021/jm801331y
+1,3,5-Triazine	0.32		SI part II tableI, p. S11	10.1021/jm801331y
+Ethylenediamine	2.25		SI part II tableI, p. S11	10.1021/jm801331y
+3,5-Dichloropyridine	0.85		SI part II tableI, p. S11	10.1021/jm801331y
+tert-Butylamine	2.26		SI part II tableI, p. S11	10.1021/jm801331y
+Pyrazine	0.92		SI part II tableI, p. S11	10.1021/jm801331y
+2-Fluoropyridine	0.95		SI part II tableI, p. S11	10.1021/jm801331y
+Thiazolidine	1.10	N	SI part II tableI, p. S11	10.1021/jm801331y
+Pyrimidine	1.07		SI part II tableI, p. S11	10.1021/jm801331y
+Dibenzylamine	1.34		SI part II tableI, p. S12	10.1021/jm801331y
+2,2'-Bipyridine	1.15		SI part II tableI, p. S12	10.1021/jm801331y
+Morpholine	1.78	N	SI part II tableI, p. S12	10.1021/jm801331y
+7,8-Benzoquinoline	1.16		SI part II tableI, p. S12	10.1021/jm801331y
+N-Methylbenzylamine	1.82		SI part II tableI, p. S12	10.1021/jm801331y
+Phenazine	1.22		SI part II tableI, p. S12	10.1021/jm801331y
+2,2,6,6-Tetramethylpiperidine	1.88		SI part II tableI, p. S12	10.1021/jm801331y
+3-Chloropyridine	1.31		SI part II tableI, p. S12	10.1021/jm801331y
+2-Phenylpyrrolidine	1.93		SI part II tableI, p. S12	10.1021/jm801331y
+2-tert-Butylpyridine	1.42		SI part II tableI, p. S12	10.1021/jm801331y
+1,2,3,4-Tetrahydroisoquinoline	2.04		SI part II tableI, p. S12	10.1021/jm801331y
+Methyl nicotinate	1.45	N	SI part II tableI, p. S12	10.1021/jm801331y
+Piperazine	2.11		SI part II tableI, p. S12	10.1021/jm801331y
+4-Chloropyridine	1.54		SI part II tableI, p. S12	10.1021/jm801331y
+1,2,3,6-Tetrahydropyridine	2.16		SI part II tableI, p. S12	10.1021/jm801331y
+5-N,N-Dimethylaminopyrimidine	1.58		SI part II tableI, p. S12	10.1021/jm801331y
+N-Methyl-tert-butylamine	2.21		SI part II tableI, p. S12	10.1021/jm801331y
+2-N,N-Dimethylaminopyridine	1.61		SI part II tableI, p. S12	10.1021/jm801331y
+N-Methylcyclohexylamine	2.24		SI part II tableI, p. S12	10.1021/jm801331y
+Pyridazine	1.65		SI part II tableI, p. S12	10.1021/jm801331y
+Dimethylamine	2.26		SI part II tableI, p. S12	10.1021/jm801331y
+Pyridine	1.86		SI part II tableI, p. S12	10.1021/jm801331y
+2-Methylaziridine	2.28		SI part II tableI, p. S12	10.1021/jm801331y
+Phenanthridine	1.87		SI part II tableI, p. S12	10.1021/jm801331y
+Piperidine	2.38		SI part II tableI, p. S12	10.1021/jm801331y
+2-n-Butylpyridine	1.88		SI part II tableI, p. S12	10.1021/jm801331y
+Pyrrolidine	2.59		SI part II tableI, p. S12	10.1021/jm801331y
+Quinoline	1.89		SI part II tableI, p. S12	10.1021/jm801331y
+Azetidine	2.59		SI part II tableI, p. S12	10.1021/jm801331y
+Isoquinoline	1.94		SI part II tableI, p. S12	10.1021/jm801331y
+Acridine	1.95		SI part II tableI, p. S12	10.1021/jm801331y
+Propionitrile	0.93		SI part II tableI, p. S12	10.1021/jm801331y
+Phtalazine	1.97		SI part II tableI, p. S12	10.1021/jm801331y
+Trimethylacetonitrile	1.00		SI part II tableI, p. S12	10.1021/jm801331y
+3-Methylpyridine, 3-picoline	2.00		SI part II tableI, p. S12	10.1021/jm801331y
+2-Methoxybenzonitrile	1.06		SI part II tableI, p. S12	10.1021/jm801331y
+2-Methylpyridine, 2-picoline	2.03		SI part II tableI, p. S12	10.1021/jm801331y
+4-Dimethylaminobenzonitrile	1.23		SI part II tableI, p. S12	10.1021/jm801331y
+4-Ethylpyridine	2.07		SI part II tableI, p. S12	10.1021/jm801331y
+Cyanamide	1.40		SI part II tableI, p. S12	10.1021/jm801331y
+2-Methylaminopyridine	2.11		SI part II tableI, p. S12	10.1021/jm801331y
+Dimethylcyanamide	1.56		SI part II tableI, p. S12	10.1021/jm801331y
+2-Aminopyridine	2.12		SI part II tableI, p. S12	10.1021/jm801331y
+1-Piperidinecarbonitrile	1.58		SI part II tableI, p. S12	10.1021/jm801331y
+4-Methoxypyridine	2.13		SI part II tableI, p. S12	10.1021/jm801331y
+Diethylcyanamide	1.63		SI part II tableI, p. S12	10.1021/jm801331y
+2,6-Dimethylpyridine ; 2,6-lutidine	2.14		SI part II tableI, p. S12	10.1021/jm801331y
+1-Pyrrolidinecarbonitrile	1.66		SI part II tableI, p. S12	10.1021/jm801331y
+3,4-Dimethylpyridine ; 3,4-lutidine	2.24		SI part II tableI, p. S12	10.1021/jm801331y
+Trans-3-dimethylaminoacrylonitrile	1.70		SI part II tableI, p. S12	10.1021/jm801331y
+9-N,N-Dimethylaminoacridine	2.31		SI part II tableI, p. S12	10.1021/jm801331y
+N1,N1-Dimethyl-N2-cyanoacetamidine	2.24		SI part II tableI, p. S12	10.1021/jm801331y
+4-N,N-Dimethylaminoquinoline	2.43		SI part II tableI, p. S12	10.1021/jm801331y
+4-Aminopyridine	2.56		SI part II tableI, p. S12	10.1021/jm801331y
+2,2,2-Trifluoroethanol	-0.28		SI part II tableI, p. S12	10.1021/jm801331y
+4-Piperidinopyridine	2.68		SI part II tableI, p. S12	10.1021/jm801331y
+Phenol	-0.07		SI part II tableI, p. S12	10.1021/jm801331y
+4-N,N-Dimethylaminopyridine	2.80		SI part II tableI, p. S12	10.1021/jm801331y
+3-Methylphenol	0.01		SI part II tableI, p. S12	10.1021/jm801331y
+4-Pyrrolidinopyridine	2.93		SI part II tableI, p. S12	10.1021/jm801331y
+Propargyl alcohol	0.38		SI part II tableI, p. S12	10.1021/jm801331y
+2-Chloroethanol	0.50		SI part II tableI, p. S13	10.1021/jm801331y
+Pyrrole	0.15		SI part II tableI, p. S13	10.1021/jm801331y
+Water	0.65		SI part II tableI, p. S13	10.1021/jm801331y
+1-Methylpyrrole	0.23		SI part II tableI, p. S13	10.1021/jm801331y
+Allyl alcohol	0.79		SI part II tableI, p. S13	10.1021/jm801331y
+Isoxazole	0.81		SI part II tableI, p. S13	10.1021/jm801331y
+Methanol	0.82		SI part II tableI, p. S13	10.1021/jm801331y
+2-Phenylbenzoxazole	1.18		SI part II tableI, p. S13	10.1021/jm801331y
+Benzyl alcohol	0.86		SI part II tableI, p. S13	10.1021/jm801331y
+Oxazole	1.30		SI part II tableI, p. S13	10.1021/jm801331y
+Phenethyl alcohol	0.97		SI part II tableI, p. S13	10.1021/jm801331y
+Benzothiazole	1.35		SI part II tableI, p. S13	10.1021/jm801331y
+Ethanol	1.02		SI part II tableI, p. S13	10.1021/jm801331y
+Thiazole	1.37		SI part II tableI, p. S13	10.1021/jm801331y
+n-Octanol	1.04		SI part II tableI, p. S13	10.1021/jm801331y
+1-Methylpyrazole	1.84		SI part II tableI, p. S13	10.1021/jm801331y
+Cyclohexanol	1.14		SI part II tableI, p. S13	10.1021/jm801331y
+4-Butyl-1,2,4-triazole	2.29		SI part II tableI, p. S13	10.1021/jm801331y
+Imidazole	2.42		SI part II tableI, p. S13	10.1021/jm801331y
+Furan	-0.40		SI part II tableI, p. S13	10.1021/jm801331y
+1-Methylimidazole	2.72		SI part II tableI, p. S13	10.1021/jm801331y
+1,3,5-Trioxane	0.02		SI part II tableI, p. S13	10.1021/jm801331y
+3,4-Dihydro-2H-pyran	0.41		SI part II tableI, p. S13	10.1021/jm801331y
+Pentaisopropylguanidine	1.06		SI part II tableI, p. S13	10.1021/jm801331y
+1,3-Dioxolane	0.45		SI part II tableI, p. S13	10.1021/jm801331y
+Tetramethylguanidine	3.21		SI part II tableI, p. S13	10.1021/jm801331y
+2,3-Dihydrofuran	0.53		SI part II tableI, p. S13	10.1021/jm801331y
+Dimethoxymethane	0.58		SI part II tableI, p. S13	10.1021/jm801331y
+N-Benzylideneaniline	0.87		SI part II tableI, p. S13	10.1021/jm801331y
+1,4-Dioxane	0.73		SI part II tableI, p. S13	10.1021/jm801331y
+N-Benzilidene-tert-butylamine	1.29		SI part II tableI, p. S13	10.1021/jm801331y
+Di-tert-butyl ether	0.75		SI part II tableI, p. S13	10.1021/jm801331y
+N-Benzylidenemethylamine	1.49		SI part II tableI, p. S13	10.1021/jm801331y
+Propylene oxide	0.97		SI part II tableI, p. S13	10.1021/jm801331y
+2-Phenyl-1-pyrroline	1.98		SI part II tableI, p. S13	10.1021/jm801331y
+Diethyl ether	1.01		SI part II tableI, p. S13	10.1021/jm801331y
+Cyclohexene oxide	1.13		SI part II tableI, p. S13	10.1021/jm801331y
+Pentafluorobenzonitrile	0.01		SI part II tableI, p. S13	10.1021/jm801331y
+Tetrahydrofuran	1.28		SI part II tableI, p. S13	10.1021/jm801331y
+Chloroacetonitrile	0.39		SI part II tableI, p. S13	10.1021/jm801331y
+2-Methyltetrahydrofuran	1.34		SI part II tableI, p. S13	10.1021/jm801331y
+2-Chlorobenzonitrile	0.67		SI part II tableI, p. S13	10.1021/jm801331y
+Oxetane, trimethylene oxide	1.36		SI part II tableI, p. S13	10.1021/jm801331y
+Acrylonitrile	0.70		SI part II tableI, p. S13	10.1021/jm801331y
+Cineole, eucalyptol	1.38		SI part II tableI, p. S13	10.1021/jm801331y
+4-Fluorobenzonitrile	0.72		SI part II tableI, p. S13	10.1021/jm801331y
+2,3-Diadamant-2-yl oxirane	1.44		SI part II tableI, p. S13	10.1021/jm801331y
+Methyl thiocyanate	0.73		SI part II tableI, p. S13	10.1021/jm801331y
+Benzonitrile	0.80		SI part II tableI, p. S13	10.1021/jm801331y
+tert-Butyl peroxide	0.13		SI part II tableI, p. S13	10.1021/jm801331y
+Allyl cyanide	0.87		SI part II tableI, p. S13	10.1021/jm801331y
+Ascaridole	0.92		SI part II tableI, p. S13	10.1021/jm801331y
+Acetonitrile	0.91		SI part II tableI, p. S13	10.1021/jm801331y
+Tropolone	1.31		SI part II tableI, p. S13	10.1021/jm801331y
+Salicylaldehyde	0.36		SI part II tableI, p. S14	10.1021/jm801331y
+Xanthone	1.36		SI part II tableI, p. S14	10.1021/jm801331y
+Acetaldehyde	0.65		SI part II tableI, p. S14	10.1021/jm801331y
+1,4-Androstadiene-3,17-dione	1.36	O17	SI part II tableI, p. S14	10.1021/jm801331y
+Benzaldehyde	0.78		SI part II tableI, p. S14	10.1021/jm801331y
+1,4-Androstadiene-3,17-dione	1.84	O3	SI part II tableI, p. S14	10.1021/jm801331y
+4-Methoxybenzaldehyde	1.10		SI part II tableI, p. S14	10.1021/jm801331y
+Acetylferrocene	1.65		SI part II tableI, p. S14	10.1021/jm801331y
+trans-Cinnamaldehyde	1.13		SI part II tableI, p. S14	10.1021/jm801331y
+10-Methyl-9(10H)-acridone	1.92		SI part II tableI, p. S14	10.1021/jm801331y
+4-Dimethylaminobenzaldehyde	1.53		SI part II tableI, p. S14	10.1021/jm801331y
+Flavone	1.99		SI part II tableI, p. S14	10.1021/jm801331y
+2,6-Dimethyl-γ-pyrone	2.50		SI part II tableI, p. S14	10.1021/jm801331y
+Biacetyl	0.23		SI part II tableI, p. S14	10.1021/jm801331y
+2,2,4,4-Tetramethylpentan-3-one	0.96		SI part II tableI, p. S14	10.1021/jm801331y
+Methyl trichloroacetate	0.11		SI part II tableI, p. S14	10.1021/jm801331y
+2,4-Dimethylpentan-3-one	1.08		SI part II tableI, p. S14	10.1021/jm801331y
+Diethyl oxalate	0.65		SI part II tableI, p. S14	10.1021/jm801331y
+Hexan-3-one	1.13		SI part II tableI, p. S14	10.1021/jm801331y
+Methyl formate	0.65		SI part II tableI, p. S14	10.1021/jm801331y
+Pentan-2-one	1.17		SI part II tableI, p. S14	10.1021/jm801331y
+Ethyl fluoroacetate	0.74		SI part II tableI, p. S14	10.1021/jm801331y
+4-Methylpentan-2-one	1.17		SI part II tableI, p. S14	10.1021/jm801331y
+Diethyl terephtalate	0.76		SI part II tableI, p. S14	10.1021/jm801331y
+Hexan-2-one	1.18		SI part II tableI, p. S14	10.1021/jm801331y
+Ethyl 4-bromobenzoate	0.78		SI part II tableI, p. S14	10.1021/jm801331y
+Propan-2-one, acetone	1.18		SI part II tableI, p. S14	10.1021/jm801331y
+Dimethyl carbonate	0.82		SI part II tableI, p. S14	10.1021/jm801331y
+Cyclohexyl methyl ketone	1.24		SI part II tableI, p. S14	10.1021/jm801331y
+Triacetin	0.84		SI part II tableI, p. S14	10.1021/jm801331y
+β-Propiolactone	0.86		SI part II tableI, p. S14	10.1021/jm801331y
+Cyclobutanone	1.00		SI part II tableI, p. S14	10.1021/jm801331y
+β-Butyrolactone	0.97		SI part II tableI, p. S14	10.1021/jm801331y
+Cyclopentadecanone	1.22		SI part II tableI, p. S14	10.1021/jm801331y
+Methyl acetate	1.00		SI part II tableI, p. S14	10.1021/jm801331y
+Camphor	1.31		SI part II tableI, p. S14	10.1021/jm801331y
+Ethyl 1-adamantanecarboxylate	1.06		SI part II tableI, p. S14	10.1021/jm801331y
+5-α-Androstane-17-one	1.36		SI part II tableI, p. S14	10.1021/jm801331y
+Ethyl acetate	1.07		SI part II tableI, p. S14	10.1021/jm801331y
+Cyclohexanone	1.39		SI part II tableI, p. S14	10.1021/jm801331y
+Ethyl isovalerate	1.11		SI part II tableI, p. S14	10.1021/jm801331y
+Cyclooctanone	1.45		SI part II tableI, p. S14	10.1021/jm801331y
+Ethyl 4-methoxybenzoate	1.13		SI part II tableI, p. S14	10.1021/jm801331y
+(E)-Ethyl cinnamate	1.14		SI part II tableI, p. S14	10.1021/jm801331y
+2-Hydroxyacetophenone	0.56		SI part II tableI, p. S14	10.1021/jm801331y
+Coumarin	1.30		SI part II tableI, p. S14	10.1021/jm801331y
+3-Fluoroacetophenone	0.83		SI part II tableI, p. S14	10.1021/jm801331y
+γ-Valerolactone	1.43		SI part II tableI, p. S14	10.1021/jm801331y
+1,3-Diacetylbenzene	0.86		SI part II tableI, p. S14	10.1021/jm801331y
+δ-Valerolactone	1.57		SI part II tableI, p. S14	10.1021/jm801331y
+2-Chloroacetophenone	0.90		SI part II tableI, p. S14	10.1021/jm801331y
+ε-Caprolactone	1.63		SI part II tableI, p. S14	10.1021/jm801331y
+4-Chloroacetophenone	0.93		SI part II tableI, p. S14	10.1021/jm801331y
+Ethyl 3-dimethylaminoacrylate	2.09		SI part II tableI, p. S14	10.1021/jm801331y
+3-Methylacetophenone	1.10		SI part II tableI, p. S14	10.1021/jm801331y
+Acetophenone	1.11		SI part II tableI, p. S15	10.1021/jm801331y
+Dimethylcarbamoyl chloride	1.00		SI part II tableI, p. S15	10.1021/jm801331y
+2-Methoxyacetophenone	1.34		SI part II tableI, p. S15	10.1021/jm801331y
+N,N -Dimethylsalicylamide	1.27		SI part II tableI, p. S15	10.1021/jm801331y
+4-Dimethylaminoacetophenone	1.76		SI part II tableI, p. S15	10.1021/jm801331y
+Acetanilide	1.69		SI part II tableI, p. S15	10.1021/jm801331y
+Phenyl dimethylcarbamate	1.70		SI part II tableI, p. S15	10.1021/jm801331y
+2-Hydroxybenzophenone	0.49		SI part II tableI, p. S15	10.1021/jm801331y
+N,N -Dimethyl-2-chloroacetamide	1.74		SI part II tableI, p. S15	10.1021/jm801331y
+Benzophenone	1.07		SI part II tableI, p. S15	10.1021/jm801331y
+Formamide	1.75		SI part II tableI, p. S15	10.1021/jm801331y
+4,4’-Dimethoxybenzophenone	1.49		SI part II tableI, p. S15	10.1021/jm801331y
+Benzamide	1.81		SI part II tableI, p. S15	10.1021/jm801331y
+4,4’-Bis(diethylamino)benzophenone	2.33		SI part II tableI, p. S15	10.1021/jm801331y
+Ethyl dimethylcarbamate	1.83		SI part II tableI, p. S15	10.1021/jm801331y
+N-Formylmorpholine	1.93		SI part II tableI, p. S15	10.1021/jm801331y
+1,4-Benzoquinone	0.51		SI part II tableI, p. S15	10.1021/jm801331y
+N,N -Diphenylacetamide	1.94		SI part II tableI, p. S15	10.1021/jm801331y
+Acetylacetone (ketoenol tautomer)	0.90		SI part II tableI, p. S15	10.1021/jm801331y
+N-Methylformamide	1.96		SI part II tableI, p. S15	10.1021/jm801331y
+Butyrophenone	1.04		SI part II tableI, p. S15	10.1021/jm801331y
+N,N-Diethylnicotinamide	1.98	O	SI part II tableI, p. S15	10.1021/jm801331y
+9-Fluorenone	1.09		SI part II tableI, p. S15	10.1021/jm801331y
+N,N-Diethylnicotinamide	1.63	N	SI part II tableI, p. S15	10.1021/jm801331y
+Anthrone	1.16		SI part II tableI, p. S15	10.1021/jm801331y
+Acetamide	2.06		SI part II tableI, p. S15	10.1021/jm801331y
+Thioxanthen-9-one	1.18		SI part II tableI, p. S15	10.1021/jm801331y
+N-Acetylmorpholine	2.16		SI part II tableI, p. S15	10.1021/jm801331y
+N-Methylacetanilide	2.19		SI part II tableI, p. S15	10.1021/jm801331y
+N-Formylpyrrolidine	2.31		SI part II tableI, p. S15	10.1021/jm801331y
+Thiocamphor	0.34		SI part II tableI, p. S15	10.1021/jm801331y
+1-Methyl-2-pyrrolidone	2.38		SI part II tableI, p. S15	10.1021/jm801331y
+1,4,5-Trimethylthiazoline-2-thione	1.13		SI part II tableI, p. S15	10.1021/jm801331y
+N,N -Dimethylacetamide	2.44		SI part II tableI, p. S15	10.1021/jm801331y
+N-methylthioacetamide	1.14		SI part II tableI, p. S15	10.1021/jm801331y
+1,1,3,3-Tetramethylurea	2.44		SI part II tableI, p. S15	10.1021/jm801331y
+1,3-Dimethylbenzimidazole-2-thione	1.19		SI part II tableI, p. S15	10.1021/jm801331y
+4-(Dimethylamino)antipyrine	2.45		SI part II tableI, p. S15	10.1021/jm801331y
+N,N-Dimethylthioacetamide	1.22		SI part II tableI, p. S15	10.1021/jm801331y
+1-Methyl-2-pyridone	2.50		SI part II tableI, p. S15	10.1021/jm801331y
+Benzoxazole-2-thione	1.24		SI part II tableI, p. S15	10.1021/jm801331y
+N-Methylcaprolactam	2.53		SI part II tableI, p. S15	10.1021/jm801331y
+N,N'-Dimethyl-N,N'-ethylenethiourea	1.32		SI part II tableI, p. S15	10.1021/jm801331y
+1-Methyl-2-piperidone	2.60		SI part II tableI, p. S15	10.1021/jm801331y
+1,3-Oxazolidine-2-thione	1.38		SI part II tableI, p. S15	10.1021/jm801331y
+1-Acetylpyrrolidine	2.61		SI part II tableI, p. S15	10.1021/jm801331y
+1-Methylbenzimidazole-2-thione	1.53		SI part II tableI, p. S15	10.1021/jm801331y
+Antipyrine	2.79		SI part II tableI, p. S15	10.1021/jm801331y
+ε-Thiocaprolactam	1.60		SI part II tableI, p. S15	10.1021/jm801331y
+N-Methyl-N,N'-propylenethiourea	2.00		SI part II tableI, p. S15	10.1021/jm801331y
+Nitromethane	0.27		SI part II tableI, p. S15	10.1021/jm801331y
+Methimazole	2.11		SI part II tableI, p. S15	10.1021/jm801331y
+1,2-Dimethyl-4-nitrobenzene	0.46		SI part II tableI, p. S15	10.1021/jm801331y
+Dimethylnitramine	0.82		SI part II tableI, p. S15	10.1021/jm801331y
+Diphenyl sulfide	-0.93	S	SI part II tableI, p. S15	10.1021/jm801331y
+N,N-Dimethyl-4-nitroaniline	0.83		SI part II tableI, p. S15	10.1021/jm801331y
+Thioanisole	-0.32	S	SI part II tableI, p. S15	10.1021/jm801331y
+1,4-Dithiane	-0.14		SI part II tableI, p. S16	10.1021/jm801331y
+Nitrosobenzene	0.15		SI part II tableI, p. S16	10.1021/jm801331y
+2-Propanethiol	-0.10		SI part II tableI, p. S16	10.1021/jm801331y
+N-Nitrosodiphenylamine	0.64		SI part II tableI, p. S16	10.1021/jm801331y
+1,3-Dithiane	-0.06		SI part II tableI, p. S16	10.1021/jm801331y
+1-Nitrosopyrrolidine	1.49		SI part II tableI, p. S16	10.1021/jm801331y
+Methyl sulfide	0.12		SI part II tableI, p. S16	10.1021/jm801331y
+n-Butyl sulfide	0.23		SI part II tableI, p. S16	10.1021/jm801331y
+Diethyl sulfate	0.80		SI part II tableI, p. S16	10.1021/jm801331y
+Tetrahydrothiophene	0.32		SI part II tableI, p. S16	10.1021/jm801331y
+N,N-Dimethylmethanesulfonamide	1.30		SI part II tableI, p. S16	10.1021/jm801331y
+tert-Butyl sulfide	0.40		SI part II tableI, p. S16	10.1021/jm801331y
+Dimethyl sulfone	1.40		SI part II tableI, p. S16	10.1021/jm801331y
+N,N,N',N'-Tetraethylsulfamide	1.47		SI part II tableI, p. S16	10.1021/jm801331y
+trans-1,2-Dichlorocyclohexane	-0.50		SI part II tableI, p. S16	10.1021/jm801331y
+1,4-Dibromobutane	-0.47		SI part II tableI, p. S16	10.1021/jm801331y
+Thionyl chloride	-0.38		SI part II tableI, p. S16	10.1021/jm801331y
+Iodoethane	-0.47		SI part II tableI, p. S16	10.1021/jm801331y
+Dimethyl sulfite	0.94		SI part II tableI, p. S16	10.1021/jm801331y
+1,4-Diiodobutane	-0.46		SI part II tableI, p. S16	10.1021/jm801331y
+Bis(4-chlorophenyl) sulfoxide	1.68		SI part II tableI, p. S16	10.1021/jm801331y
+Bromoethane	-0.40		SI part II tableI, p. S16	10.1021/jm801331y
+N,N-Dimethybenzenesulfinamide	2.15		SI part II tableI, p. S16	10.1021/jm801331y
+1,5-Dichloropentane	-0.39		SI part II tableI, p. S16	10.1021/jm801331y
+Dimethyl sulfoxide	2.54		SI part II tableI, p. S16	10.1021/jm801331y
+2-Iodo-2-methylpropane	-0.33		SI part II tableI, p. S16	10.1021/jm801331y
+2-Chloropropane	-0.30		SI part II tableI, p. S16	10.1021/jm801331y
+Pyridine N-oxide	2.72		SI part II tableI, p. S16	10.1021/jm801331y
+2-Bromo-2-methylpropane	-0.22		SI part II tableI, p. S16	10.1021/jm801331y
+Trimethylamine N-oxide	5.46		SI part II tableI, p. S16	10.1021/jm801331y
+1-Fluoropentane	-0.06		SI part II tableI, p. S16	10.1021/jm801331y
+Fluorocyclohexane	0.09		SI part II tableI, p. S16	10.1021/jm801331y
+Phosphoryl chloride	0.56		SI part II tableI, p. S16	10.1021/jm801331y
+Triethyl phosphate	2.68		SI part II tableI, p. S16	10.1021/jm801331y
+N-Ethylmaleimide	0.68		SI part II tableI, p. S16	10.1021/jm801331y
+Trimethylphosphine oxide	3.53		SI part II tableI, p. S16	10.1021/jm801331y
+N-Methylsuccinimide	1.06		SI part II tableI, p. S16	10.1021/jm801331y
+Hexamethylphosphoric triamide (HMPA)	3.60		SI part II tableI, p. S16	10.1021/jm801331y
+Triethylphosphine oxide	3.66		SI part II tableI, p. S16	10.1021/jm801331y
+Tetrabutylammonium iodide	2.80		SI part II tableI, p. S16	10.1021/jm801331y
+Tetrabutylammonium acetate	5.60		SI part II tableI, p. S16	10.1021/jm801331y
+Triethylarsine oxide	4.89		SI part II tableI, p. S16	10.1021/jm801331y
+Phenyl isothiocyanate	-0.55	S	SI part II tableI, p. S16	10.1021/jm801331y

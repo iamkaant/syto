@@ -1,0 +1,187 @@
+# Mapping: perception moiety id -> entries in data-src/external/noncovalent_params.yaml
+#
+# The extracted dataset uses a finer chemical vocabulary (116 ids) than the
+# perception layer emits (~40). That asymmetry is useful, not a problem: a user
+# clicks one carbonyl oxygen and the panel shows ketone, aryl-ketone, lactam
+# and amide values side by side, which is exactly the comparison a hit-picking
+# party argues about.
+#
+# Mapping is therefore one perceived moiety -> several source entries, ordered
+# most-specific first. tools/build_data.py checks that every key is a real
+# perception id and every value is a real entry id in the source file.
+#
+# WATCH THE ESTER. The source's `hbond_ester_lactone_carbonyl_o` is the C=O of
+# an ester, which perception classifies as `carbonyl_o`. Perception's
+# `ester_o` is the *other* oxygen, the -O- linkage, which is a weak,
+# ether-like acceptor. Mapping them together would overstate it badly.
+
+schema_version: 1
+
+# Entries shown for every pose regardless of what was clicked: general
+# geometry rules, desolvation costs, water displacement, cooperativity.
+always_relevant:
+  - hbond_general_geometry
+  - desolvation_buried_unsatisfied_polar
+  - water_displacement
+  - cooperativity_thrombin_example
+  - pkbhx_scale_definition
+
+map:
+
+  # ---- nitrogen acceptors ----
+  pyridine_n:
+    - hbond_pyridine_n
+    - hbond_azine_n
+    - hbond_imidazole_n3
+    - hbond_azole_n
+  amine_n_primary:
+    - hbond_primary_amine_n
+  amine_n_secondary:
+    - hbond_secondary_amine_n
+  amine_n_tertiary:
+    - hbond_tertiary_amine_n
+  aniline_n:
+    - hbond_aniline_n
+  imine_n:
+    - hbond_amidine_guanidine_imine_n
+  nitrile_n:
+    - hbond_nitrile_n
+    - hbond_push_pull_nitrile_n
+
+  # ---- oxygen acceptors ----
+  amide_o:
+    - hbond_amide_carbonyl_o
+    - hbond_lactam_pyridone_o
+    - hbond_urea_carbamate_imide_o
+  carbonyl_o:
+    - hbond_ketone_carbonyl_o
+    - hbond_aldehyde_o
+    - hbond_ester_lactone_carbonyl_o      # the C=O of an ester, not its -O-
+    - hbond_vinylogous_amide_o
+  ether_o:
+    - hbond_ether_o
+  ester_o:                                 # the -O- linkage: weak, ether-like
+    - hbond_ether_o
+  furan_o:
+    - hbond_furan_thiophene_pyrrole
+    - hbond_ether_o
+  alcohol_oh:
+    - hbond_alcohol_phenol_o
+  phenol_oh:
+    - hbond_alcohol_phenol_o
+  water_o:
+    - water_displacement
+    - hbond_alcohol_phenol_o
+  carboxylate_o:
+    - hbond_carboxylate_o
+  phosphate_sulfonate_o:
+    - hbond_phosphoryl_o
+  sulfoxide_o:
+    - hbond_sulfoxide_o
+  sulfone_o:
+    - hbond_sulfone_o
+    - hbond_sulfonamide_o
+  phosphine_oxide_o:
+    - hbond_phosphoryl_o
+  n_oxide_o:
+    - hbond_n_oxide_o
+  nitro_o:
+    - hbond_nitro_nitroso_o
+
+  # ---- sulfur ----
+  thioether_s:
+    - hbond_thioether_thiol_s
+    - sulfur_contacts
+  thiol_s:
+    - hbond_thioether_thiol_s
+  thiocarbonyl_s:
+    - hbond_thiocarbonyl_s
+
+  # ---- halogen as acceptor / as donor ----
+  organic_f:
+    - hbond_haloalkane_x
+    - multipolar_cf_carbonyl
+  halogen_cl:
+    - xbond_halogen_carbonyl
+    - halogen_aryl_contacts
+  halogen_br:
+    - xbond_halogen_carbonyl
+    - halogen_aryl_contacts
+  halogen_i:
+    - xbond_halogen_carbonyl
+    - halogen_aryl_contacts
+
+  # ---- donors ----
+  amide_nh:
+    - hbond_general_geometry
+    - desolvation_buried_unsatisfied_polar
+  pyrrole_nh:
+    - hbond_furan_thiophene_pyrrole
+  amine_nh:
+    - hbond_general_geometry
+  charged_n_donor:
+    - cation_pi
+    - desolvation_buried_unsatisfied_polar
+  alcohol_oh_donor:
+    - hbond_alcohol_phenol_o
+  phenol_oh_donor:
+    - hbond_alcohol_phenol_o
+  thiol_sh:
+    - hbond_thioether_thiol_s
+  water_oh:
+    - water_displacement
+
+  # ---- rings ----
+  aromatic_ring_6:
+    - pi_stacking_aryl_aryl
+    - ch_pi_alkyl_aryl
+    - cation_pi
+    - hbond_pi_acceptor
+    - halogen_aryl_contacts
+  aromatic_ring_5:
+    - pi_stacking_aryl_aryl
+    - ch_pi_alkyl_aryl
+    - cation_pi
+  heteroaromatic_ring:
+    - pi_stacking_aryl_aryl
+    - cation_pi
+    - amide_pi_stacking
+
+  # ---- charged groups ----
+  carboxylate:
+    - hbond_carboxylate_o
+    - desolvation_buried_unsatisfied_polar
+  guanidinium:
+    - cation_pi
+    - desolvation_buried_unsatisfied_polar
+  amidinium:
+    - cation_pi
+    - hbond_amidine_guanidine_imine_n
+  ammonium:
+    - cation_pi
+    - desolvation_buried_unsatisfied_polar
+  imidazolium:
+    - cation_pi
+    - hbond_imidazole_n3
+  sulfonate:
+    - hbond_phosphoryl_o
+  phosphate:
+    - hbond_phosphoryl_o
+
+  # ---- apolar ----
+  hydrophobic:
+    - hydrophobic_burial
+    - ch_pi_alkyl_aryl
+
+# Interaction-type -> source entry, for the panel shown when a user clicks a
+# drawn interaction line rather than an atom.
+interaction_map:
+  hbond: [hbond_general_geometry]
+  hbond_charged: [hbond_general_geometry, hbond_carboxylate_o]
+  weak_hbond: [hbond_weak_ch_donor]
+  salt_bridge: [hbond_carboxylate_o, desolvation_buried_unsatisfied_polar]
+  pi_stack_parallel: [pi_stacking_aryl_aryl]
+  pi_stack_tshaped: [pi_stacking_aryl_aryl, ch_pi_alkyl_aryl]
+  cation_pi: [cation_pi]
+  halogen_bond: [xbond_halogen_carbonyl]
+  hydrophobic: [hydrophobic_burial]

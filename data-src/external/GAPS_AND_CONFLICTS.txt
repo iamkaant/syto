@@ -1,0 +1,96 @@
+NON-COVALENT INTERACTION PARAMETER DATASET - GAPS, ACCESS NOTES AND CONFLICTS
+Generated 2026-11-17. Companion to noncovalent_params.yaml.
+
+A. WHAT WAS ACCESSED (and how)
+  1. Laurence et al. J Med Chem 2009 (10.1021/jm801331y): full text via UCSF subscription (ACS
+     site, Cloudflare check passed in the user's browser). SI jm801331y_si_001.pdf (16 pp)
+     downloaded by the user and parsed with pdftotext/pdfplumber; pages S11, S12, S15, S16
+     visually checked against the parse. All 232 rows of SI part II and 323 rows of SI part III
+     extracted (pkbhx_SI_partII.tsv, pkbhx_SI_partIII.tsv).
+  2. Bissantz, Kuhn, Stahl J Med Chem 2010 (10.1021/jm100112j): open full text, PMC2905122.
+     Table 2 is only an image; it was read twice by eye at two zoom levels (identical readings).
+  3. Green & Popelier JCIM 2014 (10.1021/ci400657c, PMC4004274): open; used only as a
+     secondary source for pKBHX values that are missing from the Laurence SI sample.
+  4. Dougherty Acc Chem Res 2013 (10.1021/ar300265y, PMC3957424): open; cation-pi.
+  5. Cavallo et al. Chem Rev 2016 (10.1021/acs.chemrev.5b00484, PMC4768247): open; halogen bond.
+
+B. NOT ACCESSED / PAYWALLED / NOT EXTRACTED
+  - The full pKBHX database (1338 values, v08.05). Only the ~1/3 sample in the SI is public.
+    The paper says academics could get it free from CEISAM Nantes; that 2009 URL was not checked.
+  - Laurence Figure 6 (per-family pKBHX plot) and Figure S1 (SI graphical scale): plots only.
+    I did not read values off the plots. The values that the text quotes are included.
+  - Bissantz SI (Figures S-1, S-2: per-acceptor H-bond distance/angle distributions;
+    S-3 to S-8): not retrieved. So no per-acceptor angle distributions beyond the main-text rules.
+  - Bissantz Figure 4 / Figure 9 (H-bond length box plots): plots only, not extracted.
+  - Schaerfer et al. J Med Chem 2013 (correct DOI 10.1021/jm3016816; the prompt gave no DOI)
+    and Guba et al. JCIM 2016 (10.1021/acs.jcim.5b00522): the Guba article is available via
+    UCSF subscription. Its rules are in SI ci5b00522_si_001.zip. That file and the ZBH copies
+    (tor-lib-2013.zip, tor-lib-2016.zip) were NOT downloaded. Reasons: my sandbox's network
+    blocks zbh.uni-hamburg.de, and downloading through your browser needs your OK.
+    LICENCE: no open licence is stated. The ZBH dataset page says "(c) University of Hamburg. All
+    rights reserved". Guba 2016 says the library "including CSD histograms requires a CCDC
+    licence". The 2013/2016 CSD histograms were not published for legal reasons. The 2022 v3.0
+    library (Penner et al., 10.1021/acs.jcim.2c00043, SI ci2c00043_si_002.zip) does include
+    CSD+PDB histograms. Treat it as redistributable only after checking the ACS/ZBH terms.
+    -> No SMARTS or torsion ranges are in the YAML.
+  - "Kuhn et al. on hydration sites / water networks": I could not identify one specific paper
+    from this description, and I did not guess one. The only water numbers included are those
+    quoted in Bissantz 2010.
+  - Allen et al. 1987 CSD bond-length tables (J Chem Soc Perkin Trans 2, S1-S19) and
+    successors: not accessed (RSC paywall; very large tables). No geometry baselines included.
+  - Galland, Laurence, Le Questel JOC 2022 (pKBHX of 26 anions, 10.1021/acs.joc.2c00521):
+    not accessed. Carboxylate/phosphate/sulfonate anion acceptors are therefore missing, except
+    Bu4N+ acetate (5.60) and iodide (2.80) ion pairs in CCl4.
+  - Chalcogen-bond energies (e.g., Beno et al. J Med Chem 2015, 10.1021/jm501853m): not accessed.
+  - Primary papers that Bissantz/Cavallo/Dougherty cite (Homans, Dunitz, Tsuzuki, Hobza,
+    Diederich double-mutant cycles, etc.) were not read. Those numbers carry the flag
+    secondary_citation.
+
+C. FAMILIES WITH NO (OR NO RELIABLE) NUMBERS IN THIS DATASET
+  - Aryl halides (Ar-F/Cl/Br/I) as H-bond acceptors: no pKBHX values. Only haloalkanes are covered.
+  - Aryl-halide sigma-hole magnitudes: only CH3X/CF3X/NCX model VS,max values (Cavallo Table 1).
+    No measured halogen-bond free energies in solution for drug-like Ar-X...O=C.
+  - Halogen-bond energies: only a gas-phase iodobenzene...NMe3 value (5.8 kcal/mol), a
+    formaldehyde...halobenzene upper bound (<2.5), and a cathepsin L SAR-derived 1-2 kcal/mol.
+  - Phosphine oxides: 2 compounds only (database holds 11). Phosphonates/phosphinates: none.
+  - Sulfonamides (tertiary): 2 compounds, and they conflict (see D). Primary/secondary
+    sulfonamide O: none. Sulfonamide NH as donor: none (pKBHX is an acceptor scale only).
+  - Imines/oximes, amidines: sparse. Oximes: none.
+  - Five-membered azoles: no tetrazole, 1,2,3-triazole or oxadiazole values. Only one
+    1,2,4-triazole value.
+  - Thiazole vs oxazole vs isoxazole O-site values: none (N is the site).
+  - H-bond DONOR strength scale (pKAHY or similar): not covered. All pKBHX are acceptor values.
+  - Water-mediated bridge energies, explicit hydration-site free energies: none.
+  - Amide-pi stacking energy, Met-S...aromatic energy: none (geometry only).
+  - pi-stacking for heteroaromatics: no numbers (only the benzene dimer and fluorobenzene deltas).
+  - Cation-pi in water: only system-specific ddG values (0.5-0.8 buried Trp/Lys; 2.6-2.8 SAR;
+    2-5 kcal/mol range). The gas-phase values (Li+ 38 ... NMe4+ 9) are NOT transferable.
+
+D. VALUE CONFLICTS FOUND (all flagged value_conflict in the YAML)
+  Within Laurence 2009 (main text vs SI part II vs SI part III):
+    dimethyl sulfone                 1.10 (text, SI II)  vs 1.40 (SI III)
+    N,N-dimethylmethanesulfonamide   1.00 (text)         vs 1.30 (SI III)
+    fluorocyclohexane               -0.07 (Table 4)      vs 0.09 (SI III)
+    imidazole                        2.41 (Table 4)      vs 2.42 (SI III)
+    benzylamine                      1.84 (SI II)        vs 1.88 (SI III)
+    tert-butylamine                  2.23 (SI II)        vs 2.26 (SI III)
+    isopropylamine 2.20/2.22; n-butylamine 2.19/2.21; allylamine 1.93/1.94; methyl nicotinate N 1.44/1.45
+  Between sources:
+    oxazole N                        1.30 (Laurence text & SI II) vs 1.67 (Bissantz Table 1)
+    4-bromo-N,N-dimethylaniline      0.17 (Laurence SI II)        vs -0.42 (Green & Popelier Table 1)
+    cyanamide                        1.40 (Laurence SI III)       vs 1.56 (Green & Popelier Table 3;
+                                     = Laurence's N,N-dimethylcyanamide, possible mislabel)
+  The larger conflicts (sulfone, sulfonamide, fluorocyclohexane, oxazole, bromo-aniline,
+  cyanamide) should be resolved against the Nantes primary papers or the full database before
+  anyone relies on them.
+
+E. OTHER CAVEATS
+  - All pKBHX values are 4-fluorophenol/CCl4/298 K. Laurence s3 says sp2/sp3 N bases gain up to
+    4 kJ/mol relative to O bases in more polar media. The values do not convert directly to
+    aqueous protein-ligand free energies, and I did NOT convert pKBHX to kcal/mol in energy_kcal.
+  - energy_kcal is filled only where the source states an energy.
+  - Bissantz Table 2 ranges are 10th-90th percentile CSD peak ranges (crystal statistics). They
+    are not equilibrium distances; d_ideal is set only where a median is stated in the text.
+  - Scheme 2 values (2.44 / 2.44 / 2.60 / 2.79) were read from an image. The first three agree
+    with the SI text; 2.79 (cyclic urea, DMPU-like structure) is the only image-only value.
+  - Unlike the schema example, I filled no energy_kcal for pyridine N: the source gives none.
