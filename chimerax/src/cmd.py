@@ -170,6 +170,16 @@ hitpick_setup_desc = CmdDesc(
 # ------------------------------------------------------------------- analyze
 
 def hitpick_analyze(session, ligand=None):
+    """Analyse one docked pose and draw its interactions.
+
+    Reentrancy guard: analysing adds pseudobond groups and updates the
+    ViewDock table, either of which can make ViewDock re-emit
+    selection_changed, which calls straight back into here. Without the guard
+    that recurses until Python gives up, and the failure is ugly and remote -
+    it took out the REST bridge rather than reporting itself.
+    """
+    if getattr(session, "_hitpick_analyzing", False):
+        return get_state(session).result
     ensure_ui(session)
     st = get_state(session)
     if not st.ready:
@@ -181,6 +191,15 @@ def hitpick_analyze(session, ligand=None):
         lig = _guess_displayed_ligand(session, st)
     if lig is None:
         raise UserError("No ligand found. Name one: hitpick analyze #2")
+
+    session._hitpick_analyzing = True
+    try:
+        return _analyze_pose(session, st, lig)
+    finally:
+        session._hitpick_analyzing = False
+
+
+def _analyze_pose(session, st, lig):
 
     st.ligand_model = lig
     # Receptor + this pose, in one index space: receptor first, as the core

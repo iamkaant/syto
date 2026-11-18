@@ -151,7 +151,17 @@ def is_hooked(session):
 
 
 def _on_pose_changed(session, selected):
+    """Analyse the newly selected pose.
+
+    Guarded against re-entry: both analysing (which adds pseudobond groups)
+    and writing our columns can make ViewDock emit selection_changed again,
+    and this handler would then call itself until Python gave up. Guarding
+    only hitpick_analyze is not enough, because update_columns can trigger
+    the signal on its own.
+    """
     if not selected:
+        return
+    if getattr(session, "_hitpick_in_pose_change", False):
         return
     from .cmd import hitpick_analyze
     from .state import get_state
@@ -161,8 +171,12 @@ def _on_pose_changed(session, selected):
     structure = selected[0]
     if structure is st.receptor_model:
         return
-    hitpick_analyze(session, structure)
-    update_columns(session, structure)
+    session._hitpick_in_pose_change = True
+    try:
+        hitpick_analyze(session, structure)
+        update_columns(session, structure)
+    finally:
+        session._hitpick_in_pose_change = False
 
 
 # --------------------------------------------------------------- columns
