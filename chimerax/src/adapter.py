@@ -39,11 +39,38 @@ OWN_MULTIPLE_BOND_IDATM = frozenset({
     "S2", "Sac", "Son", "Sxd",
 })
 
-# IDATM types that are explicitly charged.
-_FORMAL_CHARGE_IDATM = {
-    "N1+": 1, "N2+": 1, "N3+": 1, "Ng+": 1, "O1+": 1, "O2-": -1,
-    "O3-": -1, "S3-": -1, "S3+": 1, "P3+": 1, "Oar+": 1,
-}
+# IDATM's trailing '+' and '-' mark a charge-CAPABLE type, not an actual
+# formal charge. ChimeraX types neutral trimethylamine as N3+ just as it does
+# a protonated amine, so reading the '+' as +1 marked every tertiary amine
+# cationic - which then became a phantom "ammonium" group and, through it, a
+# phantom salt bridge.
+#
+# The charge is therefore derived from connectivity, which is unambiguous.
+
+
+def _formal_charge(idatm, element, n_connections, n_hydrogens):
+    if element == "N":
+        # four substituents on nitrogen is a quaternary or protonated amine
+        if n_connections >= 4:
+            return 1
+        # sp2 nitrogen bearing three substituents: an iminium. A NEUTRAL
+        # three-coordinate sp2 nitrogen is typed Npl (amide, aniline), not N2+.
+        if idatm == "N2+" and n_connections == 3:
+            return 1
+        if idatm == "N1+" and n_connections == 2:
+            return 1
+        # Ng+ is a guanidinium nitrogen: the charge belongs to the whole
+        # delocalised group, so perceive.features assigns it there.
+        return 0
+    if element == "O":
+        # O2-/O3- are carboxylate, phosphate and nitro oxygens, where the
+        # charge is shared. Putting -1 on each would double-count it, so the
+        # group perceiver owns these too.
+        return 0
+    if element == "S" and idatm == "S3-" and n_connections == 1 \
+            and n_hydrogens == 0:
+        return -1          # thiolate
+    return 0
 
 
 def _hyb_from_idatm(idatm, element):
@@ -118,7 +145,9 @@ def from_structures(structures, ligand_structures=(), ligand_residues=None):
             name.append(str(names[k])[:6])
             hyb.append(_hyb_from_idatm(it, el))
             arom.append(it in AROMATIC_IDATM)
-            fchg.append(_FORMAL_CHARGE_IDATM.get(it, 0))
+            a_conn = len(a.neighbors)
+            a_h = sum(1 for nb in a.neighbors if nb.element.name == "H")
+            fchg.append(_formal_charge(it, el, a_conn, a_h))
             own_mb.append(it in OWN_MULTIPLE_BOND_IDATM)
             r = residues[k]
             res_name.append((r.name or "")[:4])

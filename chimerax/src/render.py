@@ -11,6 +11,13 @@ geometry is readable without opening a panel.
 from __future__ import annotations
 
 GROUP_PREFIX = "hitpick "
+CENTROID_MODEL = "hitpick centroids"
+
+# Interactions measured between ring centroids rather than between atoms.
+# Drawing these to the nearest ring ATOM puts the line in the wrong place and
+# gives it the wrong length: a stacking line should run centroid to centroid,
+# which is what the distance was measured between.
+CENTROID_KINDS = ("pi_stack_parallel", "pi_stack_tshaped", "cation_pi")
 
 # (r, g, b) 0-255. Chosen to stay distinguishable in both light and dark
 # backgrounds and to survive the usual red/green colour-vision deficiencies.
@@ -60,7 +67,52 @@ def clear_groups(session, kinds=None):
                 removed.append(m)
     if removed:
         session.models.close(removed)
+    if kinds is None:
+        clear_centroids(session)
     return len(removed)
+
+
+def clear_centroids(session):
+    doomed = [m for m in list(session.models)
+              if getattr(m, "name", "") == CENTROID_MODEL]
+    if doomed:
+        session.models.close(doomed)
+
+
+def _centroid_set(session, create=True):
+    """A MarkerSet holding the ring centroids our lines attach to."""
+    for m in session.models:
+        if getattr(m, "name", "") == CENTROID_MODEL:
+            return m
+    if not create:
+        return None
+    from chimerax.markers import MarkerSet
+    ms = MarkerSet(session, CENTROID_MODEL)
+    session.models.add([ms])
+    return ms
+
+
+def _centroid_marker(session, mset, indices, all_atoms, cache):
+    """An (invisible) marker at the centroid of these atoms."""
+    import numpy as np
+    key = tuple(sorted(int(i) for i in indices))
+    if key in cache:
+        return cache[key]
+    try:
+        pts = [all_atoms[i].scene_coord for i in key
+               if 0 <= i < len(all_atoms)]
+    except Exception:
+        return None
+    if not pts:
+        return None
+    c = np.mean(pts, axis=0)
+    try:
+        m = mset.create_marker(c, (180, 180, 180, 0), 0.01)
+        m.display = False      # the line is the point, not the dot
+    except Exception:
+        return None
+    cache[key] = m
+    return m
 
 
 # ChimeraX draws its own hydrogen bonds at 0.075, so that is the default here
@@ -103,6 +155,8 @@ def draw_interactions(session, interactions, all_atoms, show_lengths=True,
     import numpy as np
 
     clear_groups(session)
+    mset = None
+    centroid_cache = {}
     by_kind = {}
     for it in interactions:
         if it.quality < min_quality:
@@ -115,8 +169,16 @@ def draw_interactions(session, interactions, all_atoms, show_lengths=True,
         pbg = session.pb_manager.get_group(name, create=True)
         pbg.dashes = TYPE_DASHES.get(kind, 6)
         for it in items:
-            a1 = _representative_atom(it.lig_atoms, it.rec_atoms, all_atoms)
-            a2 = _representative_atom(it.rec_atoms, it.lig_atoms, all_atoms)
+            if kind in CENTROID_KINDS:
+                if mset is None:
+                    mset = _centroid_set(session)
+                a1 = _endpoint(session, mset, it.lig_atoms, all_atoms,
+                               centroid_cache, it.rec_atoms)
+                a2 = _endpoint(session, mset, it.rec_atoms, all_atoms,
+                               centroid_cache, it.lig_atoms)
+            else:
+                a1 = _representative_atom(it.lig_atoms, it.rec_atoms, all_atoms)
+                a2 = _representative_atom(it.rec_atoms, it.lig_atoms, all_atoms)
             if a1 is None or a2 is None or a1 is a2:
                 continue
             try:
@@ -141,6 +203,19 @@ def draw_interactions(session, interactions, all_atoms, show_lengths=True,
                 session.models.add([pbg])
             made[kind] = pbg.num_pseudobonds
     return made
+
+
+def _endpoint(session, mset, group, all_atoms, cache, other_group):
+    """Where a centroid-measured line should start or end.
+
+    A ring contributes its centroid; a single atom (the cation of a cation-pi)
+    contributes itself.
+    """
+    if len(group) >= 3:
+        m = _centroid_marker(session, mset, group, all_atoms, cache)
+        if m is not None:
+            return m
+    return _representative_atom(group, other_group, all_atoms)
 
 
 def _representative_atom(group, other_group, all_atoms):
