@@ -24,13 +24,24 @@ TYPE_COLORS = {
     "cation_pi":         (240, 180, 60),
     "halogen_bond":      (60, 200, 170),
     "hydrophobic":       (170, 170, 170),
+    # Clashes are drawn too: a number in a log is no use when you are looking
+    # at the pose. Red for a bad contact, deeper red when it is severe, and a
+    # separate colour for the ligand clashing with itself.
+    "clash":             (230, 70, 70),
+    "severe_clash":      (190, 20, 20),
+    "internal_clash":    (235, 130, 40),
 }
 
 TYPE_DASHES = {
     "hbond": 6, "hbond_charged": 6, "weak_hbond": 10,
     "salt_bridge": 4, "pi_stack_parallel": 8, "pi_stack_tshaped": 8,
     "cation_pi": 8, "halogen_bond": 6, "hydrophobic": 12,
+    # solid, so a clash reads differently from a favourable interaction at a
+    # glance rather than only by colour
+    "clash": 0, "severe_clash": 0, "internal_clash": 0,
 }
+
+CLASH_KINDS = ("clash", "severe_clash", "internal_clash")
 
 HIGHLIGHT_COLOR = (255, 230, 80, 255)
 
@@ -183,6 +194,93 @@ def _short_angle(name):
     return {"dha": "DHA", "haa": "HAX", "interplanar": "tilt",
             "offset": "off", "normal_offset": "off",
             "cxa": "CXA", "xay": "XAY"}.get(name, name)
+
+
+def draw_clashes(session, strain, all_atoms, show_overlap=True):
+    """Draw each clash as a solid pseudobond, grouped by severity.
+
+    Separate groups so the Model Panel can toggle severe clashes, ordinary
+    clashes and the ligand's internal clashes independently.
+    """
+    clear_groups(session, CLASH_KINDS)
+    if strain is None:
+        return {}
+
+    buckets = {"clash": [], "severe_clash": [], "internal_clash": []}
+    for c in strain.clashes:
+        buckets["severe_clash" if c.severe else "clash"].append(c)
+    for c in strain.internal:
+        buckets["internal_clash"].append(c)
+
+    _register_attrs(session)
+    made = {}
+    for kind, items in buckets.items():
+        if not items:
+            continue
+        pbg = session.pb_manager.get_group(group_name(kind), create=True)
+        pbg.dashes = TYPE_DASHES.get(kind, 0)
+        r, g, b = TYPE_COLORS[kind]
+        for c in items:
+            if not (0 <= c.i < len(all_atoms) and 0 <= c.j < len(all_atoms)):
+                continue
+            try:
+                pb = pbg.new_pseudobond(all_atoms[c.i], all_atoms[c.j])
+            except Exception:
+                continue
+            # thickness grows with the overlap, so the worst one stands out
+            pb.radius = 0.08 + min(0.22, 0.18 * c.overlap)
+            pb.color = (r, g, b, 255)
+            try:
+                pb._hitpick_text = ("%.2f over" % c.overlap) if show_overlap else ""
+                pb.hitpick_kind = kind
+            except Exception:
+                pass
+        if pbg.num_pseudobonds == 0:
+            session.models.close([pbg])
+            continue
+        if pbg not in session.models:
+            session.models.add([pbg])
+        made[kind] = pbg.num_pseudobonds
+    return made
+
+
+def label_strain(session, strain, all_atoms):
+    """Put a short note on the atoms of each strain finding.
+
+    Eclipsed torsions and puckered rings have no two atoms to draw a line
+    between, so they are labelled on the atom instead.
+    """
+    from chimerax.atomic import Atoms
+    from chimerax.core.objects import Objects
+    from chimerax.label.label3d import label
+
+    if strain is None or not strain.findings:
+        return 0
+    _register_attrs(session)
+    sel = []
+    for f in strain.findings:
+        if not f.atoms:
+            continue
+        anchor = f.atoms[len(f.atoms) // 2]
+        if not (0 <= anchor < len(all_atoms)):
+            continue
+        a = all_atoms[anchor]
+        short = {"eclipsed_torsion": "eclipsed", "nonplanar_ring": "puckered",
+                 "twisted_amide": "twisted amide"}.get(f.kind, f.kind)
+        try:
+            setattr(a, LABEL_ATTR, short)
+        except Exception:
+            continue
+        sel.append(a)
+    if not sel:
+        return 0
+    try:
+        label(session, Objects(atoms=Atoms(sel)), "atoms",
+              attribute=LABEL_ATTR, bg_color=_label_backdrop(session),
+              color=(200, 90, 30, 255), height=ATOM_LABEL_HEIGHT)
+    except Exception:
+        return 0
+    return len(sel)
 
 
 def label_interactions(session, interactions=None, all_atoms=None,

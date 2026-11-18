@@ -94,6 +94,10 @@ description = "Explain an atom automatically when it is selected"
 category = "Binding Analysis"
 description = "Show where the clicked atom sits on the basicity scale"
 
+[chimerax.command."hitpick clashes"]
+category = "Binding Analysis"
+description = "Show or hide van der Waals clashes"
+
 [chimerax.command."hitpick clear"]
 category = "Binding Analysis"
 description = "Remove hitpick drawings"

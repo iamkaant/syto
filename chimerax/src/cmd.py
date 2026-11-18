@@ -305,6 +305,17 @@ def _redraw(session, st):
     render.label_interactions(session,
                               show_lengths=st.options.show_lengths,
                               show_angles=st.options.show_angles)
+    if st.options.show_clashes:
+        drawn = render.draw_clashes(session, st.result.strain, st.all_atoms,
+                                    show_overlap=st.options.show_lengths)
+        if drawn and st.options.show_lengths:
+            render.label_interactions(
+                session, show_lengths=st.options.show_lengths,
+                show_angles=st.options.show_angles)
+    else:
+        render.clear_groups(session, render.CLASH_KINDS)
+    if st.options.show_strain_labels and st.options.annotate_atom_values is False:
+        render.label_strain(session, st.result.strain, st.all_atoms)
 
 
 def _parse_types(text):
@@ -373,6 +384,27 @@ def hitpick_lengths(session, show=True):
 
 hitpick_lengths_desc = CmdDesc(optional=[("show", BoolArg)],
                                synopsis="Show or hide interaction lengths")
+
+
+def hitpick_clashes(session, show=True):
+    """Draw or hide clashes in the 3D view."""
+    ensure_ui(session)
+    st = get_state(session)
+    st.options.show_clashes = bool(show)
+    st.options.detect_strain = bool(show) or st.options.detect_strain
+    if st.result is not None:
+        hitpick_analyze(session, st.ligand_model)
+    else:
+        if not show:
+            render.clear_groups(session, render.CLASH_KINDS)
+    session.logger.info("hitpick: clashes are %s"
+                        % ("shown" if show else "hidden"))
+    return st.options.show_clashes
+
+
+hitpick_clashes_desc = CmdDesc(
+    optional=[("show", BoolArg)],
+    synopsis="Show or hide van der Waals clashes")
 
 
 def hitpick_angles(session, show=True):
@@ -575,3 +607,5 @@ def register_commands(logger):
     register("hitpick autoexplain", hitpick_autoexplain_desc,
              hitpick_autoexplain, logger=logger)
     register("hitpick scale", hitpick_scale_desc, hitpick_scale, logger=logger)
+    register("hitpick clashes", hitpick_clashes_desc, hitpick_clashes,
+             logger=logger)

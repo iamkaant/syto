@@ -85,6 +85,9 @@ class HandbookTool(HtmlToolInstance):
                 "counts": r.counts,
                 "warnings": r.warnings,
                 "interactions": [i.to_dict() for i in r.interactions[:60]],
+                "strain": r.strain.counts if r.strain is not None else None,
+                "worst_overlap": (round(r.strain.worst_overlap, 2)
+                                  if r.strain is not None else None),
             }
         if st.last_hit is not None:
             snap["hit"] = st.last_hit.to_dict()
@@ -128,6 +131,9 @@ class HandbookTool(HtmlToolInstance):
             elif path == "angles":
                 st.options.show_angles = one("on") == "1"
                 self._reanalyse()
+            elif path == "clashes":
+                from .cmd import hitpick_clashes
+                hitpick_clashes(session, one("on") == "1")
             elif path == "labels":
                 from .cmd import hitpick_labels
                 hitpick_labels(session, one("quantity", "pKBHX"))

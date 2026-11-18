@@ -26,6 +26,12 @@ atom for atom.
 (including charge-assisted and water-mediated), salt bridges, parallel and
 T-shaped π-stacking, cation–π, halogen bonds, hydrophobic contacts.
 
+**Flags clashes and strain**: van der Waals overlaps with the site and inside
+the ligand (drawn in red, severe ones separately), near-eclipsed torsions,
+puckered aromatic rings, twisted amides, and the docking program's own strain
+terms. Inside ChimeraX this uses ChimeraX's own per-atom radii, so the numbers
+agree with its Clashes tool rather than quietly differing.
+
 Each interaction reports the measured distance and angles, a 0–1 geometric
 quality, and plain-language flags such as *"D-H···A 128°, well off linear"* or
 *"near-eclipsed sandwich; rings prefer ~1.5 Å offset"*.
@@ -81,6 +87,7 @@ hitpick setup                    # perceive the receptor once
 hitpick analyze                  # analyse the displayed pose and draw it
 hitpick report                   # text listing with geometry and flags
 
+hitpick clashes true             # draw van der Waals clashes (red)
 hitpick hide hydrophobic weak_hbond
 hitpick show all
 hitpick lengths false

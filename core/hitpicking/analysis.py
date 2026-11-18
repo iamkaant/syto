@@ -27,11 +27,13 @@ class Options:
 
     __slots__ = ("enabled_nci", "include_weak_hbonds", "site_radius",
                  "show_lengths", "show_angles", "detect_strain",
+                 "show_clashes", "show_strain_labels",
                  "handbook_on_click", "annotate_atom_values", "use_active_learning")
 
     def __init__(self, enabled_nci=None, include_weak_hbonds=False,
                  site_radius=10.0, show_lengths=True, show_angles=False,
-                 detect_strain=True, handbook_on_click=True,
+                 detect_strain=True, show_clashes=True,
+                 show_strain_labels=True, handbook_on_click=True,
                  annotate_atom_values=False, use_active_learning=False):
         self.enabled_nci = set(C.DEFAULT_ENABLED if enabled_nci is None
                                else enabled_nci)
@@ -43,6 +45,8 @@ class Options:
         self.show_lengths = show_lengths
         self.show_angles = show_angles
         self.detect_strain = detect_strain
+        self.show_clashes = show_clashes
+        self.show_strain_labels = show_strain_labels
         self.handbook_on_click = handbook_on_click
         self.annotate_atom_values = annotate_atom_values
         self.use_active_learning = use_active_learning

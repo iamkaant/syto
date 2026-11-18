@@ -96,6 +96,10 @@
     onchange="hp('lengths',{on:this.checked?1:0})"> Lengths on interactions</label>
   <label class="chk"><input type="checkbox" id="opt-angles"
     onchange="hp('angles',{on:this.checked?1:0})"> Angles on interactions</label>
+  <label class="chk"><input type="checkbox" id="opt-clashes"
+    onchange="hp('clashes',{on:this.checked?1:0})">
+    <span class="swatch" style="background:#e64646"></span>
+    Clashes and strain</label>
   <div class="row" style="margin-top:7px;gap:6px">
     <button onclick="hp('labels',{quantity:'pKBHX'})">Label pK<sub>BHX</sub></button>
     <button onclick="hp('labels',{quantity:'off'})">Clear labels</button>
@@ -179,6 +183,8 @@ window.hpSetState = function (s) {
   if (s.options) {
     document.getElementById("opt-lengths").checked = !!s.options.show_lengths;
     document.getElementById("opt-angles").checked = !!s.options.show_angles;
+    var oc = document.getElementById("opt-clashes");
+    if (oc) oc.checked = !!s.options.show_clashes;
   }
 
   renderPose(s.pose);
@@ -190,6 +196,22 @@ function renderPose(p) {
   if (!p) { el.innerHTML = '<p class="empty">Nothing analysed yet.</p>'; return; }
   var h = '<div class="card"><div class="row spread"><b>' + esc(p.name) + '</b>'
         + '<span class="pill">' + (p.interactions || []).length + ' shown</span></div>';
+  if (p.strain) {
+    var sc = p.strain;
+    var bad = (sc.clashes || 0) + (sc.internal_clashes || 0);
+    if (bad || sc.strain_flags) {
+      h += '<div class="card warn tiny"><b>' + bad + ' clash'
+        + (bad === 1 ? "" : "es");
+      if (sc.severe_clashes) h += " (" + sc.severe_clashes + " severe)";
+      if (sc.strain_flags) h += ", " + sc.strain_flags + " strain flag"
+        + (sc.strain_flags === 1 ? "" : "s");
+      h += "</b>";
+      if (p.worst_overlap) {
+        h += ' &middot; worst overlap ' + p.worst_overlap + "&nbsp;&Aring;";
+      }
+      h += "</div>";
+    }
+  }
   (p.warnings || []).forEach(function (w) {
     h += '<div class="flag" style="margin-top:6px">' + esc(w) + '</div>';
   });
