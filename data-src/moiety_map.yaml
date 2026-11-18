@@ -28,11 +28,46 @@ always_relevant:
 
 map:
 
-  # ---- nitrogen acceptors ----
+  # ---- heteroaromatic nitrogen acceptors ----
+  # Perception now names the actual ring, so each one points at the entry
+  # holding ITS family. Lumping them together spanned pyridine 1.81,
+  # azines 1.22, imidazole 2.57 and other azoles 1.36 - more than 1.5 log
+  # units of basicity presented as one answer.
   pyridine_n:
     - hbond_pyridine_n
+  quinoline_n:
+    - hbond_pyridine_n
+  isoquinoline_n:
+    - hbond_pyridine_n
+  pyridazine_n:
     - hbond_azine_n
+  pyrimidine_n:
+    - hbond_azine_n
+  pyrazine_n:
+    - hbond_azine_n
+  triazine_n:
+    - hbond_azine_n
+  phthalazine_n:
+    - hbond_azine_n
+  azine_n_polyaza:
+    - hbond_azine_n
+  imidazole_n3:
     - hbond_imidazole_n3
+  pyrazole_n2:
+    - hbond_azole_n
+  oxazole_n3:
+    - hbond_azole_n
+  isoxazole_n2:
+    - hbond_azole_n
+  thiazole_n3:
+    - hbond_azole_n
+  isothiazole_n2:
+    - hbond_azole_n
+  triazole_n:
+    - hbond_azole_n
+  tetrazole_n:
+    - hbond_azole_n
+  azole_n:
     - hbond_azole_n
   amine_n_primary:
     - hbond_primary_amine_n
@@ -117,6 +152,10 @@ map:
     - desolvation_buried_unsatisfied_polar
   pyrrole_nh:
     - hbond_furan_thiophene_pyrrole
+  pyrrole_type_n_substituted:
+    - hbond_furan_thiophene_pyrrole
+  amide_n_tertiary:
+    - hbond_amide_carbonyl_o
   amine_nh:
     - hbond_general_geometry
   charged_n_donor:
@@ -172,6 +211,28 @@ map:
   hydrophobic:
     - hydrophobic_burial
     - ch_pi_alkyl_aryl
+
+# The parent compound of a moiety, where the dataset contains it by name.
+# The family range stays on screen, but the unsubstituted parent is a far
+# better anchor than a median: the azine entry spans 0.3-2.0, while pyrazine
+# itself is 0.92 and pyridazine 1.65. Matching is exact and case-insensitive
+# on the compound name as printed in the source, so a mis-spelled or missing
+# name simply yields no anchor rather than the wrong one.
+representative:
+  pyridine_n: Pyridine
+  pyrazine_n: Pyrazine
+  pyrimidine_n: Pyrimidine
+  pyridazine_n: Pyridazine
+  phthalazine_n: Phtalazine          # spelled this way in the source
+  quinoline_n: Quinoline
+  isoquinoline_n: Isoquinoline
+  imidazole_n3: Imidazole
+  oxazole_n3: oxazole
+  thiazole_n3: Thiazole
+  furan_o: furan
+  thiophene_s: thiophene
+  nitrile_n: Acetonitrile
+  water_o: Water
 
 # Interaction-type -> source entry, for the panel shown when a user clicks a
 # drawn interaction line rather than an atom.

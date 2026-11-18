@@ -256,6 +256,42 @@ def build(strict_release=False, write=True, quiet=False):
                     "ref": v.get("ref"), "note": v.get("note"),
                 })
 
+    # resolve each moiety's parent compound to a concrete cited value
+    representative = {}
+    for mid, compound in (mp.get("representative", {}) or {}).items():
+        if mid not in moiety_map:
+            errors.append("representative[%s]: not in the moiety map" % mid)
+            continue
+        target = str(compound).strip().lower()
+        hits = []
+        for eid in moiety_map[mid]:
+            for v in iter_values(ext_by_id.get(eid, {})):
+                if str(v.get("compound", "")).strip().lower() != target:
+                    continue
+                if v.get("value") is None:
+                    continue
+                hits.append({"entry": eid, "quantity": v.get("quantity"),
+                             "value": v.get("value"), "unit": v.get("unit"),
+                             "compound": v.get("compound"),
+                             "ref": v.get("ref"), "flags": v.get("flags") or []})
+        if not hits:
+            warnings.append("representative[%s]: no value named %r in %s"
+                            % (mid, compound, moiety_map[mid]))
+            continue
+        by_q = {}
+        for h in hits:
+            by_q.setdefault(h["quantity"], []).append(h)
+        resolved = {}
+        for q, lst in by_q.items():
+            vals = {str(x["value"]) for x in lst}
+            rec = dict(lst[0])
+            if len(vals) > 1:
+                # the sources disagree about this very compound; say so
+                rec["disagrees"] = sorted(vals)
+                rec["flags"] = list(set(rec["flags"]) | {"value_conflict"})
+            resolved[q] = rec
+        representative[mid] = resolved
+
     entries = {e["id"]: e for e in local + external}
     for e in entries.values():
         st = summarise_quantities(e)
@@ -266,6 +302,7 @@ def build(strict_release=False, write=True, quiet=False):
         "schema_version": 1,
         "entries": entries,
         "by_moiety": by_moiety,
+        "representative": representative,
         "always_relevant": always,
         "interaction_map": inter_map,
         "sources": sources,
@@ -279,6 +316,7 @@ def build(strict_release=False, write=True, quiet=False):
             "n_flagged_values": n_flagged,
             "n_conflicts": len(conflicts),
             "flags": flag_counts,
+            "n_representative": len(representative),
             "n_mapped_moieties": len(moiety_map),
             "n_unmapped_moieties": len(known - set(moiety_map)),
         },

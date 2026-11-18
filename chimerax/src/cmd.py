@@ -400,9 +400,11 @@ def hitpick_labels(session, quantity="pKBHX"):
     st.options.annotate_atom_values = True
     session.logger.info("hitpick: labelled %d atoms with %s" % (n, q))
     session.logger.info(
-        "hitpick: labels show the family median and range, not a value for "
-        "this exact compound - perception knows the moiety, not the "
-        "substitution pattern.")
+        "hitpick: each label shows the UNSUBSTITUTED PARENT compound's value "
+        "where the data has it, with the family range in brackets. It is not "
+        "a value for this exact compound: perception identifies the ring or "
+        "group, not the substitution pattern, and substituents move pKBHX by "
+        "a log unit or more. A * marks values flagged for review.")
     return n
 
 

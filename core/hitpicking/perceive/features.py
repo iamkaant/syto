@@ -27,6 +27,30 @@ from ..elements import SIGMA_HOLE_HALOGENS
 
 ACCEPTOR_NONE = None
 
+# Short descriptions for the specific heteroaromatic nitrogens.
+_AROMATIC_N_NOTES = {
+    "pyridine_n": "pyridine-type N; strong acceptor",
+    "quinoline_n": "quinoline N; strong acceptor",
+    "isoquinoline_n": "isoquinoline N; strong acceptor",
+    "pyridazine_n": "1,2-diazine N; weakened by the adjacent N",
+    "pyrimidine_n": "1,3-diazine N; markedly weaker than pyridine",
+    "pyrazine_n": "1,4-diazine N; among the weakest azine acceptors",
+    "phthalazine_n": "phthalazine N",
+    "triazine_n": "triazine N; strongly deactivated",
+    "azine_n_polyaza": "polyaza ring N; strongly deactivated",
+    "imidazole_n3": "imidazole N3; the strongest common azole acceptor",
+    "pyrazole_n2": "pyrazole N2",
+    "oxazole_n3": "oxazole N3",
+    "isoxazole_n2": "isoxazole N2; weakened by the adjacent O",
+    "thiazole_n3": "thiazole N3",
+    "isothiazole_n2": "isothiazole N2",
+    "triazole_n": "triazole N",
+    "tetrazole_n": "tetrazole N",
+    "azole_n": "azole N",
+}
+
+
+
 # ---------------------------------------------------------------------------
 # The registry of every moiety id this module can emit.
 #
@@ -36,6 +60,8 @@ ACCEPTOR_NONE = None
 # deliberately, never by accident.
 # ---------------------------------------------------------------------------
 
+AROMATIC_N_IDS = frozenset(_AROMATIC_N_NOTES)
+
 ACCEPTOR_IDS = frozenset({
     "carboxylate_o", "phosphate_sulfonate_o", "amide_o", "carbonyl_o",
     "sulfoxide_o", "sulfone_o", "n_oxide_o", "nitro_o", "phosphine_oxide_o",
@@ -43,7 +69,7 @@ ACCEPTOR_IDS = frozenset({
     "generic_o", "pyridine_n", "nitrile_n", "imine_n", "amine_n_tertiary",
     "amine_n_secondary", "amine_n_primary", "aniline_n", "thiocarbonyl_s",
     "thioether_s", "thiol_s", "organic_f",
-})
+}) | AROMATIC_N_IDS
 
 DONOR_IDS = frozenset({
     "ammonium_n", "charged_n_donor", "pyrrole_nh", "amide_nh", "amine_nh",
@@ -60,7 +86,8 @@ RING_IDS = frozenset({"aromatic_ring_6", "aromatic_ring_5", "heteroaromatic_ring
 
 HALOGEN_IDS = frozenset({"halogen_cl", "halogen_br", "halogen_i"})
 
-OTHER_IDS = frozenset({"hydrophobic", "sulfonamide_n"})
+OTHER_IDS = frozenset({"hydrophobic", "sulfonamide_n",
+                       "pyrrole_type_n_substituted", "amide_n_tertiary"})
 
 MOIETY_IDS = (ACCEPTOR_IDS | DONOR_IDS | GROUP_IDS | RING_IDS
               | HALOGEN_IDS | OTHER_IDS)
@@ -145,12 +172,22 @@ def classify_acceptor(ms, i: int):
     if el == "N":
         if chg > 0:
             return None                   # protonated N donates, never accepts
-        if nh > 0 and ms.aromatic[i]:
-            return None                   # pyrrole-type NH: donor only
+        if ms.aromatic[i] and (nh > 0 or len(hv) >= 3):
+            # Pyrrole-type ring nitrogen: its lone pair is part of the
+            # aromatic sextet, so it does not accept - whether it carries a
+            # hydrogen (pyrrole, imidazole N1-H) or a substituent
+            # (N-methylimidazole N1). Only the other, two-coordinate ring
+            # nitrogen of an azole is an acceptor.
+            return None
         if is_conj and _is_amide_like(ms, i):
             return None                   # amide / sulfonamide N: not an acceptor
         if ms.aromatic[i] and nh == 0 and len(hv) == 2:
-            return "pyridine_n", "aromatic N; strong acceptor"
+            # Which heteroaromatic ring this is matters: pyridine, pyrazine
+            # and imidazole nitrogens differ by more than 1.5 log units of
+            # basicity, so reporting them all as "pyridine-type" is noise.
+            from .heteroaromatic import classify_aromatic_nitrogen
+            mid = classify_aromatic_nitrogen(ms, i)
+            return mid, _AROMATIC_N_NOTES.get(mid, "aromatic N; acceptor")
         if ms.hyb[i] == HYB_SP and len(hv) == 1:
             return "nitrile_n", "nitrile; moderate, highly directional"
         if ms.hyb[i] == HYB_SP2 and nh == 0 and len(hv) == 2:
@@ -261,6 +298,32 @@ def _is_ester_o(ms, i):
 
 
 # ------------------------------------------------------------------ donors
+
+def classify_non_acceptor(ms, i):
+    """Atoms commonly mistaken for acceptors. Returns (moiety_id, why) or None.
+
+    Half of what gets argued about at a hit-picking party is someone counting
+    one of these, so the handbook says so explicitly rather than just staying
+    silent about the atom.
+    """
+    el = str(ms.element[i])
+    if el != "N":
+        return None
+    hv = ms.heavy_neighbors(i)
+    nh = len(ms.attached_hydrogens(i))
+    if ms.aromatic[i] and (nh > 0 or len(hv) >= 3):
+        if nh > 0:
+            return ("pyrrole_nh",
+                    "pyrrole-type NH: donates, does not accept")
+        return ("pyrrole_type_n_substituted",
+                "substituted pyrrole-type ring N: lone pair is in the "
+                "aromatic sextet, so it neither donates nor accepts")
+    if _is_amide_like(ms, i) and nh == 0:
+        return ("amide_n_tertiary",
+                "tertiary amide N: delocalised into the carbonyl, not an "
+                "acceptor")
+    return None
+
 
 def classify_donor(ms, i: int):
     """Return (moiety_id, note) if atom i is a hydrogen-bond donor heavy atom."""

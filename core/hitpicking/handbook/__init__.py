@@ -17,7 +17,8 @@ from __future__ import annotations
 import json
 import os
 
-from ..perceive.features import classify_acceptor, classify_donor, Feature
+from ..perceive.features import (classify_acceptor, classify_donor,
+                                 classify_non_acceptor, Feature)
 from ..perceive import features as _F
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "handbook.json")
@@ -64,6 +65,8 @@ class Handbook:
         self.payload = payload
         self.entries = payload.get("entries", {})
         self.by_moiety = payload.get("by_moiety", {})
+        # moiety -> quantity -> the parent compound's own cited value
+        self.representative = payload.get("representative", {})
         self.interaction_map = payload.get("interaction_map", {})
         self._always = payload.get("always_relevant", [])
         self.stats = payload.get("stats", {})
@@ -121,6 +124,11 @@ class Handbook:
         if don:
             mids.append(don[0])
             roles.append("donor: " + don[1] if don[1] else "donor")
+        if not acc:
+            neg = classify_non_acceptor(ms, idx)
+            if neg:
+                mids.append(neg[0])
+                roles.append("NOT an acceptor - " + neg[1])
 
         for f in _F.find_charged_groups(ms):
             if idx in f.atoms:
@@ -185,6 +193,18 @@ class Handbook:
 
     # -------------------------------------------------------- annotations
 
+    def representative_for(self, moiety_ids, quantity):
+        """The parent compound's own value for this moiety, if the data has it.
+
+        Anchoring on the unsubstituted parent beats a family median: the azine
+        family spans 0.3 to 2.0, while pyrazine itself is 0.92.
+        """
+        for mid in moiety_ids:
+            rec = (self.representative.get(mid) or {}).get(quantity)
+            if rec:
+                return rec
+        return None
+
     def annotations_for(self, moiety_ids):
         """Numeric summaries suitable for display next to an atom."""
         out = []
@@ -200,35 +220,43 @@ class Handbook:
                         continue
                     seen.add(key)
                     s = st[q]
-                    out.append({
+                    ann = {
                         "quantity": q, "entry": e["id"],
                         "entry_title": e.get("title", e["id"]),
                         "median": s["median"], "min": s["min"],
                         "max": s["max"], "n": s["n"], "unit": s.get("unit"),
                         "n_flagged": s.get("n_flagged", 0),
                         "derived": True,
-                    })
+                    }
+                    rep = self.representative_for(moiety_ids, q)
+                    if rep and rep.get("entry") == e["id"]:
+                        ann["representative"] = rep
+                    out.append(ann)
         return out
 
     def label_for_atom(self, ms, idx, quantity="pKBHX"):
         """One compact string for a 3D atom label, or None.
 
-        Deliberately shows the family median and range rather than a single
-        number: the perception layer knows "this is a pyridine nitrogen", not
-        which substituted pyridine, and those differ by whole log units.
+        Prefers the parent compound's own cited value and keeps the family
+        range beside it, so the number is anchored on something real while
+        still showing how far substitution can move it.
         """
         hit = self.for_atom(ms, idx)
         for a in hit.annotations:
             if a["quantity"] != quantity:
                 continue
             flag = "*" if a["n_flagged"] else ""
+            rep = a.get("representative")
+            if rep and isinstance(rep.get("value"), (int, float)):
+                rflag = "*" if rep.get("flags") else ""
+                return "%s %.2f%s (%.1f-%.1f)%s" % (
+                    quantity, float(rep["value"]), rflag,
+                    a["min"], a["max"], flag)
             n = a["n"]
             if a["min"] == a["max"]:
                 return "%s %.2f%s" % (quantity, a["median"], flag)
             if n < MIN_N_FOR_MEDIAN:
-                # Too few compounds for a median to mean anything. Quoting
-                # "~4.2" from two values 2.8 and 5.6 would imply a precision
-                # the data does not have, so the range and n are shown instead.
+                # Too few compounds for a median to mean anything.
                 return "%s %.1f-%.1f (n=%d)%s" % (
                     quantity, a["min"], a["max"], n, flag)
             return "%s ~%.1f (%.1f-%.1f)%s" % (
