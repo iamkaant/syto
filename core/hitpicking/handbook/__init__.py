@@ -235,17 +235,40 @@ class Handbook:
                 quantity, a["median"], a["min"], a["max"], flag)
         return None
 
-    def annotate_system(self, ms, quantity="pKBHX", ligand_only=True):
-        """{atom_index: label} for every atom that has a value worth showing."""
+    def annotate_system(self, ms, quantity="pKBHX", ligand_only=True,
+                        heteroatoms_only=True, deduplicate=True):
+        """{atom_index: label} for atoms worth annotating in 3D.
+
+        Two filters, both on by default, because labelling everything makes
+        the view unreadable and buries the values that matter:
+
+        * `heteroatoms_only` skips carbon. An aromatic carbon does carry a
+          pKBHX (benzene is a very weak pi acceptor, about -0.5), but putting
+          that on all six carbons of every ring drowns out the pyridine
+          nitrogen next to it.
+        * `deduplicate` emits one label per moiety rather than one per atom,
+          so a ring gets a single annotation instead of six identical ones.
+        """
         out = {}
+        seen = set()
         for i in range(ms.n_atoms):
             if ligand_only and not ms.is_ligand[i]:
                 continue
-            if str(ms.element[i]) == "H":
+            el = str(ms.element[i])
+            if el == "H":
+                continue
+            if heteroatoms_only and el == "C":
                 continue
             lab = self.label_for_atom(ms, i, quantity)
-            if lab:
-                out[i] = lab
+            if not lab:
+                continue
+            if deduplicate:
+                hit = self.for_atom(ms, i)
+                key = (lab, frozenset(hit.highlight))
+                if key in seen:
+                    continue
+                seen.add(key)
+            out[i] = lab
         return out
 
     # ----------------------------------------------------------- moieties
