@@ -25,6 +25,11 @@ DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "handbook.json
 # Quantities worth putting directly on an atom in the 3D view, best first.
 LABEL_QUANTITIES = ("pKBHX", "pKBH+", "VS_max")
 
+# Below this many compounds a median is not reported: the range is shown with
+# its n instead. A "median" of two values 2.8 and 5.6 is just their midpoint
+# and reads far more authoritative than it is.
+MIN_N_FOR_MEDIAN = 5
+
 
 class HandbookHit:
     """What the handbook has to say about one clicked atom or interaction."""
@@ -217,8 +222,15 @@ class Handbook:
             if a["quantity"] != quantity:
                 continue
             flag = "*" if a["n_flagged"] else ""
+            n = a["n"]
             if a["min"] == a["max"]:
                 return "%s %.2f%s" % (quantity, a["median"], flag)
+            if n < MIN_N_FOR_MEDIAN:
+                # Too few compounds for a median to mean anything. Quoting
+                # "~4.2" from two values 2.8 and 5.6 would imply a precision
+                # the data does not have, so the range and n are shown instead.
+                return "%s %.1f-%.1f (n=%d)%s" % (
+                    quantity, a["min"], a["max"], n, flag)
             return "%s ~%.1f (%.1f-%.1f)%s" % (
                 quantity, a["median"], a["min"], a["max"], flag)
         return None

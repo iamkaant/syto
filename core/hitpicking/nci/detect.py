@@ -69,11 +69,12 @@ class Interaction:
 
     __slots__ = ("kind", "criterion", "lig_atoms", "rec_atoms", "distance",
                  "angles", "quality", "components", "flags", "moiety_ids",
-                 "label", "water_mediated")
+                 "label", "water_mediated", "key_pair")
 
     def __init__(self, kind, criterion, lig_atoms, rec_atoms, distance,
                  angles=None, quality=0.0, components=None, flags=None,
-                 moiety_ids=(), label="", water_mediated=False):
+                 moiety_ids=(), label="", water_mediated=False,
+                 key_pair=None):
         self.kind = kind
         self.criterion = criterion
         self.lig_atoms = tuple(int(a) for a in lig_atoms)
@@ -86,6 +87,10 @@ class Interaction:
         self.moiety_ids = tuple(moiety_ids)
         self.label = label
         self.water_mediated = water_mediated
+        # The two atoms the geometry was actually measured between. For a
+        # group interaction (salt bridge, stacking) this is the closest pair,
+        # which is what lets duplicates be recognised.
+        self.key_pair = (tuple(sorted(key_pair)) if key_pair else None)
 
     @property
     def energy_estimate(self):
@@ -240,6 +245,7 @@ def detect_hbonds(ms, feats, lig_mask, rec_mask, include_weak=False,
                 crit.key, crit, lig_a, rec_a, dist, angles, q, comp, flags,
                 mids,
                 label="%s -> %s" % (ms.atom_label(d_i), ms.atom_label(a_i)),
+                key_pair=(d_i, a_i),
             ))
     return out
 
@@ -286,6 +292,7 @@ def detect_salt_bridges(ms, feats, lig_mask, rec_mask):
                 {"distance": q}, flags,
                 (a_grp.moiety_id, b_grp.moiety_id),
                 label="%s ... %s" % (ms.atom_label(x), ms.atom_label(y)),
+                key_pair=(x, y),
             ))
     # de-duplicate the symmetric pass
     seen, uniq = set(), []
@@ -474,6 +481,44 @@ DETECTORS = {
 }
 
 
+def _merge_salt_bridges_with_hbonds(interactions):
+    """Collapse a salt bridge and its own hydrogen bond into one finding.
+
+    An ammonium N-H donating to a carboxylate oxygen is ONE interaction. The
+    detectors each see it from their own side, so it was reported twice -
+    once as a charge-assisted hydrogen bond with angles, once as a salt
+    bridge - which double-counts it in the table and inflates any total.
+
+    The hydrogen bond is kept, because it carries the geometry a hit-picking
+    party actually judges, and is flagged as also being a salt bridge. A salt
+    bridge with no matching hydrogen bond is left alone: that is a real and
+    separate observation, and common when the file has no hydrogens.
+    """
+    hb_pairs = {}
+    for it in interactions:
+        if it.kind in ("hbond", "hbond_charged") and it.key_pair:
+            hb_pairs.setdefault(it.key_pair, []).append(it)
+    if not hb_pairs:
+        return interactions
+
+    out = []
+    for it in interactions:
+        if it.kind != "salt_bridge" or not it.key_pair:
+            out.append(it)
+            continue
+        partners = hb_pairs.get(it.key_pair)
+        if not partners:
+            out.append(it)
+            continue
+        for hb in partners:
+            note = "also a salt bridge (%.2f A between the charged groups)" % it.distance
+            if note not in hb.flags:
+                hb.flags.append(note)
+            hb.moiety_ids = tuple(hb.moiety_ids) + tuple(it.moiety_ids)
+        # the salt bridge is now represented by the hydrogen bond
+    return out
+
+
 def detect_interactions(ms, enabled=None, include_weak_hbonds=False,
                         features=None):
     """Detect every enabled interaction between the ligand and everything else.
@@ -504,6 +549,7 @@ def detect_interactions(ms, enabled=None, include_weak_hbonds=False,
     if "hydrophobic" in enabled:
         out += detect_hydrophobic(ms, feats, lig_mask, rec_mask)
 
+    out = _merge_salt_bridges_with_hbonds(out)
     out = [i for i in out if i.kind in enabled]
     out.sort(key=lambda i: -i.quality)
 
