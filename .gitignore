@@ -22,3 +22,6 @@ scratch/
 chimerax/src/_vendor/
 chimerax/dist/
 chimerax/build/
+
+# fetched QM scans: large, reproducible with tools/fetch_qm_torsions.py
+data-src/external/qm_torsions/raw/

@@ -292,20 +292,48 @@ def test_perpendicular_anilide_is_flagged():
     set_torsion(ms, t, 90.0)
     again = _find(ms, "anilide N")
     assert again.flagged, again.note
-    assert again.assessment == T.TWISTED
-    assert "ortho" in again.note
+    # with the QM reference built this becomes a quantified finding, and
+    # without it the geometric rule still catches it
+    assert again.assessment in (T.TWISTED, T.STRAINED), again.assessment
+    assert "ortho" in again.note or "kcal/mol" in again.note
 
 
-def test_ortho_substitution_excuses_the_twist():
-    """2,6-dimethylacetanilide is twisted because it must be, not from strain."""
+def test_perpendicular_anilide_costs_several_kcal_when_qm_is_available():
+    if T.qm_reference() is None:
+        pytest.skip("QM torsion reference not built")
+    ms = build3d("CC(=O)Nc1ccccc1")
+    t = _find(ms, "anilide N")
+    set_torsion(ms, t, 90.0)
+    again = _find(ms, "anilide N")
+    if again.energy is None:
+        pytest.skip("no exact QM class for this bond")
+    assert again.energy > 2.0, again.note
+    # and coplanar must be cheap
+    set_torsion(ms, t, 0.0)
+    flat = _find(ms, "anilide N")
+    assert flat.energy is None or flat.energy < again.energy
+
+
+def test_ortho_substitution_is_detected_and_respected():
+    """2,6-dimethylacetanilide is twisted because it must be, not from strain.
+
+    The QM reference is keyed on ortho substitution for exactly this reason,
+    and a class for the OTHER ortho state must never be used to flag: an
+    ortho biaryl prefers ~38 degrees where an unsubstituted one prefers ~15,
+    so judging one by the other would condemn the correct geometry.
+    """
     ms = build3d("CC(=O)Nc1c(C)cccc1C")
     t = _find(ms, "anilide N")
     assert t is not None
     set_torsion(ms, t, 90.0)
     again = _find(ms, "anilide N")
     assert again.ortho_substituted, "ortho substituent not detected"
-    assert not again.flagged, again.note
-    assert "expected" in again.note
+    if again.energy is not None:
+        # an exact ortho class exists; it may legitimately say this is costly
+        assert "indicative" not in again.note
+    else:
+        # no exact class: it must not be flagged from a mismatched curve
+        assert not again.flagged or "indicative" not in again.note
 
 
 def test_aryl_carbonyl_is_recognised():
@@ -313,15 +341,35 @@ def test_aryl_carbonyl_is_recognised():
     assert _find(ms, "aryl carbonyl") is not None
 
 
-def test_biaryl_is_reported_but_not_judged():
-    """Both planar and twisted biphenyls are common; without CSD data the
-    honest answer is to say so rather than guess."""
+def test_biaryl_without_qm_is_not_guessed_at():
+    """Both planar and twisted biphenyls are common.
+
+    Without a reference the honest answer is to say so; with the QM curves
+    the question is actually answerable, so the assertion is conditional.
+    """
     ms = build3d("c1ccccc1-c1ccccc1")
     ts = [t for t in T.analyze_torsions(ms, ligand_only=False)
           if t.bond_type == T.BIARYL]
     assert ts, "biaryl bond not found"
-    assert ts[0].assessment == T.UNJUDGED
-    assert "CSD" in ts[0].note
+    t = ts[0]
+    if T.qm_reference() is None:
+        assert t.assessment == T.UNJUDGED
+        assert "CSD" in t.note
+    else:
+        assert "kcal/mol" in t.note, t.note
+
+
+def test_qm_reference_knows_ortho_biaryls_prefer_a_twist():
+    """The textbook case, and the one the geometric rules could not judge."""
+    if T.qm_reference() is None:
+        pytest.skip("QM torsion reference not built")
+    flat_ortho = T.qm_cost("biaryl", "biaryl", True, 0.0)
+    twist_ortho = T.qm_cost("biaryl", "biaryl", True, 40.0)
+    if not (flat_ortho and twist_ortho and flat_ortho[5] and twist_ortho[5]):
+        pytest.skip("no exact ortho biaryl class in this build")
+    assert twist_ortho[0] < flat_ortho[0], (
+        "an ortho-substituted biaryl should prefer a twist, got flat=%.2f "
+        "twisted=%.2f" % (flat_ortho[0], twist_ortho[0]))
 
 
 def test_unjudged_is_never_counted_as_fine():

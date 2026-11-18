@@ -47,7 +47,109 @@ BIARYL = "biaryl"
 AMIDE = "amide"
 OTHER = "other"
 
+# --------------------------------------------------------------------------
+# QM reference, when it has been built (tools/fetch_qm_torsions.py then
+# tools/build_torsion_profiles.py). Without it the thresholds below are the
+# only judgement available; with it, a flag can quote what the twist costs.
+# --------------------------------------------------------------------------
+
+_QM = None
+_QM_TRIED = False
+
+# A torsion costing less than this is not worth mentioning; past the second
+# value it is worth a warning rather than a note.
+QM_NOTE_KCAL = 1.5
+QM_WARN_KCAL = 3.0
+
+
+def qm_reference():
+    """The compiled QM torsion curves, or None if they were never built."""
+    global _QM, _QM_TRIED
+    if _QM_TRIED:
+        return _QM
+    _QM_TRIED = True
+    import json
+    import os
+    path = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "data", "torsion_qm.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            _QM = json.load(fh)
+    except Exception:
+        _QM = None
+    return _QM
+
+
+def _qm_class(bond_type, subtype, ortho):
+    qm = qm_reference()
+    if not qm:
+        return None
+    key = "%s|%s|%s" % (bond_type, subtype or "-",
+                        "ortho" if ortho else "no-ortho")
+    cls = qm["classes"].get(key)
+    if cls is not None:
+        return cls, True
+    # A class for the OTHER ortho state is not a substitute. An ortho
+    # substituent is exactly what moves the preferred angle - an ortho biaryl
+    # prefers about 38 degrees where an unsubstituted one prefers 15 - so
+    # judging one by the other's curve would flag the correct geometry as
+    # strained. Such a fallback is reported as indicative only, and never
+    # raises a flag.
+    for alt in ("%s|%s|%s" % (bond_type, subtype or "-",
+                              "no-ortho" if ortho else "ortho"),
+                "%s|-|no-ortho" % bond_type):
+        cls = qm["classes"].get(alt)
+        if cls is not None:
+            return cls, False
+    return None
+
+
+def qm_cost(bond_type, subtype, ortho, angle):
+    """What this torsion costs, in kcal/mol, or None if unknown.
+
+    Returns (median, q1, q3, n_scans, class_name), interpolated between the
+    binned angles of the matching class.
+    """
+    found = _qm_class(bond_type, subtype, ortho)
+    if not found:
+        return None
+    cls, exact = found
+    folded = _fold_for_class(angle, bond_type)
+    curve = cls["curve"]
+    xs = sorted(int(k) for k in curve)
+    if not xs:
+        return None
+    if folded <= xs[0]:
+        s = curve[str(xs[0])]
+    elif folded >= xs[-1]:
+        s = curve[str(xs[-1])]
+    else:
+        hi = next(x for x in xs if x >= folded)
+        lo = max(x for x in xs if x <= folded)
+        if hi == lo:
+            s = curve[str(hi)]
+        else:
+            f = (folded - lo) / float(hi - lo)
+            a, b = curve[str(lo)], curve[str(hi)]
+            s = {k: a[k] + (b[k] - a[k]) * f for k in ("median", "q1", "q3")}
+            s["n"] = min(a["n"], b["n"])
+    name = "%s|%s|%s" % (cls["bond_type"], cls["subtype"] or "-",
+                         "ortho" if cls["ortho_substituted"] else "no-ortho")
+    return (s["median"], s["q1"], s["q3"], cls["n_scans"], name, exact)
+
+
+def _fold_for_class(angle, bond_type):
+    a = abs(float(angle)) % 360.0
+    if a > 180.0:
+        a = 360.0 - a
+    if bond_type == SP3_SP3:
+        f = a % 120.0
+        return min(f, 120.0 - f)
+    return min(a, 180.0 - a)
+
+
 OK = "ok"
+STRAINED = "strained"
 ECLIPSED = "eclipsed"
 TWISTED = "twisted out of conjugation"
 FORCED_PLANAR = "forced planar"
@@ -56,11 +158,13 @@ UNJUDGED = "unjudged"
 
 class Torsion:
     __slots__ = ("atoms", "angle", "bond_type", "assessment", "note",
-                 "ortho_substituted", "subtype")
+                 "ortho_substituted", "subtype", "energy")
 
     def __init__(self, atoms, angle, bond_type, assessment, note="",
                  ortho_substituted=False, subtype=""):
         self.subtype = subtype
+        # kcal/mol above this bond type's QM minimum, when the reference exists
+        self.energy = None
         self.atoms = tuple(int(a) for a in atoms)
         self.angle = float(angle)
         self.bond_type = bond_type
@@ -83,6 +187,8 @@ class Torsion:
     def to_dict(self):
         return {"atoms": list(self.atoms), "angle": round(self.angle, 1),
                 "bond_type": self.bond_type, "subtype": self.subtype,
+                "energy_kcal": (None if self.energy is None
+                                else round(self.energy, 2)),
                 "assessment": self.assessment,
                 "note": self.note, "flagged": self.flagged,
                 "ortho_substituted": self.ortho_substituted}
@@ -316,8 +422,34 @@ def analyze_torsions(ms, ligand_only=True):
             subtype = conjugated_subtype(ms, a, b) if btype == CONJUGATED else "biaryl"
         elif btype == AMIDE:
             subtype = "amide C-N"
-        out.append(Torsion((p, a, b, q), angle, btype, assessment, note,
-                           ortho, subtype))
+        # If the QM reference has been built, let it speak: it knows, for
+        # instance, that an ortho-substituted biaryl PREFERS about 38 degrees,
+        # which the geometric rules above could only call "unjudged".
+        cost = qm_cost(btype, subtype, ortho, angle)
+        if cost is not None:
+            med, q1, q3, n, cls_name, exact = cost
+            qm_note = ("%.1f kcal/mol above this bond type's minimum "
+                       "(QM, %.1f-%.1f across %d scans)"
+                       % (med, q1, q3, n))
+            if not exact:
+                qm_note += (" - indicative only: no QM class for this "
+                            "ortho substitution, read from %s" % cls_name)
+            if exact and med >= QM_NOTE_KCAL:
+                assessment = STRAINED
+                note = (note + "; " if note else "") + qm_note
+            elif exact and assessment in (UNJUDGED, OK):
+                assessment = OK
+                note = qm_note
+            else:
+                note = (note + "; " if note else "") + qm_note
+            energy = med if exact else None
+        else:
+            energy = None
+
+        t = Torsion((p, a, b, q), angle, btype, assessment, note,
+                    ortho, subtype)
+        t.energy = energy
+        out.append(t)
     return out
 
 

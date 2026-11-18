@@ -1,0 +1,10 @@
+{
+ "source": "MolSSI QCArchive (public server)",
+ "server": "https://api.qcarchive.molssi.org",
+ "submitter": "Open Force Field Initiative",
+ "dataset_licence": "CC-BY-4.0",
+ "licence_statement": "All datasets in this repository are licensed under the CC-BY-4.0 license. (openforcefield/qca-dataset-submission, LICENSE)",
+ "licence_url": "https://github.com/openforcefield/qca-dataset-submission/blob/master/LICENSE",
+ "changes": "Relaxed torsion-drive energies were converted from hartree to kcal/mol relative to each scan's own minimum, and each scan was classified by the rotatable-bond type used by this tool. No energies were recomputed.",
+ "server_licence_note": "The public QCArchive server itself states no site-wide data licence; only OpenFF-submitted datasets are used by default."
+}
