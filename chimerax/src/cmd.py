@@ -28,9 +28,38 @@ from .state import get_state
 ALL_TYPES = tuple(C.ALL.keys())
 
 
+def ensure_ui(session):
+    """Register the mouse mode and hook ViewDock, once, on first use.
+
+    Called from the commands and from the panel - never at startup. Touching
+    session.ui during bundle initialisation constructs the mouse-mode manager
+    before ChimeraX does, which duplicates the 'mouse hover' trigger and takes
+    the Toolbar down with it.
+    """
+    if getattr(session, "_hitpick_ui_ready", False):
+        return
+    ui = getattr(session, "ui", None)
+    if ui is None or not getattr(ui, "is_gui", False):
+        return                      # nogui: nothing to register
+    if not hasattr(ui, "mouse_modes"):
+        return                      # UI not built yet; try again next time
+    session._hitpick_ui_ready = True
+    try:
+        from .mousemode import register_mouse_mode
+        register_mouse_mode(session)
+    except Exception as e:
+        session.logger.info("hitpick: mouse mode unavailable (%s)" % e)
+    try:
+        from .viewdock_link import autohook
+        autohook(session)
+    except Exception as e:
+        session.logger.info("hitpick: ViewDock link not established (%s)" % e)
+
+
 # --------------------------------------------------------------------- setup
 
 def hitpick_setup(session, receptor=None, ligand=None):
+    ensure_ui(session)
     st = get_state(session)
 
     rec = receptor
@@ -72,6 +101,7 @@ hitpick_setup_desc = CmdDesc(
 # ------------------------------------------------------------------- analyze
 
 def hitpick_analyze(session, ligand=None):
+    ensure_ui(session)
     st = get_state(session)
     if not st.ready:
         hitpick_setup(session)

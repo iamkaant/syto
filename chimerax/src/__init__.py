@@ -43,27 +43,26 @@ class _HitPickAPI(BundleAPI):
 
     @staticmethod
     def initialize(session, bundle_info):
-        """Register the mouse mode and hook ViewDock if it is running."""
-        try:
-            from .mousemode import register_mouse_mode
-            register_mouse_mode(session)
-        except Exception as e:
-            session.logger.warning("hitpick: mouse mode unavailable: %s" % e)
-        try:
-            from .viewdock_link import autohook
-            autohook(session)
-        except Exception as e:
-            session.logger.info("hitpick: ViewDock link not established (%s)" % e)
+        """Deliberately does nothing.
 
-    @staticmethod
-    def finish(session, bundle_info):
-        try:
-            from .viewdock_link import unhook
-            unhook(session)
-        except Exception:
-            pass
-        from .state import clear_state
-        clear_state(session)
+        custom-init is false in pyproject.toml, so this should never be
+        called. It exists because ChimeraX caches bundle metadata: an older
+        cached entry can still say custom-init=true, and a missing initialize()
+        then reports "custom initialization failed" on every startup. Doing
+        nothing here is safe under both.
+
+        Nothing may be added to this method. Touching session.ui at startup is
+        what caused the duplicate 'mouse hover' trigger; setup is lazy, in
+        cmd.ensure_ui.
+        """
+        return
+
+    # NOTE: the real setup deliberately does NOT happen at startup. Registering the mouse mode
+    # or hooking ViewDock at startup means touching session.ui before ChimeraX
+    # has finished building it, which constructs the mouse-mode manager early
+    # and leaves ObjectIdMouseMode trying to add the 'mouse hover' trigger a
+    # second time - breaking the Toolbar tool. Both are set up lazily instead,
+    # on the first `hitpick` command or when the panel opens (see cmd.ensure_ui).
 
     @staticmethod
     def get_class(class_name):

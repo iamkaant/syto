@@ -38,6 +38,8 @@ class HandbookTool(HtmlToolInstance):
         super().__init__(session, tool_name, size_hint=(480, 820),
                          log_errors=True)
         self.display_name = "Hit Picking Handbook"
+        from .cmd import ensure_ui
+        ensure_ui(session)
         st = get_state(session)
         st.add_listener(self._on_state_changed)
         self._state = st

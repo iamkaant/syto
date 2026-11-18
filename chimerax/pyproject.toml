@@ -27,7 +27,11 @@ categories = ["Binding Analysis"]
 classifiers = []
 min-session-version = 1
 max-session-version = 1
-custom-init = true
+# custom-init is deliberately OFF. A bundle that runs code at startup
+# and touches session.ui can construct the mouse-mode manager before
+# ChimeraX does, which makes ObjectIdMouseMode register the
+# 'mouse hover' trigger twice and breaks the Toolbar for everyone.
+custom-init = false
 
 [chimerax.package-data]
 "src/ui" = ["*.html", "*.css", "*.js"]
