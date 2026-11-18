@@ -236,9 +236,12 @@ def _parse_record(comment_lines, lines, part_default, source):
         name=name, hyb=hyb, aromatic=arom, formal_charge=fchg,
         part=part, res_name=res_name, res_seq=res_seq, meta=meta,
     )
-    # Sybyl types already distinguish N.am from N.3, but the conjugation flag
-    # is computed the same way on every path so the handbook sees one answer.
-    mark_conjugated(ms, set_hyb=True)
+    # Sybyl names the bonding directly: X.1/X.2/O.co2 carry their own
+    # multiple bond, while N.am (amide) and N.pl3 (planar) are flat precisely
+    # because their lone pair is delocalised.
+    own = np.array([str(t).split(".")[-1] in ("1", "2", "co2", "cat")
+                    for t in sybyl], dtype=bool)
+    mark_conjugated(ms, set_hyb=True, own_multiple_bond=own)
     return ms
 
 

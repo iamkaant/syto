@@ -128,7 +128,8 @@ def read_pdb(path, keep_waters: bool = True, keep_altloc: str = "A",
         _merge_conect(ms, conect, serial_to_idx)
 
     _perceive_unknown_residues(ms)
-    mark_conjugated(ms, set_hyb=True)
+    own = (ms.hyb == HYB_SP2) & np.isin(ms.element, ("C", "O"))
+    mark_conjugated(ms, set_hyb=True, own_multiple_bond=own)
     return ms
 
 

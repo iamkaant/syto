@@ -26,7 +26,7 @@ from ..molsys import HYB_SP, HYB_SP2, HYB_SP3
 CONJUGABLE = ("N", "O", "S")
 
 
-def mark_conjugated(ms, set_hyb: bool = True):
+def mark_conjugated(ms, set_hyb: bool = True, own_multiple_bond=None):
     """Flag heteroatoms whose lone pair is conjugated; optionally retype them.
 
     Returns a boolean array, also cached on ``ms.meta['conjugated']``.
@@ -42,6 +42,16 @@ def mark_conjugated(ms, set_hyb: bool = True):
     retype = np.zeros(n, dtype=bool)
     el = ms.element
 
+    # `own_multiple_bond[i]` says atom i is sp2/sp because of a double or
+    # triple bond of its OWN, not because its lone pair is delocalised. Each
+    # reader supplies it from what its format actually knows (Sybyl types,
+    # MDL bond orders, residue templates). Without it we can only assume that
+    # any already-sp2 atom earned that typing honestly, which would silently
+    # lose every amide nitrogen -- the one distinction the handbook most needs.
+    omb = (np.zeros(n, dtype=bool) if own_multiple_bond is None
+           else np.asarray(own_multiple_bond, dtype=bool))
+    assume_own = own_multiple_bond is None
+
     for i in range(n):
         e = str(el[i])
         if e not in CONJUGABLE:
@@ -49,8 +59,10 @@ def mark_conjugated(ms, set_hyb: bool = True):
         if ms.aromatic[i]:
             conj[i] = True          # aromatic heteroatoms are conjugated
             continue
-        if ms.hyb[i] in (HYB_SP, HYB_SP2):
-            continue                # already multiply bonded; nothing to infer
+        if omb[i]:
+            continue                # genuinely multiply bonded; nothing to infer
+        if assume_own and ms.hyb[i] in (HYB_SP, HYB_SP2):
+            continue
         for j in ms.heavy_neighbors(i):
             j = int(j)
             if ms.aromatic[j] or ms.hyb[j] in (HYB_SP, HYB_SP2):

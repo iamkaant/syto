@@ -181,7 +181,8 @@ def _perceive(xyz, element, bonds, order):
     # Lone-pair conjugation (amide N, ester O, aniline N ...). Shared with
     # every other input path so all front ends type these atoms identically.
     tmp2 = MolSystem(xyz, element, bonds, hyb=hyb, aromatic=arom)
-    conj = mark_conjugated(tmp2, set_hyb=True)
+    conj = mark_conjugated(tmp2, set_hyb=True,
+                           own_multiple_bond=(max_order >= 2))
     return tmp2.hyb, arom, conj
 
 
