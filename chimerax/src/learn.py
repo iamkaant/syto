@@ -101,9 +101,10 @@ def _features_for(hp, lig, job):
         ms, _atoms = adapter.from_structures(
             [hp.receptor_model, lig], ligand_structures=[lig])
         # read the scalars here too; `lig` must not be touched off-thread
-        return ms, str(lig.name), int(hp.receptor_model.num_atoms)
+        return (ms, str(lig.name), int(hp.receptor_model.num_atoms),
+                adapter.pose_scores(lig))
 
-    ms, name, n_rec = job.on_main(extract)
+    ms, name, n_rec, scores = job.on_main(extract)
 
     job.checkpoint()
     feats = perceive_all(ms)
@@ -116,8 +117,8 @@ def _features_for(hp, lig, job):
     if hp.options.detect_strain:
         from hitpicking.strain import analyze_strain
         strain = analyze_strain(ms)
-    return PoseResult(name, res.interactions, res.warnings, res.counts, {},
-                      combined=ms, n_receptor=n_rec, strain=strain)
+    return PoseResult(name, res.interactions, res.warnings, res.counts,
+                      scores, combined=ms, n_receptor=n_rec, strain=strain)
 
 
 def _store(st, key, structure, vector):

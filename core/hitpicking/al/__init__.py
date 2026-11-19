@@ -21,7 +21,7 @@ from __future__ import annotations
 import numpy as np
 
 from .model import Committee, ordinal_targets, decode_ordinal
-from .features import pose_features, feature_info, TOTAL_BITS
+from .features import pose_features, feature_info, TOTAL_BITS, BLOCKS
 from .. import FEATURE_VERSION
 
 __all__ = ["Learner", "Grades", "UNCERTAINTY", "DISAGREEMENT", "PREDICTION",
@@ -144,10 +144,51 @@ class Learner:
     def _fit_scaler(self, X):
         self._mean = X.mean(axis=0)
         sd = X.std(axis=0)
+        live = sd > 1e-8
         # a constant column carries no information; leaving its scale at 1
         # keeps it at zero after centring rather than exploding it
-        sd[sd < 1e-8] = 1.0
+        sd[~live] = 1.0
+
+        # Then weight whole blocks against one another. Per-column
+        # standardisation alone gave the ligand fingerprint about 90% of
+        # the variance reaching the first layer - not because it matters
+        # more, but because it has around 765 varying columns against the
+        # interaction block's 67. The model was a ligand model with
+        # interaction trimmings, and two poses of one compound, which
+        # differ only outside the ligand block, were nearly identical to
+        # it.
+        #
+        # Each block is scaled to carry the same total variance. The
+        # weights are folded into _scale, so predict(), state() and
+        # from_state() need no changes and an old model stays readable.
+        counts = [(lo, hi, int(live[lo:hi].sum())) for _, lo, hi in BLOCKS]
+        present = [n for _, _, n in counts if n]
+        if present:
+            # keep the overall magnitude where it was, so the learning
+            # rate still means what it meant
+            total = float(sum(present))
+            share = total / len(present)
+            for lo, hi, n in counts:
+                if n:
+                    sd[lo:hi] = sd[lo:hi] * np.sqrt(n / share)
         self._scale = sd
+
+    def block_variance(self, X=None):
+        """Share of the first layer's input variance each block carries.
+
+        Reported rather than assumed: the imbalance this corrects was
+        invisible until it was measured.
+        """
+        keys = [k for k in self.grades.keys() if k in self.features]
+        if X is None:
+            if not keys:
+                return {}
+            X = np.stack([self.features[k] for k in keys])
+        Z = self._apply_scaler(X)
+        energy = {name: float((Z[:, lo:hi] ** 2).sum())
+                  for name, lo, hi in BLOCKS}
+        total = sum(energy.values()) or 1.0
+        return {k: v / total for k, v in energy.items()}
 
     def _apply_scaler(self, X):
         if self._mean is None:

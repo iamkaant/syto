@@ -317,8 +317,8 @@ def _analyze_pose(session, st, lig):
     from hitpicking.analysis import PoseResult
     n_rec = st.receptor_model.num_atoms
     st.result = PoseResult(lig.name, res.interactions, res.warnings,
-                           res.counts, {}, combined=ms, n_receptor=n_rec,
-                           strain=strain)
+                           res.counts, adapter.pose_scores(lig),
+                           combined=ms, n_receptor=n_rec, strain=strain)
 
     _redraw(session, st)
     session.logger.info("hitpick: %s -> %s"

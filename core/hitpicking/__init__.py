@@ -13,7 +13,7 @@ __version__ = "0.1.0.dev0"
 
 # Feature-vector schema version for the active-learning module. Models trained
 # under one version must not be loaded under another.
-FEATURE_VERSION = 1
+FEATURE_VERSION = 2
 
 # Handbook data schema version.
 HANDBOOK_SCHEMA_VERSION = 1

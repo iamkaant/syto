@@ -30,13 +30,23 @@ from .. import FEATURE_VERSION
 
 IFP_BITS = 1024
 LIGAND_BITS = 1024
-N_DESCRIPTORS = 16
+N_DESCRIPTORS = 21
 TOTAL_BITS = IFP_BITS + LIGAND_BITS + N_DESCRIPTORS
 
-# Score terms worth feeding in, where a DOCK pose carries them.
+# Score terms worth feeding in, where a DOCK pose carries them. These are
+# the keys ViewDock puts on the structure, verified against DOCK mol2
+# output rather than guessed.
 DOCK_TERMS = ("Total Energy", "Van der Waals", "Electrostatic",
               "Ligand Polar Desolv", "Ligand Apolar Desolv",
               "Total Strain", "Max Strain")
+
+# Where each block starts and ends. The learner weights these against one
+# another: standardising per column leaves the ligand block with ~90% of
+# the variance simply because it has ~765 varying columns to the
+# interaction block's ~67, and equal per column is not equal per block.
+BLOCKS = (("interactions", 0, IFP_BITS),
+          ("ligand", IFP_BITS, IFP_BITS + LIGAND_BITS),
+          ("descriptors", IFP_BITS + LIGAND_BITS, TOTAL_BITS))
 
 
 def _fold(text, bits):
@@ -107,7 +117,13 @@ def ligand_fingerprint(ms, bits=LIGAND_BITS, radius=2):
 
 
 def descriptors(result):
-    """A short block of per-pose numbers, scaled to roughly [0, 1]."""
+    """A short block of per-pose numbers.
+
+    The first thirteen are geometry and counts, scaled to roughly [0, 1].
+    The rest are the docking program's own score terms, which the model
+    was previously blind to: PoseResult used to be built with no scores at
+    all, so the two slots reserved for them sat at zero for every pose.
+    """
     ms = result.combined
     d = np.zeros(N_DESCRIPTORS, dtype=np.float64)
     if ms is None:
@@ -134,14 +150,21 @@ def descriptors(result):
         d[11] = sc.get("internal_clashes", 0) / 5.0
         d[12] = sc.get("flagged_torsions", 0) / 5.0
 
+    d[13] = 1.0 if (ms.meta.get("has_hydrogens") or False) else 0.0
+
+    # DOCK energies are negative and of order tens. The division only puts
+    # them on a comparable footing; the per-column standardisation does the
+    # real scaling. The clip is there for DOCK's sentinel values - a failed
+    # term comes through as 999.999, which would otherwise swamp the column
+    # mean and standard deviation for every pose in the set.
     scores = result.scores or {}
-    # DOCK energies are negative and of order tens; scale and clip so one
-    # outlier cannot dominate the input
-    for k, name in enumerate(("Total Energy", "Total Strain")):
+    for k, name in enumerate(DOCK_TERMS):
         val = scores.get(name)
-        if isinstance(val, float):
-            d[13 + k] = float(np.clip(val / 50.0, -2.0, 2.0))
-    d[15] = 1.0 if (ms.meta.get("has_hydrogens") or False) else 0.0
+        if isinstance(val, (int, float)) and not isinstance(val, bool):
+            v = float(val)
+            if v != v or abs(v) > 500.0:      # NaN, or a sentinel
+                continue
+            d[14 + k] = float(np.clip(v / 50.0, -4.0, 4.0))
     return d
 
 

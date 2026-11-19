@@ -321,3 +321,23 @@ def find_receptor_structure(session):
         if n > best_n:
             best, best_n = m, n
     return best if best_n > 10 else None
+
+
+def pose_scores(structure):
+    """The docking program's own score terms for one pose.
+
+    ViewDock parses these out of the DOCK mol2 comment block and leaves
+    them on the structure, so there is nothing to re-read from disk. Only
+    the numeric entries are of use; the rest are names, SMILES and flags.
+
+    Must be called on the GUI thread - it touches a ChimeraX structure.
+    """
+    data = getattr(structure, "viewdock_data", None)
+    if not isinstance(data, dict):
+        return {}
+    out = {}
+    for k, v in data.items():
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            continue
+        out[str(k)] = float(v)
+    return out
