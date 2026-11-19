@@ -26,6 +26,7 @@ class LearnState:
         self.learner = Learner(seed=0)
         self.keys = {}            # key -> ChimeraX structure
         self.last_ranked = []
+        self.waiting = 0          # rated in ViewDock but not yet featurised
 
     # ------------------------------------------------------------ poses
 
@@ -47,16 +48,23 @@ class LearnState:
 
         ViewDock stores 0 unrated, 1 bad, 2 maybe, 3 good, which is already
         the ordinal scale the model wants.
+
+        Returns (applied, waiting) where `waiting` counts poses that are
+        rated but not yet featurised. Those used to be dropped in silence,
+        so grading in ViewDock before pressing "Analyse poses" lost the lot.
         """
         from . import viewdock_link as vl
-        n = 0
+        n = waiting = 0
         for structure, rating in vl.rated_poses(self.session):
             key = self.key_for(structure)
             if key not in self.learner.features:
+                waiting += 1
                 continue
-            self.learner.grade(key, int(rating) - 1)
+            if self.learner.grades.rank(key) != int(rating) - 1:
+                self.learner.grade(key, int(rating) - 1)
             n += 1
-        return n
+        self.waiting = waiting
+        return n, waiting
 
 
 def state(session, create=True):
@@ -91,7 +99,13 @@ def collect(session, limit=None, quiet=False):
         hp = get_state(session)
 
     st = state(session)
-    structures = [s for s, _ in vl.iter_rated(session)]
+    # Rated poses first. Analysing is the slow step and a real session can
+    # hold a few thousand poses, so putting the graded ones at the front
+    # means the model becomes trainable in the first seconds rather than
+    # after the whole set has been ground through.
+    scored = vl.iter_rated(session)
+    structures = ([s for s, r in scored if r]
+                  + [s for s, r in scored if not r])
     if not structures:
         from . import adapter
         structures = adapter.find_ligand_structures(
@@ -123,8 +137,18 @@ def collect(session, limit=None, quiet=False):
 
 # ------------------------------------------------------------- reporting
 
-def describe(session):
+def describe(session, pull=True):
+    """Current state, taking in any ViewDock ratings first.
+
+    Pulling here rather than only at training time is what lets the panel
+    show a grade the moment it is given in ViewDock.
+    """
     st = state(session)
+    if pull:
+        try:
+            st.pull_viewdock_ratings()
+        except Exception:
+            pass
     lr = st.learner
     counts = lr.grades.counts()
     ok, why = lr.can_train()
@@ -137,6 +161,7 @@ def describe(session):
         "can_train": ok,
         "why_not": why,
         "feature_version": lr.feature_version,
+        "waiting": st.waiting,
     }
 
 

@@ -145,6 +145,14 @@ window.hpLearnState = function (s) {
     el.innerHTML = st.poses + " pose(s) featurised &middot; " + st.graded
       + " graded" + (st.ready ? " &middot; model trained on " + st.trained_on : "");
   }
+  // Grades given in ViewDock only count once the pose has been featurised.
+  // Saying so beats a silently-too-low "graded" number.
+  if (st.waiting) {
+    el.className = "card tiny warn";
+    el.innerHTML += (st.poses ? "<br>" : " ") + "<b>" + st.waiting
+      + "</b> pose(s) rated in ViewDock are not analysed yet, so they are "
+      + "not being learned from. Press <b>Analyse poses</b> to include them.";
+  }
 
   renderCurrent(s);
   document.getElementById("adv").checked = !!s.auto_advance;

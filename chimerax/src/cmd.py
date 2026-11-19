@@ -938,10 +938,15 @@ def hitpick_learn_train(session, epochs=120):
     ensure_ui(session)
     from . import learn
     ls = learn.state(session)
-    pulled = ls.pull_viewdock_ratings()
+    pulled, waiting = ls.pull_viewdock_ratings()
     if pulled:
         session.logger.info("hitpick learn: took %d grade(s) from ViewDock"
                             % pulled)
+    if waiting:
+        session.logger.warning(
+            "hitpick learn: %d rated pose(s) have not been analysed yet and "
+            "are being ignored. Run 'hitpick learn collect' to include them."
+            % waiting)
     ok, why = ls.learner.can_train()
     if not ok:
         raise UserError(why)

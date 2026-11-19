@@ -197,11 +197,26 @@ def _on_pose_changed(session, selected):
 
 # --------------------------------------------------------------- columns
 
-def _structures(tool):
-    try:
-        return list(tool.structures)
-    except Exception:
-        return []
+# ViewDock 1.12 keeps every loaded pose in `vd_structures` and the rows
+# currently passing the filter in `table_structures`. There is no
+# `.structures`: asking for it raises AttributeError, which this function
+# used to swallow and return [] for, so every rating in the table was
+# invisible to us. Grades belong to the pose, not to the current filter,
+# so the full list is the one to use.
+_STRUCTURE_ATTRS = ("vd_structures", "table_structures", "structures")
+
+
+def _structures(tool, filtered=False):
+    attrs = (("table_structures", "vd_structures", "structures")
+             if filtered else _STRUCTURE_ATTRS)
+    for attr in attrs:
+        try:
+            found = list(getattr(tool, attr))
+        except Exception:
+            continue
+        if found:
+            return found
+    return []
 
 
 def _existing_titles(tool):
@@ -350,13 +365,29 @@ def update_columns(session, structure=None):
 
 # ---------------------------------------------------------------- ratings
 
-def iter_rated(session):
-    """(structure, rating_int) for every pose ViewDock knows about."""
+def rated_structures(session):
+    """Every structure carrying a viewdock rating, with or without the tool.
+
+    The ratings live on the structures themselves, so they survive ViewDock
+    being closed, never opened (a file opened with showTool false), or not
+    found. Depending on the tool object meant grades silently did not exist
+    in those cases.
+    """
     tool = find_viewdock(session)
-    if tool is None:
-        return []
+    if tool is not None:
+        found = _structures(tool)
+        if found:
+            return found
+    from chimerax.atomic import AtomicStructure
+    return [m for m in session.models
+            if isinstance(m, AtomicStructure)
+            and isinstance(getattr(m, "viewdock_data", None), dict)]
+
+
+def iter_rated(session):
+    """(structure, rating_int) for every pose carrying viewdock data."""
     out = []
-    for s in _structures(tool):
+    for s in rated_structures(session):
         data = getattr(s, "viewdock_data", None) or {}
         r = data.get(RATING_KEY, 0)
         try:
