@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hit Picking Learn</title>
+<style>
+  :root {
+    --bg:#fff; --fg:#1a1d21; --muted:#6b7280; --line:#e3e6ea; --card:#f7f8fa;
+    --accent:#2563c9; --good:#1f8a4c; --maybe:#c88214; --bad:#c83228;
+    --warn:#a2600a; --warn-bg:#fdf4e3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#1b1e23; --fg:#e6e8eb; --muted:#9aa3ae; --line:#2d323a;
+      --card:#22262c; --accent:#6ba4f8; --good:#5fd08a; --maybe:#e0b060;
+      --bad:#ef7a6e; --warn:#e0b060; --warn-bg:#2e2718;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:12px 14px 28px; background:var(--bg); color:var(--fg);
+         font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  h1 { font-size:12px; letter-spacing:.04em; text-transform:uppercase;
+       color:var(--muted); margin:0 0 10px; font-weight:600; }
+  h2 { font-size:11.5px; letter-spacing:.04em; text-transform:uppercase;
+       color:var(--muted); margin:16px 0 7px; font-weight:600;
+       border-top:1px solid var(--line); padding-top:11px; }
+  .card { background:var(--card); border:1px solid var(--line);
+          border-radius:7px; padding:10px 11px; margin-bottom:8px; }
+  .row { display:flex; align-items:center; gap:8px; }
+  .spread { justify-content:space-between; }
+  button { font:inherit; background:var(--card); color:var(--fg); cursor:pointer;
+           border:1px solid var(--line); border-radius:6px; padding:5px 10px; }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button:disabled { opacity:.45; cursor:default; }
+  button:disabled:hover { border-color:var(--line); color:var(--fg); }
+  .grades { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+  .grades button { padding:11px 6px; font-weight:600; font-size:14px;
+                   border-width:2px; }
+  .g-good { color:var(--good); border-color:var(--good); }
+  .g-maybe { color:var(--maybe); border-color:var(--maybe); }
+  .g-bad { color:var(--bad); border-color:var(--bad); }
+  .g-good:hover { background:var(--good); color:#fff; }
+  .g-maybe:hover { background:var(--maybe); color:#fff; }
+  .g-bad:hover { background:var(--bad); color:#fff; }
+  .g-good.on { background:var(--good); color:#fff; }
+  .g-maybe.on { background:var(--maybe); color:#fff; }
+  .g-bad.on { background:var(--bad); color:#fff; }
+  .muted { color:var(--muted); }
+  .tiny { font-size:11.5px; }
+  .warn { background:var(--warn-bg); border-color:var(--warn); color:var(--warn); }
+  .empty { color:var(--muted); font-style:italic; padding:6px 0; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  td { padding:4px 3px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tr:last-child td { border-bottom:none; }
+  tr.pick { cursor:pointer; }
+  tr.pick:hover td { background:var(--card); }
+  .bar { display:inline-block; width:46px; height:5px; border-radius:3px;
+         background:var(--line); overflow:hidden; vertical-align:middle; }
+  .bar > i { display:block; height:100%; background:var(--accent); }
+  .pill { font-size:10.5px; padding:1px 6px; border-radius:20px;
+          border:1px solid var(--line); color:var(--muted); }
+  .counts span { margin-right:12px; font-variant-numeric:tabular-nums; }
+  select { font:inherit; background:var(--card); color:var(--fg);
+           border:1px solid var(--line); border-radius:6px; padding:4px 6px; }
+  label.chk { display:flex; align-items:center; gap:7px; cursor:pointer;
+              user-select:none; padding:3px 0; }
+  svg { width:100%; height:auto; display:block; }
+  .ax { font-size:8px; fill:var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>Hit Picking Learn</h1>
+<div id="status" class="card tiny muted">Connecting&hellip;</div>
+
+<h2>This pose</h2>
+<div id="current"></div>
+<div class="grades" id="gradebtns" style="margin-top:7px">
+  <button class="g-bad"   id="b-bad"   onclick="hp('grade',{value:'bad'})">bad</button>
+  <button class="g-maybe" id="b-maybe" onclick="hp('grade',{value:'maybe'})">maybe</button>
+  <button class="g-good"  id="b-good"  onclick="hp('grade',{value:'good'})">good</button>
+</div>
+<label class="chk tiny" style="margin-top:6px">
+  <input type="checkbox" id="adv" onchange="hp('autoadvance',{on:this.checked?1:0})">
+  Move to the next suggestion after grading</label>
+
+<h2>Model</h2>
+<div class="card">
+  <div class="row" style="gap:6px;flex-wrap:wrap">
+    <button onclick="hp('collect')">Analyse poses</button>
+    <button class="primary" id="trainbtn" onclick="hp('train')">Train</button>
+    <button onclick="hp('save')">Save&hellip;</button>
+    <button onclick="hp('load')">Load&hellip;</button>
+  </div>
+  <div id="modelinfo" class="tiny muted" style="margin-top:7px"></div>
+  <div id="curve"></div>
+</div>
+
+<h2>Look at these next</h2>
+<div class="card" style="padding:7px 9px">
+  <div class="row spread">
+    <span class="tiny muted">order by</span>
+    <select id="strategy" onchange="hp('strategy',{value:this.value})">
+      <option value="uncertainty">what teaches the model most</option>
+      <option value="disagreement">where it disagrees with you</option>
+      <option value="prediction">best predicted</option>
+    </select>
+  </div>
+  <div id="strategyhelp" class="tiny muted" style="margin-top:5px"></div>
+</div>
+<div id="suggestions"></div>
+
+<script>
+function hp(action, params) {
+  var q = [];
+  for (var k in (params || {})) {
+    q.push(encodeURIComponent(k) + "=" + encodeURIComponent(params[k]));
+  }
+  window.location.href = "hplearn:/" + action + (q.length ? "?" + q.join("&") : "");
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+    return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"})[c]; });
+}
+var HELP = {
+  uncertainty: "The committee disagrees with itself most about these, so "
+    + "your grade teaches it more than a confident one would.",
+  disagreement: "The model's prediction differs most from the grade you "
+    + "already gave. Either it is wrong, or the pose is worth a second look.",
+  prediction: "Simply what the model rates highest. Useful for review, but "
+    + "grading these teaches it little - it already believes them."
+};
+
+window.hpLearnState = function (s) {
+  var st = s.stats || {};
+
+  var el = document.getElementById("status");
+  if (!st.poses) {
+    el.className = "card tiny warn";
+    el.innerHTML = "No poses analysed yet. Press <b>Analyse poses</b> &mdash; "
+      + "this is the slow step, a few hundredths of a second each.";
+  } else {
+    el.className = "card tiny muted";
+    el.innerHTML = st.poses + " pose(s) featurised &middot; " + st.graded
+      + " graded" + (st.ready ? " &middot; model trained on " + st.trained_on : "");
+  }
+
+  renderCurrent(s);
+  document.getElementById("adv").checked = !!s.auto_advance;
+  document.getElementById("strategy").value = s.strategy || "uncertainty";
+  document.getElementById("strategyhelp").innerHTML =
+    HELP[s.strategy || "uncertainty"];
+
+  var g = st.grades || {};
+  var info = '<span class="counts">'
+    + '<span style="color:var(--bad)">bad ' + (g.bad || 0) + "</span>"
+    + '<span style="color:var(--maybe)">maybe ' + (g.maybe || 0) + "</span>"
+    + '<span style="color:var(--good)">good ' + (g.good || 0) + "</span></span>";
+  if (!st.can_train && !st.ready) info += "<br>" + esc(st.why_not || "");
+  else if (st.ready) info += "<br>trained on " + st.trained_on + " graded pose(s)";
+  document.getElementById("modelinfo").innerHTML = info;
+  document.getElementById("trainbtn").disabled = !st.can_train;
+  document.getElementById("curve").innerHTML = renderCurve(s.curve);
+
+  renderSuggestions(s);
+};
+
+function renderCurrent(s) {
+  var c = s.current, el = document.getElementById("current");
+  ["bad", "maybe", "good"].forEach(function (g) {
+    var b = document.getElementById("b-" + g);
+    b.classList.toggle("on", !!(c && c.grade === g));
+    b.disabled = !c;
+  });
+  if (!c) {
+    el.innerHTML = '<p class="empty">No pose displayed. Select one in '
+      + "ViewDock, or run hitpick analyze.</p>";
+    return;
+  }
+  var h = '<div class="card"><div class="row spread"><b>' + esc(c.name)
+    + '</b><span class="pill">' + esc(c.spec) + "</span></div>";
+  if (c.summary) h += '<div class="tiny muted">' + esc(c.summary) + "</div>";
+  var bits = [];
+  if (c.good != null) bits.push(c.good + " well-formed");
+  if (c.worst_overlap) bits.push("worst overlap " + c.worst_overlap + "&nbsp;&Aring;");
+  if (bits.length) h += '<div class="tiny" style="margin-top:3px">'
+    + bits.join(" &middot; ") + "</div>";
+  if (c.grade) h += '<div class="tiny" style="margin-top:4px">you graded this '
+    + '<b style="color:var(--' + c.grade + ')">' + c.grade + "</b></div>";
+  if (!c.featurised) h += '<div class="tiny warn" style="margin-top:5px">'
+    + "not featurised yet &mdash; press Analyse poses</div>";
+  h += "</div>";
+  el.innerHTML = h;
+}
+
+function renderSuggestions(s) {
+  var el = document.getElementById("suggestions");
+  var rows = s.suggestions || [];
+  if (!s.stats || !s.stats.ready) {
+    el.innerHTML = '<p class="empty">Train the model to get suggestions.</p>';
+    return;
+  }
+  if (!rows.length) {
+    el.innerHTML = '<p class="empty">Nothing to suggest. Grade a few more '
+      + "and train again.</p>";
+    return;
+  }
+  var max = 0;
+  rows.forEach(function (r) { if (r.uncertainty > max) max = r.uncertainty; });
+  var h = "<table>";
+  rows.forEach(function (r) {
+    var pct = max > 0 ? Math.round(100 * r.uncertainty / max) : 0;
+    h += '<tr class="pick" onclick="hp(\'show\',{key:\'' + esc(r.key)
+      + '\'})"><td style="width:52px">'
+      + '<span class="bar"><i style="width:' + pct + '%"></i></span></td>'
+      + "<td><b>" + esc(r.name) + "</b>"
+      + ' <span class="tiny muted">predicts ' + esc(r.grade) + "</span>"
+      + (r.yours ? ' <span class="tiny" style="color:var(--' + r.yours
+         + ')">you said ' + esc(r.yours) + "</span>" : "")
+      + '<br><span class="tiny muted">uncertainty ' + r.uncertainty
+      + (r.error ? " &middot; off by " + r.error : "") + "</span></td></tr>";
+  });
+  h += "</table>";
+  el.innerHTML = h;
+}
+
+function renderCurve(pts) {
+  if (!pts || pts.length < 2) return "";
+  var W = 400, H = 70, L = 30, R = 6, T = 6, B = 14;
+  var tr = pts.map(function (p) { return p.train; });
+  var va = pts.filter(function (p) { return p.val != null; })
+              .map(function (p) { return p.val; });
+  var all = tr.concat(va);
+  var hi = Math.max.apply(null, all), lo = Math.min.apply(null, all);
+  if (hi === lo) hi = lo + 1e-6;
+  function X(i) { return L + i / (pts.length - 1) * (W - L - R); }
+  function Y(v) { return T + (1 - (v - lo) / (hi - lo)) * (H - T - B); }
+  var p = ['<svg viewBox="0 0 ' + W + " " + H + '">'];
+  p.push('<polyline fill="none" stroke="var(--muted)" stroke-width="1.2" '
+    + 'points="' + pts.map(function (q, i) { return X(i) + "," + Y(q.train); })
+      .join(" ") + '"/>');
+  var vp = [];
+  pts.forEach(function (q, i) { if (q.val != null) vp.push(X(i) + "," + Y(q.val)); });
+  if (vp.length > 1) {
+    p.push('<polyline fill="none" stroke="var(--accent)" stroke-width="1.6" '
+      + 'points="' + vp.join(" ") + '"/>');
+  }
+  p.push('<text class="ax" x="2" y="' + (T + 8) + '">' + hi.toFixed(2) + "</text>");
+  p.push('<text class="ax" x="2" y="' + (H - B + 4) + '">' + lo.toFixed(2) + "</text>");
+  p.push('<text class="ax" x="' + (W / 2) + '" y="' + (H - 2)
+    + '" text-anchor="middle">epochs &middot; grey training, blue validation'
+    + " (first committee member)</text>");
+  p.push("</svg>");
+  return p.join("");
+}
+
+hp("ready");
+</script>
+</body>
+</html>

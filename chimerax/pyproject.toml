@@ -46,6 +46,10 @@ custom-init = false
 category = "Binding Analysis"
 description = "Contextual handbook and interaction panel for hit picking"
 
+[chimerax.tool."Hit Picking Learn"]
+category = "Binding Analysis"
+description = "Active learning over the grades given at a hit-picking party"
+
 [chimerax.command."hitpick setup"]
 category = "Binding Analysis"
 description = "Prepare a binding site for hit picking"
@@ -129,6 +133,10 @@ description = "Plot the QM energy profile for this pose's torsions"
 [chimerax.command."hitpick reveal"]
 category = "Binding Analysis"
 description = "Display the residues the interactions point at"
+
+[chimerax.command."hitpick learn panel"]
+category = "Binding Analysis"
+description = "Open the active-learning panel"
 
 [chimerax.command."hitpick learn collect"]
 category = "Binding Analysis"

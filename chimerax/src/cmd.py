@@ -872,6 +872,17 @@ hitpick_report_desc = CmdDesc(synopsis="Text report for the current pose")
 # Every one of these imports .learn lazily. A user who only wants the
 # handbook never loads the model, the feature code or numpy's linear algebra.
 
+def hitpick_learn_panel(session):
+    """Open the active-learning panel."""
+    from chimerax.core.commands import run
+    run(session, 'ui tool show "Hit Picking Learn"')
+    return True
+
+
+hitpick_learn_panel_desc = CmdDesc(
+    synopsis="Open the active-learning panel")
+
+
 def hitpick_learn_collect(session, limit=None):
     """Analyse and featurise the poses, ready for learning."""
     ensure_ui(session)
@@ -1070,6 +1081,7 @@ def register_commands(logger):
     register("hitpick report", hitpick_report_desc, hitpick_report, logger=logger)
     register("hitpick clear", hitpick_clear_desc, hitpick_clear, logger=logger)
     for name, desc, fn in (
+            ("panel", hitpick_learn_panel_desc, hitpick_learn_panel),
             ("collect", hitpick_learn_collect_desc, hitpick_learn_collect),
             ("grade", hitpick_learn_grade_desc, hitpick_learn_grade),
             ("train", hitpick_learn_train_desc, hitpick_learn_train),

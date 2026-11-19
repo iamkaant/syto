@@ -34,6 +34,10 @@ class _HitPickAPI(BundleAPI):
         if tool_info.name == "Hit Picking Handbook":
             from .tool import HandbookTool
             return HandbookTool(session, tool_info.name)
+        if tool_info.name == "Hit Picking Learn":
+            # the active-learning stack loads HERE and nowhere earlier
+            from .learn_tool import LearnTool
+            return LearnTool(session, tool_info.name)
         raise ValueError("unknown tool %r" % tool_info.name)
 
     @staticmethod
@@ -69,6 +73,9 @@ class _HitPickAPI(BundleAPI):
         if class_name == "HandbookTool":
             from .tool import HandbookTool
             return HandbookTool
+        if class_name == "LearnTool":
+            from .learn_tool import LearnTool
+            return LearnTool
         return None
 
 

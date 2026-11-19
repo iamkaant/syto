@@ -159,6 +159,14 @@ hitpick learn status
 hitpick learn save party.json
 ```
 
+There is a panel too: **Tools -> Binding Analysis -> Hit Picking Learn**, or
+`hitpick learn panel`. It is a separate tool from the handbook, so the whole
+active-learning stack loads when you open it and not before. It gives large
+bad / maybe / good buttons for the displayed pose, a ranked list of what to
+look at next (click a row to jump to that pose), the training curve, and
+save/load. By default grading moves straight on to the next suggestion,
+which is the loop a party actually runs.
+
 Grades come from ViewDock's own Rating column, so there is no second place
 to record an opinion; `hitpick learn grade good` works without ViewDock.
 
