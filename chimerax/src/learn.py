@@ -232,6 +232,28 @@ def describe(session, pull=True):
     }
 
 
+def apply_predictions(session):
+    """Predict every featurised pose and write it into ViewDock's table.
+
+    This is what turns the model from a 25-row suggestion list into
+    something a party can work from: sort the table by HP Pred Rank and
+    walk down it exactly as you would any other column.
+    """
+    from . import viewdock_link as vl
+    st = state(session)
+    if st.learner.committee is None:
+        return 0, "the model has not been trained yet"
+    try:
+        preds = st.learner.predict()
+    except Exception as exc:
+        return 0, str(exc)
+    n = vl.write_predictions(session, preds, st.keys)
+    if not n:
+        return 0, ("ViewDock is not running, so there is no table to write "
+                   "to. The Learn panel still lists the suggestions.")
+    return n, ""
+
+
 def save(session, path):
     import json
     st = state(session)

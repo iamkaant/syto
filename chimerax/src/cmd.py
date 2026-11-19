@@ -961,6 +961,25 @@ hitpick_learn_collect_desc = CmdDesc(
     synopsis="Analyse and featurise poses for active learning")
 
 
+def hitpick_learn_apply(session):
+    """Write the model's predictions into ViewDock's table."""
+    ensure_ui(session)
+    from . import learn
+    n, why = learn.apply_predictions(session)
+    if n:
+        session.logger.info(
+            "hitpick learn: scored %d pose(s) in ViewDock. Sort by 'HP Pred "
+            "Rank' (2 = good) or 'HP Uncert' to see what it is unsure of."
+            % n)
+    else:
+        session.logger.warning("hitpick learn: %s" % (why or "nothing to do"))
+    return {"written": n, "why": why}
+
+
+hitpick_learn_apply_desc = CmdDesc(
+    synopsis="Write the model's predictions into the ViewDock table")
+
+
 def hitpick_learn_cancel(session):
     """Stop whatever background analysis or training is running."""
     from . import background
@@ -1055,6 +1074,15 @@ def hitpick_learn_train(session, epochs=120, wait=False):
                 % (d["trained_on"], time.time() - t0,
                    ", ".join("%s %d" % (g, n)
                              for g, n in d["grades"].items())))
+            # Push the predictions straight into ViewDock: a model whose
+            # output you cannot sort is of little use at a party.
+            written, why = learn.apply_predictions(session)
+            if written:
+                session.logger.info(
+                    "   %d pose(s) scored in ViewDock - sort by 'HP Pred "
+                    "Rank' to work down the predicted-good ones" % written)
+            elif why:
+                session.logger.info("   %s" % why)
             session.logger.info(
                 "   next: hitpick learn next   - the poses worth grading now")
         _refresh_learn_panel(session)
@@ -1203,7 +1231,8 @@ def register_commands(logger):
             ("save", hitpick_learn_save_desc, hitpick_learn_save),
             ("load", hitpick_learn_load_desc, hitpick_learn_load),
             ("cancel", hitpick_learn_cancel_desc,
-             hitpick_learn_cancel)):
+             hitpick_learn_cancel),
+            ("apply", hitpick_learn_apply_desc, hitpick_learn_apply)):
         register("hitpick learn " + name, desc, fn, logger=logger)
     register("hitpick autoexplain", hitpick_autoexplain_desc,
              hitpick_autoexplain, logger=logger)

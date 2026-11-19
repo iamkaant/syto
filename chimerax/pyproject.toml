@@ -170,6 +170,10 @@ description = "Load a saved model and grades"
 category = "Binding Analysis"
 description = "Stop background analysis or training"
 
+[chimerax.command."hitpick learn apply"]
+category = "Binding Analysis"
+description = "Write the model's predictions into the ViewDock table"
+
 [chimerax.command."hitpick clear"]
 category = "Binding Analysis"
 description = "Remove hitpick drawings"

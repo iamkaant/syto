@@ -52,7 +52,20 @@ COL_STACK = "HP Stack"
 # What is left are counts and a measurement: things that are what they say.
 COL_GOOD = "HP Good"
 COL_CLASH = "HP Clash"
-COLUMNS = (COL_HBONDS, COL_SALT, COL_STACK, COL_GOOD, COL_CLASH)
+
+# What the model thinks, so a party can sort on it and work down the list
+# rather than reading 25 rows at a time out of the Learn panel.
+#
+# COL_PRED is the predicted grade as a word, which sorts alphabetically -
+# bad, good, maybe - so it is useless for ordering. COL_PRANK is the same
+# thing as 0/1/2 and is what you actually sort by. Both are shown because
+# the word is what a person reads and the number is what the table needs.
+COL_PRED = "HP Pred"
+COL_PRANK = "HP Pred Rank"
+COL_UNC = "HP Uncert"
+PREDICTION_COLUMNS = (COL_PRED, COL_PRANK, COL_UNC)
+COLUMNS = (COL_HBONDS, COL_SALT, COL_STACK, COL_GOOD, COL_CLASH,
+           COL_PRED, COL_PRANK, COL_UNC)
 
 # An interaction counts as well formed at or above this geometric quality -
 # the same threshold the labels use for their green band.
@@ -333,6 +346,63 @@ def annotate_structure(session, structure, result, allowed=None):
             continue
         data[title] = v
     return True
+
+
+def write_predictions(session, predictions, keys_to_structures):
+    """Put the model's predictions into ViewDock's table.
+
+    `predictions` is what Learner.predict() returns, keyed the same way as
+    `keys_to_structures`. Every pose the model has an opinion about gets a
+    row value, so the table can be sorted by predicted grade and walked
+    down in the usual way.
+
+    Returns how many rows were written.
+    """
+    tool = find_viewdock(session)
+    if tool is None:
+        return 0
+    allowed = _ensure_columns(session, tool)
+    if not set(PREDICTION_COLUMNS) & allowed:
+        return 0
+
+    n = 0
+    for key, pred in predictions.items():
+        structure = keys_to_structures.get(key)
+        if structure is None:
+            continue
+        data = getattr(structure, "viewdock_data", None)
+        if not isinstance(data, dict):
+            try:
+                structure.viewdock_data = data = {}
+            except Exception:
+                continue
+        values = {COL_PRED: str(pred["grade"]),
+                  COL_PRANK: int(pred["rank"]),
+                  COL_UNC: round(float(pred["uncertainty"]), 4)}
+        for title, v in values.items():
+            if title in allowed:
+                data[title] = v
+            else:
+                data.pop(title, None)
+        n += 1
+
+    present = _existing_titles(tool)
+    for title in PREDICTION_COLUMNS:
+        col = present.get(title)
+        if col is not None:
+            try:
+                tool.struct_table.update_column(col, data=True)
+            except Exception:
+                continue
+    return n
+
+
+def clear_predictions(session):
+    """Drop prediction values, for when the model is retrained or reset."""
+    tool = find_viewdock(session)
+    if tool is None:
+        return 0
+    return _strip_keys(tool, PREDICTION_COLUMNS)
 
 
 def update_columns(session, structure=None):
