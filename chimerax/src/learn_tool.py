@@ -134,8 +134,18 @@ class LearnTool(HtmlToolInstance):
                     "error": p["error"],
                 })
 
+        from . import background
+        job = background.current(session)
+        running = None
+        if job is not None:
+            n, total, msg = job.progress
+            running = {"title": job.title, "done": n, "total": total,
+                       "message": msg,
+                       "percent": int(100.0 * n / total) if total else 0}
+
         return {
             "stats": d,
+            "running": running,
             "options": list(ls.learner.options),
             "current": current,
             "strategy": self._strategy,
@@ -165,6 +175,9 @@ class LearnTool(HtmlToolInstance):
                 self.refresh()
             elif path == "train":
                 run(session, "hitpick learn train")
+                self.refresh()
+            elif path == "cancel":
+                run(session, "hitpick learn cancel")
                 self.refresh()
             elif path == "grade":
                 self._grade(one("value"))

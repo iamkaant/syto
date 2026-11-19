@@ -166,6 +166,10 @@ description = "Save the model and grades"
 category = "Binding Analysis"
 description = "Load a saved model and grades"
 
+[chimerax.command."hitpick learn cancel"]
+category = "Binding Analysis"
+description = "Stop background analysis or training"
+
 [chimerax.command."hitpick clear"]
 category = "Binding Analysis"
 description = "Remove hitpick drawings"

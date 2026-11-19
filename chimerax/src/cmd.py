@@ -883,24 +883,99 @@ hitpick_learn_panel_desc = CmdDesc(
     synopsis="Open the active-learning panel")
 
 
-def hitpick_learn_collect(session, limit=None):
-    """Analyse and featurise the poses, ready for learning."""
+def _job_feedback(session, title):
+    """Progress to the status line and the Learn panel, if it is open."""
+    def on_progress(done, total, message):
+        session.logger.status("hitpick %s: %s" % (title, message))
+        _refresh_learn_panel(session)
+    return on_progress
+
+
+def _refresh_learn_panel(session):
+    import sys
+    # Only if the panel is actually open: importing it here would drag the
+    # whole AL stack in for someone who never asked for it.
+    mod = sys.modules.get("chimerax.hitpickingtool.learn_tool")
+    if mod is None:
+        return
+    try:
+        tools = session.tools.find_by_class(mod.LearnTool)
+    except Exception:
+        return
+    for t in tools:
+        try:
+            t.refresh()
+        except Exception:
+            pass
+
+
+def hitpick_learn_collect(session, limit=None, wait=False):
+    """Analyse and featurise the poses, ready for learning.
+
+    At about 0.14 s a pose this is minutes of work on a full party, so in a
+    window it runs on a background thread and the command returns at once.
+    `wait true` forces the old blocking behaviour for scripts.
+    """
     ensure_ui(session)
-    from . import learn
-    n = learn.collect(session, limit=limit)
-    d = learn.describe(session)
-    session.logger.info(
-        "hitpick learn: %d pose(s) featurised, %d in total"
-        % (n, d["poses"]))
-    if d["poses"]:
+    from . import learn, background
+
+    job = background.claim(session, "analysing")
+
+    def work(j):
+        return learn.collect(session, limit=limit, quiet=True, job=j)
+
+    def finished(j):
+        background.release(session, j)
+        if j.error is not None:
+            session.logger.warning("hitpick learn: analysing failed: %s"
+                                   % j.error)
+        elif j.cancelled:
+            d = learn.describe(session)
+            session.logger.info(
+                "hitpick learn: cancelled, %d pose(s) featurised so far"
+                % d["poses"])
+        else:
+            d = learn.describe(session)
+            session.logger.info(
+                "hitpick learn: %d pose(s) featurised, %d in total"
+                % (j.result or 0, d["poses"]))
+            if d["poses"] and not d["can_train"]:
+                session.logger.info("   %s" % d["why_not"])
+            elif d["can_train"]:
+                session.logger.info("   ready: hitpick learn train")
+        _refresh_learn_panel(session)
+
+    threaded = job.start(work, on_progress=_job_feedback(session, "learn"),
+                         on_done=finished, threaded=(False if wait else None))
+    if threaded:
         session.logger.info(
-            "   grade them in ViewDock (g / m / b), then: hitpick learn train")
-    return d
+            "hitpick learn: analysing in the background. The window stays "
+            "usable; 'hitpick learn cancel' stops it.")
+        return {"started": True, "background": True}
+    return learn.describe(session)
 
 
 hitpick_learn_collect_desc = CmdDesc(
     optional=[("limit", IntArg)],
+    keyword=[("wait", BoolArg)],
     synopsis="Analyse and featurise poses for active learning")
+
+
+def hitpick_learn_cancel(session):
+    """Stop whatever background analysis or training is running."""
+    from . import background
+    job = background.current(session)
+    if job is None:
+        session.logger.info("hitpick learn: nothing is running")
+        return {"cancelled": False}
+    session.logger.info("hitpick learn: cancelling %s - it will stop after "
+                        "the pose in hand" % job.title)
+    background.cancel(session)
+    return {"cancelled": True, "was": job.title}
+
+
+hitpick_learn_cancel_desc = CmdDesc(
+    synopsis="Stop background analysis or training")
 
 
 def hitpick_learn_grade(session, grade, structure=None):
@@ -934,9 +1009,14 @@ hitpick_learn_grade_desc = CmdDesc(
     synopsis="Grade a pose good, maybe or bad")
 
 
-def hitpick_learn_train(session, epochs=120):
+def hitpick_learn_train(session, epochs=120, wait=False):
+    """Train the committee on the grades given so far.
+
+    Pure numpy and no ChimeraX objects, so the whole of it goes to the
+    worker thread. At a thousand graded poses it is about twenty seconds.
+    """
     ensure_ui(session)
-    from . import learn
+    from . import learn, background
     ls = learn.state(session)
     pulled, waiting = ls.pull_viewdock_ratings()
     if pulled:
@@ -950,21 +1030,49 @@ def hitpick_learn_train(session, epochs=120):
     ok, why = ls.learner.can_train()
     if not ok:
         raise UserError(why)
+
+    job = background.claim(session, "training")
     import time
     t0 = time.time()
-    ls.learner.train(epochs=epochs)
-    d = learn.describe(session)
-    session.logger.info(
-        "hitpick learn: trained on %d graded pose(s) in %.1fs  (%s)"
-        % (d["trained_on"], time.time() - t0,
-           ", ".join("%s %d" % (g, n) for g, n in d["grades"].items())))
-    session.logger.info(
-        "   next: hitpick learn next   - the poses worth grading now")
-    return d
+
+    def work(j):
+        j.report(0, epochs, "training on %d graded pose(s)"
+                 % ls.learner.n_graded)
+        ls.learner.train(epochs=epochs)
+        return True
+
+    def finished(j):
+        background.release(session, j)
+        if j.error is not None:
+            session.logger.warning("hitpick learn: training failed: %s"
+                                   % j.error)
+        elif j.cancelled:
+            session.logger.info("hitpick learn: training cancelled")
+        else:
+            d = learn.describe(session)
+            session.logger.info(
+                "hitpick learn: trained on %d graded pose(s) in %.1fs  (%s)"
+                % (d["trained_on"], time.time() - t0,
+                   ", ".join("%s %d" % (g, n)
+                             for g, n in d["grades"].items())))
+            session.logger.info(
+                "   next: hitpick learn next   - the poses worth grading now")
+        _refresh_learn_panel(session)
+
+    threaded = job.start(work, on_progress=_job_feedback(session, "learn"),
+                         on_done=finished, threaded=(False if wait else None))
+    if threaded:
+        session.logger.info(
+            "hitpick learn: training in the background - about %.0fs at this "
+            "many grades. The window stays usable."
+            % max(1.0, ls.learner.n_graded * 0.02))
+        return {"started": True, "background": True}
+    return learn.describe(session)
 
 
 hitpick_learn_train_desc = CmdDesc(
     optional=[("epochs", IntArg)],
+    keyword=[("wait", BoolArg)],
     synopsis="Train the model on the grades given so far")
 
 
@@ -1093,7 +1201,9 @@ def register_commands(logger):
             ("next", hitpick_learn_next_desc, hitpick_learn_next),
             ("status", hitpick_learn_status_desc, hitpick_learn_status),
             ("save", hitpick_learn_save_desc, hitpick_learn_save),
-            ("load", hitpick_learn_load_desc, hitpick_learn_load)):
+            ("load", hitpick_learn_load_desc, hitpick_learn_load),
+            ("cancel", hitpick_learn_cancel_desc,
+             hitpick_learn_cancel)):
         register("hitpick learn " + name, desc, fn, logger=logger)
     register("hitpick autoexplain", hitpick_autoexplain_desc,
              hitpick_autoexplain, logger=logger)

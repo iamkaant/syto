@@ -81,16 +81,62 @@ def clear(session):
 
 # ------------------------------------------------------------- analysing
 
-def collect(session, limit=None, quiet=False):
+def _features_for(hp, lig, job):
+    """Analyse one pose for learning only - no drawing, no table update.
+
+    The display path (`hitpick analyze`) also redraws pseudobonds, relabels
+    and notifies the panel. Doing that for every pose in a bulk collect is
+    both wasted and, in a window, far more expensive than the analysis
+    itself, so this is a separate and much leaner route.
+
+    Only the first step touches ChimeraX, so only the first step goes back
+    to the GUI thread.
+    """
+    from hitpicking.analysis import PoseResult
+    from hitpicking.nci.detect import detect_interactions
+    from hitpicking.perceive.features import perceive_all
+    from . import adapter
+
+    def extract():
+        ms, _atoms = adapter.from_structures(
+            [hp.receptor_model, lig], ligand_structures=[lig])
+        # read the scalars here too; `lig` must not be touched off-thread
+        return ms, str(lig.name), int(hp.receptor_model.num_atoms)
+
+    ms, name, n_rec = job.on_main(extract)
+
+    job.checkpoint()
+    feats = perceive_all(ms)
+    res = detect_interactions(
+        ms, enabled=hp.options.enabled_nci,
+        include_weak_hbonds=hp.options.include_weak_hbonds,
+        features=feats)
+    job.checkpoint()
+    strain = None
+    if hp.options.detect_strain:
+        from hitpicking.strain import analyze_strain
+        strain = analyze_strain(ms)
+    return PoseResult(name, res.interactions, res.warnings, res.counts, {},
+                      combined=ms, n_receptor=n_rec, strain=strain)
+
+
+def _store(st, key, structure, vector):
+    """Record one featurised pose. Always called on the GUI thread."""
+    st.learner.add_features(key, vector)
+    st.keys[key] = structure
+
+
+def collect(session, limit=None, quiet=False, job=None):
     """Analyse every pose ViewDock knows about and featurise it.
 
-    This is the slow step - a few hundredths of a second per pose - and it
-    has to happen before anything can be learned, so it is explicit rather
-    than hidden inside `train`.
+    This is the slow step - about 0.14 s a pose - so with a few thousand
+    loaded it is minutes of work and belongs on a background thread. Pass a
+    `job` to get progress and cancellation; without one it runs inline, as
+    it does under test.
     """
     from .state import get_state
     from . import viewdock_link as vl
-    from .cmd import hitpick_analyze
+    from . import background
 
     hp = get_state(session)
     if not hp.ready:
@@ -99,39 +145,59 @@ def collect(session, limit=None, quiet=False):
         hp = get_state(session)
 
     st = state(session)
+    if job is None:
+        job = background.Job(session, "analysing")
+
     # Rated poses first. Analysing is the slow step and a real session can
     # hold a few thousand poses, so putting the graded ones at the front
     # means the model becomes trainable in the first seconds rather than
     # after the whole set has been ground through.
-    scored = vl.iter_rated(session)
+    scored = job.on_main(vl.iter_rated, session)
     structures = ([s for s, r in scored if r]
                   + [s for s, r in scored if not r])
     if not structures:
         from . import adapter
-        structures = adapter.find_ligand_structures(
-            session, exclude=[hp.receptor_model] if hp.receptor_model else [])
+        structures = job.on_main(
+            adapter.find_ligand_structures, session,
+            exclude=[hp.receptor_model] if hp.receptor_model else [])
     if limit:
         structures = structures[:limit]
     if not structures:
         return 0
 
-    done = 0
+    todo = []
     for s in structures:
         if s is hp.receptor_model:
             continue
         key = st.key_for(s)
         if key in st.learner.features:
             continue
+        todo.append((s, key))
+
+    done = 0
+    total = len(todo)
+    for s, key in todo:
+        job.checkpoint()
         try:
-            result = hitpick_analyze(session, s)
+            result = _features_for(hp, s, job)
+        except background.Cancelled:
+            raise
         except Exception:
             continue
-        # hitpick_analyze returns a summary; the full result is on the state
-        if hp.result is not None:
-            st.add(s, hp.result)
-            done += 1
-        if not quiet and done and done % 50 == 0:
-            session.logger.status("hitpick learn: analysed %d poses" % done)
+        # Featurise on this thread - it is numpy over the detached
+        # MolSystem - but write into the learner on the GUI thread. The
+        # panel reads those same dictionaries whenever it refreshes, and a
+        # dict being written from one thread while another walks it raises
+        # "changed size during iteration" at random.
+        from hitpicking.al.features import pose_features
+        vector = pose_features(result)
+        job.on_main(_store, st, key, s, vector)
+        done += 1
+        if done % 5 == 0 or done == total:
+            job.report(done, total, "analysed %d of %d poses" % (done, total))
+            if not quiet:
+                session.logger.status(
+                    "hitpick learn: analysed %d of %d poses" % (done, total))
     return done
 
 
