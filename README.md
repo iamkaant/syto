@@ -144,6 +144,35 @@ the pose itself.
 
 ---
 
+## Active learning (AutoParty)
+
+Optional and lazily loaded: nothing here is imported until you run one of
+these, so the handbook costs nothing if you never use it.
+
+```
+hitpick learn collect            # analyse and featurise the poses
+                                 # ...then grade in ViewDock with g / m / b
+hitpick learn train
+hitpick learn next               # the poses worth grading now
+hitpick learn next strategy disagreement   # where it disagrees with YOU
+hitpick learn status
+hitpick learn save party.json
+```
+
+Grades come from ViewDock's own Rating column, so there is no second place
+to record an opinion; `hitpick learn grade good` works without ViewDock.
+
+A numpy port of the [AutoParty](https://github.com/keiserlab/autoparty) model
+with PyTorch removed, so it runs inside ChimeraX and, later, in the browser.
+A committee of small networks is trained on the ordinal grades, and the poses
+it disagrees with itself about are the ones worth grading next.
+
+**What to expect.** On a 250-pose set with a synthetic rubric, uncertainty
+sampling was ahead of random selection at three of four checkpoints (75% vs
+72% at 64 graded) - a real but modest margin, within noise at three seeds.
+Treat the ranking as a reading order, not an oracle. It refuses to train on
+fewer than eight grades, or when every grade is the same.
+
 ## Development
 
 ```bash

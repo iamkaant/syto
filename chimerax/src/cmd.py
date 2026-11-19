@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 from chimerax.core.commands import (CmdDesc, register, BoolArg, StringArg,
-                                    FloatArg, ModelArg, ModelsArg,
+                                    FloatArg, IntArg, ModelArg, ModelsArg,
                                     EmptyArg, Or, RestOfLine)
 from chimerax.atomic import AtomsArg, StructureArg
 from chimerax.core.errors import UserError
@@ -867,6 +867,183 @@ def hitpick_report(session):
 hitpick_report_desc = CmdDesc(synopsis="Text report for the current pose")
 
 
+# ---------------------------------------------------------------- learning
+#
+# Every one of these imports .learn lazily. A user who only wants the
+# handbook never loads the model, the feature code or numpy's linear algebra.
+
+def hitpick_learn_collect(session, limit=None):
+    """Analyse and featurise the poses, ready for learning."""
+    ensure_ui(session)
+    from . import learn
+    n = learn.collect(session, limit=limit)
+    d = learn.describe(session)
+    session.logger.info(
+        "hitpick learn: %d pose(s) featurised, %d in total"
+        % (n, d["poses"]))
+    if d["poses"]:
+        session.logger.info(
+            "   grade them in ViewDock (g / m / b), then: hitpick learn train")
+    return d
+
+
+hitpick_learn_collect_desc = CmdDesc(
+    optional=[("limit", IntArg)],
+    synopsis="Analyse and featurise poses for active learning")
+
+
+def hitpick_learn_grade(session, grade, structure=None):
+    """Grade the displayed pose without ViewDock."""
+    ensure_ui(session)
+    from . import learn
+    st = get_state(session)
+    ls = learn.state(session)
+    s = structure or st.ligand_model
+    if s is None:
+        raise UserError("no pose to grade; run hitpick analyze first")
+    key = ls.key_for(s)
+    if key not in ls.learner.features:
+        if st.result is None:
+            raise UserError("analyse the pose first: hitpick analyze")
+        ls.add(s, st.result)
+    try:
+        ls.learner.grade(key, grade)
+    except ValueError as e:
+        raise UserError(str(e))
+    from . import viewdock_link as vl
+    rank = ls.learner.grades.rank(key)
+    vl.set_rating(session, s, rank + 1)
+    session.logger.info("hitpick learn: %s graded %s" % (s.name, grade))
+    return ls.learner.grades.counts()
+
+
+hitpick_learn_grade_desc = CmdDesc(
+    required=[("grade", StringArg)],
+    optional=[("structure", StructureArg)],
+    synopsis="Grade a pose good, maybe or bad")
+
+
+def hitpick_learn_train(session, epochs=120):
+    ensure_ui(session)
+    from . import learn
+    ls = learn.state(session)
+    pulled = ls.pull_viewdock_ratings()
+    if pulled:
+        session.logger.info("hitpick learn: took %d grade(s) from ViewDock"
+                            % pulled)
+    ok, why = ls.learner.can_train()
+    if not ok:
+        raise UserError(why)
+    import time
+    t0 = time.time()
+    ls.learner.train(epochs=epochs)
+    d = learn.describe(session)
+    session.logger.info(
+        "hitpick learn: trained on %d graded pose(s) in %.1fs  (%s)"
+        % (d["trained_on"], time.time() - t0,
+           ", ".join("%s %d" % (g, n) for g, n in d["grades"].items())))
+    session.logger.info(
+        "   next: hitpick learn next   - the poses worth grading now")
+    return d
+
+
+hitpick_learn_train_desc = CmdDesc(
+    optional=[("epochs", IntArg)],
+    synopsis="Train the model on the grades given so far")
+
+
+def hitpick_learn_next(session, count=10, strategy="uncertainty"):
+    """The poses worth looking at next."""
+    ensure_ui(session)
+    from . import learn
+    from hitpicking.al import UNCERTAINTY, DISAGREEMENT, PREDICTION
+    ls = learn.state(session)
+    if ls.learner.committee is None:
+        raise UserError("train first: hitpick learn train")
+    strat = {"uncertainty": UNCERTAINTY, "disagreement": DISAGREEMENT,
+             "prediction": PREDICTION}.get(strategy.lower())
+    if strat is None:
+        raise UserError("strategy must be uncertainty, disagreement or "
+                        "prediction")
+    rows = ls.learner.rank_poses(strategy=strat,
+                                 exclude_graded=(strat != DISAGREEMENT))
+    ls.last_ranked = [k for k, _ in rows]
+    if not rows:
+        session.logger.info("hitpick learn: nothing left to suggest")
+        return []
+    header = {UNCERTAINTY: "where the committee disagrees with itself - "
+                           "grading these teaches it most",
+              DISAGREEMENT: "where the model disagrees with YOUR grade - "
+                            "worth a second look",
+              PREDICTION: "simply the best predicted"}[strat]
+    session.logger.info("<b>hitpick learn: %s</b>" % header, is_html=True)
+    for k, p in rows[:count]:
+        s = ls.keys.get(k)
+        spec = ("#%s" % s.id_string) if s is not None else ""
+        extra = ""
+        if p["error"] is not None:
+            extra = "  you said %s" % ls.learner.grades.label(k)
+        session.logger.info(
+            "   %-26s predicts %-5s  uncertainty %.4f%s   %s"
+            % (k.split("|", 1)[-1][:26], p["grade"], p["uncertainty"],
+               extra, spec))
+    return [{"key": k, **p} for k, p in rows[:count]]
+
+
+hitpick_learn_next_desc = CmdDesc(
+    optional=[("count", IntArg), ("strategy", StringArg)],
+    synopsis="List the poses worth grading next")
+
+
+def hitpick_learn_status(session):
+    ensure_ui(session)
+    from . import learn
+    d = learn.describe(session)
+    log = session.logger
+    log.info("<b>hitpick learn</b>", is_html=True)
+    log.info("   %d pose(s) featurised, %d graded (%s)"
+             % (d["poses"], d["graded"],
+                ", ".join("%s %d" % (g, n) for g, n in d["grades"].items())))
+    if d["ready"]:
+        log.info("   model trained on %d pose(s)" % d["trained_on"])
+    elif d["can_train"]:
+        log.info("   ready to train: hitpick learn train")
+    else:
+        log.info("   not ready: %s" % d["why_not"])
+    return d
+
+
+hitpick_learn_status_desc = CmdDesc(
+    synopsis="Report the state of the active-learning model")
+
+
+def hitpick_learn_save(session, path):
+    ensure_ui(session)
+    from . import learn
+    p = learn.save(session, path)
+    session.logger.info("hitpick learn: wrote %s" % p)
+    return p
+
+
+hitpick_learn_save_desc = CmdDesc(required=[("path", StringArg)],
+                                  synopsis="Save the model and grades")
+
+
+def hitpick_learn_load(session, path):
+    ensure_ui(session)
+    from . import learn
+    try:
+        learn.load(session, path)
+    except ValueError as e:
+        raise UserError(str(e))
+    session.logger.info("hitpick learn: loaded %s" % path)
+    return hitpick_learn_status(session)
+
+
+hitpick_learn_load_desc = CmdDesc(required=[("path", StringArg)],
+                                  synopsis="Load a saved model and grades")
+
+
 def hitpick_clear(session):
     st = get_state(session)
     n = render.clear_groups(session)
@@ -892,6 +1069,15 @@ def register_commands(logger):
     register("hitpick explain", hitpick_explain_desc, hitpick_explain, logger=logger)
     register("hitpick report", hitpick_report_desc, hitpick_report, logger=logger)
     register("hitpick clear", hitpick_clear_desc, hitpick_clear, logger=logger)
+    for name, desc, fn in (
+            ("collect", hitpick_learn_collect_desc, hitpick_learn_collect),
+            ("grade", hitpick_learn_grade_desc, hitpick_learn_grade),
+            ("train", hitpick_learn_train_desc, hitpick_learn_train),
+            ("next", hitpick_learn_next_desc, hitpick_learn_next),
+            ("status", hitpick_learn_status_desc, hitpick_learn_status),
+            ("save", hitpick_learn_save_desc, hitpick_learn_save),
+            ("load", hitpick_learn_load_desc, hitpick_learn_load)):
+        register("hitpick learn " + name, desc, fn, logger=logger)
     register("hitpick autoexplain", hitpick_autoexplain_desc,
              hitpick_autoexplain, logger=logger)
     register("hitpick scale", hitpick_scale_desc, hitpick_scale, logger=logger)

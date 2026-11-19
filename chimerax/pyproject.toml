@@ -130,6 +130,34 @@ description = "Plot the QM energy profile for this pose's torsions"
 category = "Binding Analysis"
 description = "Display the residues the interactions point at"
 
+[chimerax.command."hitpick learn collect"]
+category = "Binding Analysis"
+description = "Analyse and featurise poses for active learning"
+
+[chimerax.command."hitpick learn grade"]
+category = "Binding Analysis"
+description = "Grade a pose good, maybe or bad"
+
+[chimerax.command."hitpick learn train"]
+category = "Binding Analysis"
+description = "Train the model on the grades given so far"
+
+[chimerax.command."hitpick learn next"]
+category = "Binding Analysis"
+description = "List the poses worth grading next"
+
+[chimerax.command."hitpick learn status"]
+category = "Binding Analysis"
+description = "Report the state of the active-learning model"
+
+[chimerax.command."hitpick learn save"]
+category = "Binding Analysis"
+description = "Save the model and grades"
+
+[chimerax.command."hitpick learn load"]
+category = "Binding Analysis"
+description = "Load a saved model and grades"
+
 [chimerax.command."hitpick clear"]
 category = "Binding Analysis"
 description = "Remove hitpick drawings"
