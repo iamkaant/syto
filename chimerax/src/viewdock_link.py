@@ -41,9 +41,22 @@ _HOOKS = {}
 COL_HBONDS = "HP H-Bonds"
 COL_SALT = "HP Salt"
 COL_STACK = "HP Stack"
-COL_SCORE = "HP Quality"
+# NOT a quality score. The previous "HP Quality" summed every interaction's
+# geometric quality, which on a 150-pose sample correlated +0.84 with the
+# mere NUMBER of interactions, -0.17 with DOCK's own energy, and left 64
+# poses carrying a clash over 0.6 A sitting in its top half. A sum also
+# prefers many mediocre contacts to a few excellent ones and treats a
+# hydrophobic contact as worth a salt bridge. Sorting a ViewDock column by
+# it would mislead, so it is gone.
+#
+# What is left are counts and a measurement: things that are what they say.
+COL_GOOD = "HP Good"
 COL_CLASH = "HP Clash"
-COLUMNS = (COL_HBONDS, COL_SALT, COL_STACK, COL_SCORE, COL_CLASH)
+COLUMNS = (COL_HBONDS, COL_SALT, COL_STACK, COL_GOOD, COL_CLASH)
+
+# An interaction counts as well formed at or above this geometric quality -
+# the same threshold the labels use for their green band.
+GOOD_QUALITY = 0.55
 
 # Keys written by earlier builds of this bundle. They used underscores, so
 # ViewDock's display_key turned "hitpick_hbonds" into "hitpick hbonds", which
@@ -51,7 +64,9 @@ COLUMNS = (COL_HBONDS, COL_SALT, COL_STACK, COL_SCORE, COL_CLASH)
 # carrying them - from a saved session, or a ChimeraX left running across an
 # upgrade - is cleaned up on hook.
 LEGACY_KEYS = ("hitpick_hbonds", "hitpick_salt", "hitpick_stack",
-               "hitpick_score", "HP HBonds", "HP Score")
+               "hitpick_score", "HP HBonds", "HP Score",
+               # removed: a sum of qualities that behaved as a count
+               "HP Quality")
 
 RATING_KEY = "rating"
 # ViewDock's scale, lowest first. Matches AutoParty's 3-level ordinal grading.
@@ -288,9 +303,11 @@ def annotate_structure(session, structure, result, allowed=None):
         COL_SALT: c.get("salt_bridge", 0),
         COL_STACK: (c.get("pi_stack_parallel", 0)
                     + c.get("pi_stack_tshaped", 0)),
-        # Sum of geometric qualities: a crude "how much well-formed
-        # interaction is there". Explicitly NOT an energy, never shown as one.
-        COL_SCORE: round(sum(i.quality for i in result.interactions), 2),
+        # How many interactions are actually well formed, rather than how
+        # much geometry can be totted up. A count cannot be mistaken for a
+        # score, and it does not grow just because a ligand is larger.
+        COL_GOOD: sum(1 for i in result.interactions
+                      if i.quality >= GOOD_QUALITY),
         # worst vdW overlap in Angstrom; blank when strain is switched off
         COL_CLASH: (round(result.strain.worst_overlap, 2)
                     if getattr(result, "strain", None) is not None else ""),

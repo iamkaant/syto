@@ -43,15 +43,30 @@ class FakeResult:
     counts = {"hbond": 3, "hbond_charged": 1, "salt_bridge": 2,
               "pi_stack_parallel": 1, "pi_stack_tshaped": 1}
 
-    class _I:
-        quality = 0.5
-    interactions = [_I(), _I()]
+    class _Good:
+        quality = 0.9
+
+    class _Poor:
+        quality = 0.3
+    # one well formed, one not: "HP Good" must count 1, where the old
+    # summed "HP Quality" would have returned 1.2
+    interactions = [_Good(), _Poor()]
+    strain = None
 
 
 s = FakeStructure()
 s.viewdock_data = {"Name": "x", "rating": 2}
 vl.annotate_structure(None, s, FakeResult(), allowed=set(vl.COLUMNS))
 print("\nviewdock_data after annotate:", s.viewdock_data)
+good = s.viewdock_data.get(vl.COL_GOOD)
+if good != 1:
+    failures.append(("HP Good should count well-formed interactions, got", good))
+    print("  FAIL HP Good = %r, expected 1" % (good,))
+else:
+    print("  OK   HP Good counts only the well-formed interaction")
+if "HP Quality" in s.viewdock_data:
+    failures.append("the summed HP Quality is gone")
+    print("  FAIL HP Quality is still written")
 column_titles = set(vl.COLUMNS) | {"Name", "Rating"}
 for key in s.viewdock_data:
     if key == vl.RATING_KEY:

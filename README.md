@@ -130,7 +130,17 @@ mousemode right "hit picking handbook"
 ```
 
 With ViewDock running, poses are analysed as you step through the table, and
-four columns are added (`HP HBonds`, `HP Salt`, `HP Stack`, `HP Score`).
+five columns are added: `HP H-Bonds`, `HP Salt`, `HP Stack`, `HP Good` and
+`HP Clash`.
+
+`HP Good` counts the interactions whose geometry is comfortably inside its
+literature limits (quality >= 0.55); `HP Clash` is the worst van der Waals
+overlap in Angstrom. **There is deliberately no single "score" column.** An
+earlier one summed every interaction's geometric quality, and on a 150-pose
+sample that correlated +0.84 with the mere number of interactions, -0.17
+with DOCK's own energy, and left 64 poses carrying a clash over 0.6 A in its
+top half. Sort on `HP Good` by all means, but read it next to `HP Clash` and
+the pose itself.
 
 ---
 
