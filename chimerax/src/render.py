@@ -19,6 +19,12 @@ CENTROID_MODEL = "hitpick centroids"
 # which is what the distance was measured between.
 CENTROID_KINDS = ("pi_stack_parallel", "pi_stack_tshaped", "cation_pi")
 
+# The four atoms a dihedral is measured over. The middle two are the bond
+# itself and are already drawn; the outer two are reference atoms chosen by
+# the tool, and without showing them the measured angle is unverifiable.
+TORSION_GROUP = "torsion"
+TORSION_COLOR = (120, 180, 255)
+
 # (r, g, b) 0-255. Chosen to stay distinguishable in both light and dark
 # backgrounds and to survive the usual red/green colour-vision deficiencies.
 TYPE_COLORS = {
@@ -645,6 +651,78 @@ def highlight(session, indices, all_atoms):
     finally:
         st._suppress_selection = False
     return len(sel)
+
+
+def show_torsion(session, torsion, all_atoms, label=True):
+    """Mark the four atoms a torsion is measured over.
+
+    The central pair is the rotatable bond; the outer pair are the reference
+    atoms this tool picked. Which ones they are changes the number, so they
+    are drawn rather than left implicit.
+    """
+    from chimerax.atomic import Atoms
+    from chimerax.core.objects import Objects
+    from chimerax.label.label3d import label as label3d
+
+    clear_groups(session, (TORSION_GROUP,))
+    if torsion is None:
+        return 0
+    idx = [int(i) for i in torsion.atoms]
+    if len(idx) != 4 or any(not (0 <= i < len(all_atoms)) for i in idx):
+        return 0
+    atoms = [all_atoms[i] for i in idx]
+
+    pbg = session.pb_manager.get_group(group_name(TORSION_GROUP), create=True)
+    pbg.dashes = 4
+    _register_attrs(session)
+    # the two reference arms; the middle bond is covalent and already drawn
+    for a, b, text in ((atoms[0], atoms[1], "1"), (atoms[2], atoms[3], "4")):
+        try:
+            pb = pbg.new_pseudobond(a, b)
+        except Exception:
+            continue
+        pb.radius = line_width(session) * 0.8
+        pb.color = TORSION_COLOR + (255,)
+        try:
+            pb._hitpick_text = ""
+            pb.hitpick_kind = TORSION_GROUP
+        except Exception:
+            pass
+    if pbg.num_pseudobonds == 0:
+        session.models.close([pbg])
+    elif pbg not in session.models:
+        session.models.add([pbg])
+
+    st = None
+    try:
+        from .state import get_state
+        st = get_state(session)
+        st._suppress_selection = True
+        session.selection.clear()
+        Atoms(atoms).selected = True
+    except Exception:
+        pass
+    finally:
+        if st is not None:
+            st._suppress_selection = False
+
+    if label:
+        try:
+            for k, a in enumerate(atoms):
+                setattr(a, LABEL_ATTR, "%d" % (k + 1))
+            label3d(session, Objects(atoms=Atoms(atoms)), "atoms",
+                    attribute=LABEL_ATTR, bg_color=_label_backdrop(session),
+                    color=_readable_text_color(session, TORSION_COLOR),
+                    height=ATOM_LABEL_HEIGHT)
+        except Exception:
+            pass
+    return len(atoms)
+
+
+def clear_torsion(session, all_atoms=None):
+    clear_groups(session, (TORSION_GROUP,))
+    if all_atoms:
+        clear_atom_labels(session, all_atoms)
 
 
 def reveal_partners(session, interactions, all_atoms):

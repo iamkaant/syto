@@ -25,6 +25,7 @@ class HitPickState:
         self.handbook = Handbook.load_or_none()
         self.listeners = []          # callables notified when the pose changes
         self.last_hit = None         # last HandbookHit
+        self.last_torsion = None     # Torsion for the last clicked bond
         self._sel_handler = None     # selection-changed trigger handler
         self._suppress_selection = False  # True while we set the selection
         self._atom_index_cache = None

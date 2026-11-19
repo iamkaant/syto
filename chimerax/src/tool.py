@@ -188,14 +188,12 @@ class HandbookTool(HtmlToolInstance):
         ts = st.result.strain.torsions
         if not ts:
             return None
-        chosen = None
-        hit = st.last_hit
-        if hit is not None and hit.atom is not None:
-            # a torsion whose central bond touches the clicked atom
-            for t in ts:
-                if hit.atom in t.bond:
-                    chosen = t
-                    break
+        # A torsion belongs to a BOND, so a clicked bond decides it. Driving
+        # this from a clicked atom made the profile appear whenever any atom
+        # was picked, which is not what was being asked.
+        chosen = st.last_torsion
+        if chosen is not None and chosen not in ts:
+            chosen = None
         if chosen is None:
             flagged = [t for t in ts if t.flagged]
             chosen = flagged[0] if flagged else None

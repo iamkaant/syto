@@ -124,6 +124,17 @@ def _install_selection_listener(session):
             return          # this selection is our own highlight, not a click
         if s.handbook is None:
             return
+        # A bond selection asks a different question from an atom one: not
+        # "what is this group" but "what is this torsion", so it drives the
+        # torsion profile instead of the handbook entry.
+        try:
+            bonds = session.selection.items("bonds")
+        except Exception:
+            bonds = None
+        if bonds and len(bonds[0]) == 1:
+            if _explain_bond(session, s, bonds[0][0]):
+                return
+
         try:
             sel = session.selection.items("atoms")
         except Exception:
@@ -142,11 +153,50 @@ def _install_selection_listener(session):
             session.logger.info("hitpick: %s" % e)
             return
         s.last_hit = hit
+        s.last_torsion = None      # an atom click is not a torsion question
         _log_hit(session, hit)
         s.notify()
 
     st._sel_handler = session.triggers.add_handler(SELECTION_CHANGED,
                                                    on_selection)
+
+
+def _explain_bond(session, st, bond):
+    """Show the torsion measured across a clicked bond, if there is one."""
+    if st.result is None or st.result.strain is None or st.molsys is None:
+        return False
+    try:
+        a1, a2 = bond.atoms
+    except Exception:
+        return False
+    i1, i2 = st.atom_index(a1), st.atom_index(a2)
+    if i1 is None or i2 is None:
+        return False
+    key = tuple(sorted((i1, i2)))
+    for t in st.result.strain.torsions:
+        if tuple(sorted(t.bond)) != key:
+            continue
+        st.last_torsion = t
+        render.show_torsion(session, t, st.all_atoms)
+        ms = st.molsys
+        session.logger.info(
+            "<b>%s &mdash; %s - %s</b>"
+            % (t.subtype or t.bond_type, ms.atom_label(t.bond[0]),
+               ms.atom_label(t.bond[1])), is_html=True)
+        session.logger.info(
+            "   measured %.1f deg over %s"
+            % (t.angle, " - ".join(ms.atom_label(a) for a in t.atoms)))
+        if t.note:
+            session.logger.info("   " + t.note)
+        from hitpicking.strain import torsions as T
+        view = T.profile_view(t.bond_type, t.subtype, t.ortho_substituted,
+                              t.angle)
+        if view is not None:
+            for line in T.profile_text(view):
+                session.logger.info(line.replace(" ", "&nbsp;"), is_html=True)
+        st.notify()
+        return True
+    return False
 
 
 def hitpick_autoexplain(session, enable=True):
