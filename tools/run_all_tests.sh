@@ -26,7 +26,7 @@ fi
 echo "=== core unit tests ==="
 "$PY" -m pytest "$ROOT/core/tests" -q || fail=1
 
-for t in tests_viewdock_contract tests_labels tests_json_returns tests_clash_parity tests_clash_draw tests_hover tests_formal_charge tests_torsion_click tests_learn tests_background tests_learn_panel tests_predict_columns tests_assume tests_label_layers tests_worklist; do
+for t in tests_viewdock_contract tests_labels tests_json_returns tests_clash_parity tests_clash_draw tests_hover tests_formal_charge tests_torsion_click tests_learn tests_background tests_learn_panel tests_predict_columns tests_assume tests_label_layers tests_worklist tests_score_terms; do
   echo
   echo "=== chimerax/$t.py ==="
   out="$("$CX" --nogui --silent --exit --script "$ROOT/chimerax/$t.py" 2>&1)"

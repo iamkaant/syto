@@ -24,6 +24,7 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "core"))
 PANEL = os.path.join(ROOT, "chimerax", "src", "ui", "panel.html")
+LEARN = os.path.join(ROOT, "chimerax", "src", "ui", "learn.html")
 CHROME = ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
           "/Applications/Chromium.app/Contents/MacOS/Chromium",
           "/usr/bin/google-chrome", "/usr/bin/chromium")
@@ -63,6 +64,135 @@ window.addEventListener("load", function () {
   document.body.appendChild(d);
 });
 </script></body>"""
+
+
+LEARN_REPORT = """<script>
+window.addEventListener("load", function () {
+  var d = document.createElement("pre");
+  d.id = "__report";
+  var el = document.getElementById("terms");
+  var fold = document.getElementById("termfold");
+  d.textContent = JSON.stringify({
+    errors: window.__jsErrors,
+    terms: el ? el.innerHTML : null,
+    open: fold ? !!fold.open : null,
+    overflow: document.documentElement.scrollWidth
+             - document.documentElement.clientWidth,
+    marker: fold ? getComputedStyle(fold.querySelector("summary"),
+                                    "::before").content : null,
+    boxes: [].slice.call(document.querySelectorAll("input[data-term]"))
+      .map(function (b) {
+        return [b.getAttribute("data-term"), b.checked]; }),
+    model: (document.getElementById("modelinfo") || {}).innerHTML || "",
+    status: (document.getElementById("status") || {}).innerHTML || ""
+  });
+  document.body.appendChild(d);
+});
+</script></body>"""
+
+
+def learn_snapshot(terms):
+    """The Learn panel's snapshot, with a score-term block to render."""
+    return {
+        "stats": {"poses": 24, "graded": 12, "grades": {"bad": 4, "maybe": 4,
+                  "good": 4}, "human_grades": {"bad": 4, "maybe": 4,
+                  "good": 4}, "assumed_grades": {}, "n_assumed": 0,
+                  "assumed_grade": None, "trained_on": 12, "ready": True,
+                  "can_train": True, "why_not": "", "feature_version": 2,
+                  "waiting": 0, "score_terms": terms["chosen"]},
+        "running": None, "worklist": None,
+        "options": ["bad", "maybe", "good"],
+        "current": None, "strategy": "uncertainty", "auto_advance": True,
+        "suggestions": [], "curve": None, "terms": terms,
+    }
+
+
+def _row(name, usable=True, verdict="varies", mean=-40.0, sd=3.0):
+    return {"name": name, "n": 24, "coverage": 1.0, "distinct": 20,
+            "mean": mean, "sd": sd, "sentinels": 0,
+            "verdict": verdict, "why": "" if usable else "a row number",
+            "usable": usable}
+
+
+def check_learn(chrome, work):
+    """The score-term chooser, executed rather than parsed."""
+    src = open(LEARN, encoding="utf-8").read()
+    assert "</head>" in src and "</body>" in src, "learn.html lost its shell"
+
+    dock = ["Total Energy", "Van der Waals", "Electrostatic"]
+    cases = [
+        ("dock", {"chosen": dock, "suggested": dock, "source": "dock",
+                  "why": "DOCK 3 was recognised by name",
+                  "slots": 7, "program": "DOCK 3", "verified": True,
+                  "live": 3,
+                  "available": [_row(t) for t in dock]
+                               + [_row("Number", False, "identifier")]}),
+        ("deaf", {"chosen": ["r_i_docking_score"], "suggested": dock,
+                  "source": "dock", "why": "DOCK 3 was recognised by name",
+                  "slots": 7, "program": "DOCK 3", "verified": True,
+                  "live": 0,
+                  "available": [_row(t) for t in dock]}),
+        ("none", {"chosen": [], "suggested": dock, "source": "generic",
+                  "why": "no docking program was recognised by name",
+                  "slots": 7, "program": None, "verified": False,
+                  "live": 0, "available": [_row(t) for t in dock]}),
+        ("nodata", {"chosen": list(dock), "suggested": [], "source": "generic",
+                    "why": "no pose carries a usable score term",
+                    "slots": 7, "program": None, "verified": False,
+                    "live": 0, "available": []}),
+    ]
+    failures = []
+    for name, terms in cases:
+        page = src.replace("</head>", CATCH, 1).replace(
+            "</body>", LEARN_REPORT, 1)
+        page = page.replace('hp("ready");',
+                            "window.hpLearnState(%s);"
+                            % json.dumps(learn_snapshot(terms)), 1)
+        r = render(chrome, page, work, "learn-" + name, (460, 900))
+
+        def check(cond, msg):
+            print(("  OK   " if cond else "  FAIL ") + "learn/%s: %s"
+                  % (name, msg))
+            if not cond:
+                failures.append("learn/%s: %s" % (name, msg))
+
+        check(not r["errors"], "no JavaScript error (%s)"
+              % ("; ".join(r["errors"]) or "none"))
+        # The panel docks at about 460px. A table that overflows it puts a
+        # horizontal scrollbar under a list you are meant to read across.
+        check(r["overflow"] <= 0,
+              "nothing overflows the docked width (%dpx over)"
+              % r["overflow"])
+        ticked = [n for n, on in r["boxes"] if on]
+        if name == "nodata":
+            check("learns from geometry and interactions alone"
+                  in (r["terms"] or ""),
+                  "says plainly that there is no score to learn from")
+            check(not r["boxes"], "and offers no checkboxes")
+            continue
+        check(len(r["boxes"]) == len(terms["available"]),
+              "every term the poses carry is offered (%d)" % len(r["boxes"]))
+        check(ticked == [t for t in terms["chosen"]
+                         if any(x["name"] == t for x in terms["available"])],
+              "the ticked boxes are the current pick: %s" % ticked)
+        check("Number" in (r["terms"] or "") or name != "dock",
+              "the junk is shown, named as junk, rather than hidden")
+        if name == "deaf":
+            # the whole reason this feature exists: a pick that matches
+            # nothing in the file must not look like a working one
+            check("None of the 1 selected term" in r["terms"],
+                  "a pick that matches nothing in the file says so")
+            check(r["open"] is True,
+                  "and the section opens itself rather than waiting to be "
+                  "found")
+        if name == "dock":
+            check(r["open"] is False,
+                  "a working pick stays folded away")
+            check("DOCK 3" in r["terms"], "and names the program")
+        if name == "none":
+            check("No score terms" in r["terms"],
+                  "choosing none is reported as a choice, not an error")
+    return failures
 
 
 def find_chrome():
@@ -188,6 +318,8 @@ def main():
             check(not verdict,
                   "a neutral atom does not spend a card saying it is neutral")
             check(not tabs, "and shows no tab bar for a single scale")
+
+    failures += check_learn(chrome, work)
 
     print()
     if failures:

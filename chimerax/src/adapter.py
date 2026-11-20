@@ -339,5 +339,14 @@ def pose_scores(structure):
     for k, v in data.items():
         if isinstance(v, bool) or not isinstance(v, (int, float)):
             continue
-        out[str(k)] = float(v)
+        k = str(k)
+        # Our own columns are numeric and sit in the same dictionary. They
+        # must never reach the feature vector: HP Pred Rank IS the model's
+        # output, and HP H-Bonds and HP Clash are already in the descriptor
+        # block, computed from the geometry rather than read back off a
+        # table that may be stale. This mattered the moment the score terms
+        # became selectable, because the chooser lists whatever is here.
+        if k.startswith("HP ") or k == "rating":
+            continue
+        out[k] = float(v)
     return out

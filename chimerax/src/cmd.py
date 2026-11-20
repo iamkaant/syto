@@ -1337,6 +1337,108 @@ hitpick_learn_worklist_desc = CmdDesc(
     synopsis="Work the suggestion list down inside ViewDock")
 
 
+def _score_term_report(session, info, chosen):
+    """Print the selection and the evidence behind it."""
+    log = session.logger
+    rows = info["available"]
+    usable = [r for r in rows if r["usable"]]
+    if chosen:
+        log.info("<b>docking score terms in use</b> (%d of %d slot(s)):"
+                 % (len(chosen), info["slots"]), is_html=True)
+        for t in chosen:
+            r = next((x for x in rows if x["name"] == t), None)
+            if r is None:
+                log.info("   %s - no loaded pose carries this; "
+                         "its column stays empty" % t)
+            else:
+                log.info("   %-26s mean %8.3f  sd %7.3f  on %d%% of poses"
+                         % (t, r["mean"], r["sd"],
+                            int(100 * r["coverage"])))
+    else:
+        log.info("<b>no docking score terms</b> - the model learns from "
+                 "geometry and interactions alone.", is_html=True)
+    log.info("   %s" % info["why"])
+    rejected = [r for r in rows if not r["usable"]]
+    spare = [r for r in usable if r["name"] not in chosen]
+    if spare:
+        log.info("   also available: %s"
+                 % ", ".join(r["name"] for r in spare))
+    if rejected:
+        log.info("   not offered: %s"
+                 % "; ".join("%s (%s)" % (r["name"], r["verdict"])
+                             for r in rejected))
+    log.info("   set with: hitpick learn terms &lt;name&gt;, &lt;name&gt;, ... "
+             "| auto | none", is_html=True)
+
+
+def hitpick_learn_terms(session, terms=None):
+    """Choose which of the pose's own score terms the model may learn from.
+
+    The descriptor block ends with seven slots holding the docking
+    program's own numbers. Those slots used to be wired to DOCK 3's term
+    names, so a mol2 from Glide, Vina, GOLD or rDock put zero in every one
+    of them and the model never saw the score its user trusts most.
+
+    With no argument this reports the current selection and everything the
+    loaded poses carry, with the junk - row numbers, constants, failed
+    terms that came through as 999.999 - named as junk. `auto` picks for
+    you; `none` turns the block off.
+
+    Changing the selection rewrites those seven columns on every pose
+    already collected, so nothing has to be analysed again. It does
+    discard a trained model: its first layer was fitted to columns that
+    now hold different quantities. The grades survive - retrain.
+    """
+    ensure_ui(session)
+    from . import learn
+    ls = learn.state(session)
+    info = ls.suggest_score_terms()
+
+    text = (terms or "").strip()
+    if not text:
+        _score_term_report(session, info, list(ls.learner.score_terms))
+        return {"terms": list(ls.learner.score_terms),
+                "available": info["available"], "why": info["why"]}
+
+    low = text.lower()
+    if low in ("auto", "default", "detect"):
+        wanted = list(info["terms"])
+    elif low in ("none", "off", "clear"):
+        wanted = []
+    else:
+        wanted = [t.strip() for t in text.split(",") if t.strip()]
+        known = {r["name"]: r for r in info["available"]}
+        missing = [t for t in wanted if t not in known]
+        if missing:
+            raise UserError(
+                "no loaded pose carries %s. Run 'hitpick learn terms' with "
+                "no argument to see what they do carry."
+                % ", ".join(repr(m) for m in missing))
+        dead = [t for t in wanted if not known[t]["usable"]]
+        if dead:
+            session.logger.warning(
+                "hitpick learn terms: %s - including it anyway, as you asked"
+                % "; ".join("%s is %s (%s)" % (t, known[t]["verdict"],
+                                               known[t]["why"]) for t in dead))
+
+    was_trained = ls.learner.committee is not None
+    n = ls.set_score_terms(wanted)
+    chosen = list(ls.learner.score_terms)
+    _score_term_report(session, info, chosen)
+    if n:
+        session.logger.info(
+            "   rewrote the score columns on %d collected pose(s)%s"
+            % (n, "; the trained model was discarded - retrain with "
+               "'hitpick learn train'" if was_trained else ""))
+    _refresh_learn_panel(session)
+    return {"terms": chosen, "changed": n, "retrain": bool(was_trained and n)}
+
+
+hitpick_learn_terms_desc = CmdDesc(
+    optional=[("terms", RestOfLine)],
+    synopsis="Choose which docking score terms the model learns from")
+
+
 hitpick_learn_next_desc = CmdDesc(
     optional=[("count", IntArg), ("strategy", StringArg)],
     synopsis="List the poses worth grading next")
@@ -1425,6 +1527,7 @@ def register_commands(logger):
             ("next", hitpick_learn_next_desc, hitpick_learn_next),
             ("worklist", hitpick_learn_worklist_desc,
              hitpick_learn_worklist),
+            ("terms", hitpick_learn_terms_desc, hitpick_learn_terms),
             ("status", hitpick_learn_status_desc, hitpick_learn_status),
             ("save", hitpick_learn_save_desc, hitpick_learn_save),
             ("load", hitpick_learn_load_desc, hitpick_learn_load),

@@ -21,11 +21,14 @@ from __future__ import annotations
 import numpy as np
 
 from .model import Committee, ordinal_targets, decode_ordinal
-from .features import pose_features, feature_info, TOTAL_BITS, BLOCKS
+from .features import (pose_features, feature_info, score_block, TOTAL_BITS,
+                       BLOCKS, SCORE_SLICE)
+from . import scoreterms
+from .scoreterms import DEFAULT_TERMS
 from .. import FEATURE_VERSION
 
 __all__ = ["Learner", "Grades", "UNCERTAINTY", "DISAGREEMENT", "PREDICTION",
-           "pose_features", "feature_info"]
+           "pose_features", "feature_info", "scoreterms"]
 
 # Acquisition strategies: how to choose what to show next.
 UNCERTAINTY = "uncertainty"     # where the committee disagrees with itself
@@ -33,6 +36,16 @@ DISAGREEMENT = "disagreement"   # where it disagrees with the human grade
 PREDICTION = "prediction"       # simply the best predicted, for review
 
 DEFAULT_GRADES = ("bad", "maybe", "good")
+
+
+def _numeric(scores):
+    """Only the plain numbers; names, SMILES and flags are not features."""
+    out = {}
+    for k, v in (scores or {}).items():
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            continue
+        out[str(k)] = float(v)
+    return out
 
 
 class Grades:
@@ -84,12 +97,19 @@ class Learner:
 
     def __init__(self, options=DEFAULT_GRADES, committee_size=3,
                  n_neurons=256, hidden_layers=2, dropout=0.2, lr=1e-3,
-                 weight_decay=1e-2, seed=0):
+                 weight_decay=1e-2, seed=0, score_terms=None):
         self.options = tuple(options)
         self.grades = Grades(self.options)
         self.features = {}          # key -> vector
+        # The pose's own score terms, kept beside the vector so the
+        # selection can be changed later without re-analysing: the score
+        # slots are rewritten from these. Cheap - a handful of floats a
+        # pose against a 2069-wide vector.
+        self.scores = {}            # key -> {term: value}
         self.committee = None
         self.feature_version = FEATURE_VERSION
+        self.score_terms = scoreterms.normalize(
+            DEFAULT_TERMS if score_terms is None else score_terms)
         self.config = {"committee_size": committee_size,
                        "n_neurons": n_neurons, "hidden_layers": hidden_layers,
                        "dropout": dropout, "lr": lr,
@@ -108,15 +128,54 @@ class Learner:
 
     def add_pose(self, key, result):
         """Record the feature vector for an analysed pose."""
-        self.features[key] = pose_features(result)
+        self.features[key] = pose_features(result, terms=self.score_terms)
+        self.scores[key] = _numeric(getattr(result, "scores", None))
         return self.features[key]
 
-    def add_features(self, key, vector):
+    def add_features(self, key, vector, scores=None):
         v = np.asarray(vector, dtype=np.float64)
         if v.shape != (TOTAL_BITS,):
             raise ValueError("feature vector is %s, expected (%d,)"
                              % (v.shape, TOTAL_BITS))
         self.features[key] = v
+        if scores is not None:
+            self.scores[key] = _numeric(scores)
+
+    # ------------------------------------------------- score term choice
+
+    def set_score_terms(self, terms):
+        """Change which of the pose's own numbers the model may learn from.
+
+        The score slots are rewritten in place from the dictionaries kept
+        by `add_pose`, so a few thousand poses do not have to be analysed
+        again - which on a real set is minutes. Everything outside those
+        slots is untouched.
+
+        A trained committee is discarded: its first layer was fitted to
+        columns that now hold different quantities, and keeping it would
+        make every prediction quietly wrong. The grades survive, so
+        retraining is one call.
+        """
+        terms = scoreterms.normalize(terms)
+        if terms == self.score_terms:
+            return 0
+        self.score_terms = terms
+        n = 0
+        for key, vec in self.features.items():
+            vec[SCORE_SLICE] = score_block(self.scores.get(key), terms)
+            n += 1
+        self.committee = None
+        self.history = []
+        self.trained_on = 0
+        self._mean = self._scale = None
+        return n
+
+    def observed_scores(self):
+        """The score dictionaries of every featurised pose, for `suggest`."""
+        return list(self.scores.values())
+
+    def suggest_score_terms(self):
+        return scoreterms.suggest(self.observed_scores())
 
     def grade(self, key, grade):
         self.grades.set(key, grade)
@@ -299,6 +358,7 @@ class Learner:
     def state(self):
         return {
             "feature_version": self.feature_version,
+            "score_terms": list(self.score_terms),
             "options": list(self.options),
             "config": self.config,
             "trained_on": self.trained_on,
@@ -318,7 +378,12 @@ class Learner:
                 "thing, so it cannot be loaded. Retrain from the grades."
                 % (st.get("feature_version"), FEATURE_VERSION))
         cfg = dict(st.get("config") or {})
-        lr = cls(options=tuple(st.get("options") or DEFAULT_GRADES), **cfg)
+        # Models saved before the selection existed were trained on DOCK's
+        # seven terms, which is what DEFAULT_TERMS still is - so an old
+        # file loads unchanged rather than being refused.
+        terms = st.get("score_terms")
+        lr = cls(options=tuple(st.get("options") or DEFAULT_GRADES),
+                 score_terms=DEFAULT_TERMS if terms is None else terms, **cfg)
         for k, v in (st.get("grades") or {}).items():
             lr.grades.set(k, int(v))
         if st.get("mean") is not None:

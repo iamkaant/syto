@@ -145,8 +145,32 @@ class LearnTool(HtmlToolInstance):
 
         from . import worklist as _wl
         wl = _wl.current(self.session)
+
+        # Which of the docking program's own numbers the model is fed.
+        # Offered even before anything is collected, because getting it
+        # wrong is invisible otherwise: a mol2 that is not from DOCK
+        # simply puts zero in every score slot and nothing says so.
+        try:
+            sug = ls.suggest_score_terms()
+            terms = {
+                "chosen": list(ls.learner.score_terms),
+                "suggested": list(sug["terms"]),
+                "source": sug["source"],
+                "why": sug["why"],
+                "slots": sug["slots"],
+                "program": (sug["program"] or {}).get("name"),
+                "verified": bool((sug["program"] or {}).get("verified")),
+                "available": sug["available"],
+                "live": sum(1 for t in ls.learner.score_terms
+                            if any(r["name"] == t and r["usable"]
+                                   for r in sug["available"])),
+            }
+        except Exception:
+            terms = None
+
         return {
             "stats": d,
+            "terms": terms,
             "running": running,
             "worklist": wl.describe() if wl is not None else None,
             "options": list(ls.learner.options),
@@ -192,6 +216,13 @@ class LearnTool(HtmlToolInstance):
                     hitpick_learn_worklist(
                         self.session, count=int(one("count", "20") or 20),
                         strategy=self._strategy)
+                self.refresh()
+            elif path == "terms":
+                from .cmd import hitpick_learn_terms
+                # The panel sends the ticked names; nothing ticked is a
+                # deliberate "no score terms", not a request for a report.
+                hitpick_learn_terms(self.session,
+                                    one("value", "auto") or "none")
                 self.refresh()
             elif path == "assume":
                 from .cmd import hitpick_learn_assume

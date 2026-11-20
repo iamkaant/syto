@@ -65,6 +65,18 @@
            border:1px solid var(--line); border-radius:6px; padding:4px 6px; }
   label.chk { display:flex; align-items:center; gap:7px; cursor:pointer;
               user-select:none; padding:3px 0; }
+  details.fold > summary { cursor:pointer; list-style:none; padding:3px 0;
+          font-size:11.5px; color:var(--muted); }
+  details.fold > summary::-webkit-details-marker { display:none; }
+  details.fold > summary::before { content:"\25b8\A0"; }
+  details.fold[open] > summary::before { content:"\25be\A0"; }
+  details.fold > summary b { color:var(--fg); }
+  table.terms { width:100%; border-collapse:collapse; font-size:11px;
+          font-variant-numeric:tabular-nums; }
+  table.terms td { padding:2px 4px 2px 0; vertical-align:top; }
+  table.terms td.num { text-align:right; color:var(--muted);
+          white-space:nowrap; }
+  table.terms tr.off td { color:var(--muted); }
   svg { width:100%; height:auto; display:block; }
   .ax { font-size:8px; fill:var(--muted); }
 .bar { height:5px; border-radius:3px; background:var(--line,#3a3a3a);
@@ -110,6 +122,7 @@
   </div>
   <div id="modelinfo" class="tiny muted" style="margin-top:7px"></div>
   <div id="curve"></div>
+  <div id="terms"></div>
 </div>
 
 <h2>Look at these next</h2>
@@ -226,9 +239,108 @@ window.hpLearnState = function (s) {
   document.getElementById("trainbtn").disabled = !st.can_train || !!s.running;
   document.getElementById("curve").innerHTML = renderCurve(s.curve);
 
+  renderTerms(s);
   renderWorklist(s);
   renderSuggestions(s);
 };
+
+// Which of the docking program's own numbers go into the feature vector.
+//
+// This was a constant - DOCK 3's seven term names - until it was pointed
+// out that a mol2 need not come from DOCK. When it does not, every one of
+// those slots holds zero and nothing anywhere says so, which is the worst
+// kind of defect: the model trains, predicts, and is simply deaf to the
+// score its user trusts most. So the panel states the selection even when
+// it is the default, and names what it is ignoring and why.
+function renderTerms(s) {
+  var el = document.getElementById("terms");
+  if (!el) return;
+  var t = s.terms;
+  if (!t) { el.innerHTML = ""; return; }
+
+  var chosen = t.chosen || [], avail = t.available || [];
+  var usable = avail.filter(function (r) { return r.usable; });
+  var head, cls = "tiny muted";
+  if (!avail.length) {
+    head = "No pose carries a docking score, so the model learns from "
+         + "geometry and interactions alone.";
+  } else if (!chosen.length) {
+    head = "<b>No score terms</b> \u00b7 geometry and interactions only.";
+  } else if (!t.live) {
+    // the case this whole feature exists for
+    cls = "tiny warn";
+    head = "<b>None of the " + chosen.length + " selected term(s) is in "
+         + "these poses.</b> Those feature slots are all zero, so the "
+         + "docking score is not being learned from. "
+         + (t.suggested.length
+            ? "Suggested: " + t.suggested.map(esc).join(", ") + "."
+            : "");
+  } else {
+    head = "Learning from <b>" + t.live + "</b> of " + t.slots
+         + " score slot(s)"
+         + (t.program ? " \u00b7 " + esc(t.program)
+              + (t.verified ? "" : " (matched by name)") : "")
+         + ".";
+  }
+
+  var rows = avail.map(function (r) {
+    var on = chosen.indexOf(r.name) >= 0;
+    return '<tr class="' + (on ? "" : "off") + '">'
+      + '<td><label class="chk" title="' + esc(r.why || "") + '">'
+      + '<input type="checkbox" data-term="' + esc(r.name) + '"'
+      + (on ? " checked" : "")
+      + (r.usable ? "" : " ") + '> ' + esc(r.name) + "</label></td>"
+      + '<td class="num">' + (r.usable
+          ? r.mean.toFixed(2) + " \u00b1 " + r.sd.toFixed(2)
+          : esc(r.verdict)) + "</td></tr>";
+  }).join("");
+
+  var over = chosen.length >= t.slots;
+  el.innerHTML = '<details class="fold" id="termfold"'
+    + (t.live || !avail.length ? "" : " open") + ">"
+    + "<summary>Docking score terms</summary>"
+    + '<div class="' + cls + '" style="margin:3px 0 6px">' + head + "</div>"
+    + (avail.length
+        ? '<table class="terms">' + rows + "</table>"
+          + '<div class="tiny muted" style="margin-top:5px">'
+          + "At most " + t.slots + " may be ticked"
+          + (over ? " &mdash; untick one first" : "")
+          + ". " + esc(t.why) + "</div>"
+          + '<div class="row" style="gap:6px;margin-top:6px">'
+          + '<button id="termapply">Apply</button>'
+          + '<button id="termauto">Auto</button>'
+          + '<button id="termnone">None</button></div>'
+          + '<div class="tiny muted" style="margin-top:5px">Changing this '
+          + "rewrites those columns on the poses already analysed &mdash; "
+          + "nothing is re-analysed &mdash; but a trained model is "
+          + "discarded, because its first layer was fitted to different "
+          + "quantities. Retrain after.</div>"
+        : "")
+    + "</details>";
+
+  if (!avail.length) return;
+  var boxes = function () {
+    return [].slice.call(el.querySelectorAll("input[data-term]")); };
+  var picked = function () {
+    return boxes().filter(function (b) { return b.checked; })
+                  .map(function (b) { return b.getAttribute("data-term"); }); };
+  // Hold the limit at the point of clicking rather than at the point of
+  // applying, so the cap is a visible fact and not a rejected command.
+  boxes().forEach(function (b) {
+    b.onclick = function () {
+      if (b.checked && picked().length > t.slots) {
+        b.checked = false;
+        alert("At most " + t.slots + " score terms. Untick one first.");
+      }
+    };
+  });
+  document.getElementById("termapply").onclick = function () {
+    hp("terms", {value: picked().join(",")}); };
+  document.getElementById("termauto").onclick = function () {
+    hp("terms", {value: "auto"}); };
+  document.getElementById("termnone").onclick = function () {
+    hp("terms", {value: "none"}); };
+}
 
 // The queue lives in ViewDock, so the panel's job is to say whether one is
 // running and how far down it you are - not to duplicate the list.

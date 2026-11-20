@@ -29,6 +29,7 @@ class LearnState:
         self.waiting = 0          # rated in ViewDock but not yet featurised
         self.assumed = set()      # graded by assumption, not by a person
         self.assumed_grade = None
+        self._score_cache = None  # (n_poses, suggestion) - see suggest_score_terms
 
     # ------------------------------------------------------------ poses
 
@@ -42,6 +43,52 @@ class LearnState:
         self.learner.add_pose(key, result)
         self.keys[key] = structure
         return key
+
+    # ----------------------------------------------- docking score terms
+
+    def available_scores(self, limit=400):
+        """The numeric terms the loaded poses carry.
+
+        Read straight off ViewDock's structures rather than from the
+        learner, so the choice can be made - and seen to be right - before
+        the slow collect, not after it. Falls back to what has already been
+        featurised when ViewDock is not running.
+        """
+        from . import adapter, viewdock_link as vl
+        samples = []
+        try:
+            for s in vl.rated_structures(self.session)[:limit]:
+                d = adapter.pose_scores(s)
+                if d:
+                    samples.append(d)
+        except Exception:
+            samples = []
+        if not samples:
+            samples = self.learner.observed_scores()[:limit]
+        return samples
+
+    def suggest_score_terms(self, refresh=False):
+        """What to feed the model, with the evidence.
+
+        Cached on the number of loaded poses: the panel asks for this on
+        every refresh, and walking a few thousand ViewDock structures each
+        time a pose is clicked would be felt.
+        """
+        from hitpicking.al import scoreterms
+        from . import viewdock_link as vl
+        try:
+            n = len(vl.rated_structures(self.session))
+        except Exception:
+            n = -1
+        if not refresh and self._score_cache and self._score_cache[0] == n:
+            return self._score_cache[1]
+        info = scoreterms.suggest(self.available_scores())
+        self._score_cache = (n, info)
+        return info
+
+    def set_score_terms(self, terms):
+        """Apply a selection, rewriting the score columns already collected."""
+        return self.learner.set_score_terms(terms)
 
     # ----------------------------------------------------------- grades
 
@@ -252,9 +299,13 @@ def _features_for(hp, lig, job):
                       scores, combined=ms, n_receptor=n_rec, strain=strain)
 
 
-def _store(st, key, structure, vector):
-    """Record one featurised pose. Always called on the GUI thread."""
-    st.learner.add_features(key, vector)
+def _store(st, key, structure, vector, scores=None):
+    """Record one featurised pose. Always called on the GUI thread.
+
+    The raw score dictionary is kept beside the vector so the score-term
+    selection can be changed afterwards without analysing the set again.
+    """
+    st.learner.add_features(key, vector, scores)
     st.keys[key] = structure
 
 
@@ -322,8 +373,8 @@ def collect(session, limit=None, quiet=False, job=None):
         # dict being written from one thread while another walks it raises
         # "changed size during iteration" at random.
         from hitpicking.al.features import pose_features
-        vector = pose_features(result)
-        job.on_main(_store, st, key, s, vector)
+        vector = pose_features(result, terms=st.learner.score_terms)
+        job.on_main(_store, st, key, s, vector, result.scores)
         done += 1
         if done % 5 == 0 or done == total:
             job.report(done, total, "analysed %d of %d poses" % (done, total))
@@ -365,6 +416,7 @@ def describe(session, pull=True):
         "why_not": why,
         "feature_version": lr.feature_version,
         "waiting": st.waiting,
+        "score_terms": list(lr.score_terms),
     }
 
 
