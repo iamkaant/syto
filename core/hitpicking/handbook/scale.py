@@ -14,10 +14,18 @@ from __future__ import annotations
 
 import math
 
-# Families worth showing on the scale, in a sensible reading order, with the
-# short labels the axis uses. Anything not listed is still included under its
-# entry title, after these.
+# Families worth plotting, in reading order, with the short labels the axis
+# uses. This list is also the FILTER: an entry that is not here is not a
+# family and does not go on the plot.
+#
+# It used to be only an ordering, with anything unlisted appended under its
+# full entry title. That put "pKBHX hydrogen-bond basicity scale: definition,
+# range, classes" on the axis as though it were a moiety, with its class
+# bounds (-0.96 to 5.46) stretching the axis to fit, and overflowed the label
+# gutter with three lines of prose. Adding a new family now takes one line
+# here, which is a fair price for an axis that only carries moieties.
 FAMILY_ORDER = [
+    ("hbond_carboxylate_o", "carboxylate O"),
     ("hbond_phosphoryl_o", "P=O"),
     ("hbond_n_oxide_o", "N-oxide"),
     ("hbond_sulfoxide_o", "S=O sulfoxide"),
@@ -38,6 +46,7 @@ FAMILY_ORDER = [
     ("hbond_aldehyde_o", "aldehyde C=O"),
     ("hbond_ester_lactone_carbonyl_o", "ester C=O"),
     ("hbond_nitrile_n", "nitrile N"),
+    ("hbond_push_pull_nitrile_n", "push-pull nitrile N"),
     ("hbond_ether_o", "ether O"),
     ("hbond_alcohol_phenol_o", "alcohol/phenol O"),
     ("hbond_sulfone_o", "sulfone O"),
@@ -206,7 +215,12 @@ def build_scale(handbook, quantity="pKBHX", moiety_ids=(), same_element_only=Fal
         stats = (entry.get("summary_stats") or {}).get(quantity)
         if not stats:
             continue
-        label = labels.get(eid) or entry.get("title", eid)
+        if eid not in labels:
+            # Not a moiety family: a scale definition, or a set of worked
+            # examples. Its numbers are real and stay in the entry list;
+            # they are just not a row on this axis.
+            continue
+        label = labels[eid]
         points = []
         for v in entry.get("values") or []:
             if v.get("quantity") != quantity:

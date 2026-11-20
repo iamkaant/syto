@@ -79,6 +79,31 @@
   .pill { font-size: 10.5px; padding: 1px 6px; border-radius: 20px;
           border: 1px solid var(--line); color: var(--muted); }
   .flag { color: var(--warn); font-size: 11.5px; }
+  /* Settings fold away. They are set once at the start of a party and the
+     pose above them is what gets looked at on every compound. Collapsed,
+     the summary still reports what is on, so nothing has to be opened to
+     find out. */
+  .fold { margin: 18px 0 0; }
+  .fold > summary {
+    list-style: none; cursor: pointer; display: flex; align-items: baseline;
+    gap: 8px; font-size: 12px; letter-spacing: .04em; font-weight: 600;
+    text-transform: uppercase; color: var(--muted);
+    border-top: 1px solid var(--line); padding: 12px 0 8px;
+  }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary::before {
+    content: "\25B8"; font-size: 10px; transition: transform .12s ease;
+    display: inline-block; color: var(--muted);
+  }
+  .fold[open] > summary::before { transform: rotate(90deg); }
+  .fold > summary:hover { color: var(--fg); }
+  .fold > summary .sum {
+    margin-left: auto; font-style: normal; font-weight: 400;
+    text-transform: none; letter-spacing: 0; font-size: 11.5px;
+    color: var(--muted); text-align: right;
+  }
+  .fold[open] > summary .sum { opacity: .55; }
+  .col > .fold:first-child > summary { border-top: none; padding-top: 0; }
   /* Scale tabs. pKBHX and pKBH+ answer different questions about the same
      atom, so they share one plot area rather than stacking two charts. */
   .tabs { display: flex; gap: 4px; margin: 0 0 6px; }
@@ -129,10 +154,15 @@
 <h2>Current pose</h2>
 <div id="pose"></div>
 
-<h2>Interactions shown</h2>
+<details class="fold" id="fold-nci" ontoggle="hpRemember(this)">
+  <summary><span>Interactions shown</span>
+    <i class="sum" id="sum-nci"></i></summary>
 <div class="card" id="toggles"></div>
+</details>
 
-<h2>Display</h2>
+<details class="fold" id="fold-display" ontoggle="hpRemember(this)">
+  <summary><span>Display</span>
+    <i class="sum" id="sum-display"></i></summary>
 <div class="card">
   <label class="chk"><input type="checkbox" id="opt-lengths"
     onchange="hp('lengths',{on:this.checked?1:0})"> Lengths on interactions</label>
@@ -166,6 +196,7 @@
     <button onclick="hp('labels',{quantity:'off'})">Clear labels</button>
   </div>
 </div>
+</details>
 
 </div><!-- /col -->
 <div class="col right">
@@ -207,6 +238,58 @@ var TYPES = [
   ["weak_hbond",        "Weak C&ndash;H&middot;&middot;&middot;O", "var(--phobic)"],
   ["hydrophobic",       "Hydrophobic contacts",  "var(--phobic)"]
 ];
+
+// Which settings folds are open. Kept in localStorage so reopening the
+// panel - or restarting ChimeraX - does not put them back the way the
+// author liked them rather than the way you left them. Every access is
+// guarded: the store can be absent or throw in an embedded view, and the
+// panel has to work either way.
+var FOLD_DEFAULT = {"fold-nci": false, "fold-display": false};
+
+function hpFoldState() {
+  try {
+    var raw = window.localStorage.getItem("hp.folds");
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* no store, or it refused: fall through to the default */ }
+  return null;
+}
+
+function hpRemember(el) {
+  try {
+    var st = hpFoldState() || {};
+    st[el.id] = el.open;
+    window.localStorage.setItem("hp.folds", JSON.stringify(st));
+  } catch (e) { /* not remembering is survivable; failing to toggle is not */ }
+}
+
+function hpRestoreFolds() {
+  var st = hpFoldState() || FOLD_DEFAULT;
+  Object.keys(FOLD_DEFAULT).forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.open = (id in st) ? !!st[id] : FOLD_DEFAULT[id];
+  });
+}
+
+// A collapsed section that says nothing about its contents is a section
+// people open just to check. These say what is on, so they do not have to.
+function hpFoldSummary(s) {
+  var o = s.options || {};
+  var on = (o.enabled_nci || []).length;
+  var el = document.getElementById("sum-nci");
+  if (el) {
+    el.textContent = on === TYPES.length
+      ? "all " + TYPES.length
+      : on + " of " + TYPES.length;
+  }
+  el = document.getElementById("sum-display");
+  if (!el) return;
+  var bits = [];
+  if (o.show_lengths) bits.push("lengths");
+  if (o.show_angles) bits.push("angles");
+  if (o.show_clashes) bits.push("clashes");
+  if (o.show_scale !== false) bits.push("scales");
+  el.textContent = bits.length ? bits.join(", ") : "nothing extra";
+}
 
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
@@ -256,6 +339,8 @@ window.hpSetState = function (s) {
     var oh = document.getElementById("opt-hover");
     if (oh) oh.checked = s.options.hover_detail !== false;
   }
+
+  hpFoldSummary(s);
 
   window.hpShowScale = s.options ? (s.options.show_scale !== false) : true;
   renderPose(s.pose);
@@ -544,6 +629,11 @@ function renderHit(hit, scales, torsion) {
     // A family median is the fallback, not the headline: the azine family
     // runs 0.3 to 2.0 while pyrazine itself is 0.92.
     var rep = a.representative;
+    // A median of 9.864 over 20 compounds is false precision; 2 dp
+    // is the most any of these sources justifies.
+    var n2 = function (v) {
+      return (typeof v === "number") ? +v.toFixed(2) : v;
+    };
     var lead = (rep && typeof rep.value === "number")
       ? '<span class="val"><b>' + n2(rep.value) + "</b></span>"
       : '<span class="val">median <b>' + n2(a.median) + "</b></span>";
@@ -613,6 +703,7 @@ function renderHit(hit, scales, torsion) {
   el.innerHTML = h;
 }
 
+hpRestoreFolds();
 hp("ready");
 </script>
 </body>

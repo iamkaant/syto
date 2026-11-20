@@ -35,5 +35,11 @@ for t in tests_viewdock_contract tests_labels tests_json_returns tests_clash_par
 done
 
 echo
+echo "=== panel JavaScript (executed, not just parsed) ==="
+pjs="$("$PY" "$ROOT/tools/check_panel_js.py" 2>&1)"
+echo "$pjs" | tail -4
+echo "$pjs" | grep -qE "PANEL JS OK|skipping the panel JS check" || fail=1
+
+echo
 [ $fail -eq 0 ] && echo "ALL TESTS PASSED" || echo "SOME TESTS FAILED"
 exit $fail
