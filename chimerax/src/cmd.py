@@ -1270,6 +1270,73 @@ def hitpick_learn_next(session, count=10, strategy="uncertainty"):
     return [{"key": k, **p} for k, p in rows[:count]]
 
 
+def hitpick_learn_worklist(session, count=20, strategy="uncertainty",
+                           off=False):
+    """Put the "look at these next" list into ViewDock and work it down.
+
+    The suggestions are useless in a panel you then have to translate into
+    clicks in another window. This sets ViewDock's own table to the queue,
+    in the model's order, and a pose leaves the list the moment you grade
+    it - so b/m/g walks the batch with no hunting in between.
+
+    `off` hands the table back to ViewDock's own filter. So does finishing
+    the batch; the queue is not re-ranked underneath you while you work it,
+    because a batch that reshuffles itself is not a batch.
+    """
+    ensure_ui(session)
+    from . import learn, viewdock_link as vl, worklist
+    from hitpicking.al import UNCERTAINTY, DISAGREEMENT, PREDICTION
+
+    if off:
+        n = worklist.stop(session)
+        session.logger.info(
+            "hitpick learn: worklist off; ViewDock is showing its own list "
+            "again%s" % (" (%d pose(s) were left in the queue)" % n if n
+                         else ""))
+        _refresh_learn_panel(session)
+        return {"stopped": True, "left": n}
+
+    ls = learn.state(session)
+    if ls.learner.committee is None:
+        raise UserError("train first: hitpick learn train")
+    strat = {"uncertainty": UNCERTAINTY, "disagreement": DISAGREEMENT,
+             "prediction": PREDICTION}.get(strategy.lower())
+    if strat is None:
+        raise UserError("strategy must be uncertainty, disagreement or "
+                        "prediction")
+    tool = vl.find_viewdock(session)
+    if tool is None:
+        raise UserError(
+            "ViewDock is not running, so there is no table to put a "
+            "worklist in. The Learn panel still lists the suggestions.")
+
+    rows = ls.learner.rank_poses(strategy=strat,
+                                 exclude_graded=(strat != DISAGREEMENT))
+    queue = []
+    for k, _p in rows[:int(count)]:
+        st = ls.keys.get(k)
+        if st is not None and getattr(st, "id", None):
+            queue.append(st)
+    if not queue:
+        session.logger.info("hitpick learn: nothing left to suggest")
+        return {"queued": 0}
+
+    worklist.stop(session)
+    wl = worklist.Worklist(session, tool, queue, label=strategy)
+    n = wl.install()
+    session.logger.info(
+        "hitpick learn: %d pose(s) queued in ViewDock, best first by %s. "
+        "Grade with b/m/g and each one drops out as you go. "
+        "Stop early with: hitpick learn worklist off" % (n, strategy))
+    _refresh_learn_panel(session)
+    return {"queued": n, "strategy": strategy}
+
+
+hitpick_learn_worklist_desc = CmdDesc(
+    optional=[("count", IntArg), ("strategy", StringArg), ("off", BoolArg)],
+    synopsis="Work the suggestion list down inside ViewDock")
+
+
 hitpick_learn_next_desc = CmdDesc(
     optional=[("count", IntArg), ("strategy", StringArg)],
     synopsis="List the poses worth grading next")
@@ -1356,6 +1423,8 @@ def register_commands(logger):
             ("assume", hitpick_learn_assume_desc, hitpick_learn_assume),
             ("train", hitpick_learn_train_desc, hitpick_learn_train),
             ("next", hitpick_learn_next_desc, hitpick_learn_next),
+            ("worklist", hitpick_learn_worklist_desc,
+             hitpick_learn_worklist),
             ("status", hitpick_learn_status_desc, hitpick_learn_status),
             ("save", hitpick_learn_save_desc, hitpick_learn_save),
             ("load", hitpick_learn_load_desc, hitpick_learn_load),

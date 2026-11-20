@@ -143,9 +143,12 @@ class LearnTool(HtmlToolInstance):
                        "message": msg,
                        "percent": int(100.0 * n / total) if total else 0}
 
+        from . import worklist as _wl
+        wl = _wl.current(self.session)
         return {
             "stats": d,
             "running": running,
+            "worklist": wl.describe() if wl is not None else None,
             "options": list(ls.learner.options),
             "current": current,
             "strategy": self._strategy,
@@ -181,6 +184,15 @@ class LearnTool(HtmlToolInstance):
                 self.refresh()
             elif path == "grade":
                 self._grade(one("value"))
+            elif path == "worklist":
+                from .cmd import hitpick_learn_worklist
+                if one("off") == "1":
+                    hitpick_learn_worklist(self.session, off=True)
+                else:
+                    hitpick_learn_worklist(
+                        self.session, count=int(one("count", "20") or 20),
+                        strategy=self._strategy)
+                self.refresh()
             elif path == "assume":
                 from .cmd import hitpick_learn_assume
                 if one("forget") == "1":

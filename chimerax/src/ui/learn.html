@@ -123,6 +123,15 @@
     </select>
   </div>
   <div id="strategyhelp" class="tiny muted" style="margin-top:5px"></div>
+  <div class="row" style="margin-top:7px;gap:6px;flex-wrap:wrap">
+    <button class="primary" id="wlbtn"
+      onclick="hp('worklist',{count:document.getElementById('wln').value})"
+      title="Put this list into ViewDock and grade down it with b/m/g"
+      >Work this list in ViewDock</button>
+    <input id="wln" type="number" min="1" max="500" value="20"
+      style="width:62px" title="how many to queue">
+  </div>
+  <div id="wlstate" class="tiny" style="margin-top:5px"></div>
 </div>
 <div id="suggestions"></div>
 
@@ -217,8 +226,41 @@ window.hpLearnState = function (s) {
   document.getElementById("trainbtn").disabled = !st.can_train || !!s.running;
   document.getElementById("curve").innerHTML = renderCurve(s.curve);
 
+  renderWorklist(s);
   renderSuggestions(s);
 };
+
+// The queue lives in ViewDock, so the panel's job is to say whether one is
+// running and how far down it you are - not to duplicate the list.
+function renderWorklist(s) {
+  var w = s.worklist, el = document.getElementById("wlstate");
+  var btn = document.getElementById("wlbtn");
+  var box = document.getElementById("wln");
+  if (!el || !btn) return;
+  if (w && w.left) {
+    btn.textContent = "Stop working the list";
+    btn.className = "";
+    btn.onclick = function () { hp("worklist", {off: 1}); };
+    if (box) box.style.display = "none";
+    el.className = "tiny";
+    el.innerHTML = "<b>" + w.left + "</b> left in ViewDock"
+      + (w.done ? " &middot; " + w.done + " graded" : "")
+      + ". Grade with <b>b</b>/<b>m</b>/<b>g</b> &mdash; each one drops out "
+      + "and the next takes its place.";
+  } else {
+    btn.textContent = "Work this list in ViewDock";
+    btn.className = "primary";
+    btn.onclick = function () {
+      hp("worklist", {count: box ? box.value : 20});
+    };
+    if (box) box.style.display = "";
+    el.className = "tiny muted";
+    el.innerHTML = s.stats && s.stats.ready
+      ? "Sets ViewDock's table to this list, best first."
+      : "Train the model first.";
+  }
+  btn.disabled = !!s.running || !(s.stats && s.stats.ready);
+}
 
 // Rating by exception leaves the model with nothing to aim at: it learns
 // what you reject and never sees what you would buy. Offer the fix exactly
