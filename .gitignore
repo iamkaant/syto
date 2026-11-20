@@ -33,3 +33,10 @@ web/vendor/hitpicking.zip
 # headless-browser profiles from the test harnesses
 .chrome-*/
 web/build.js
+
+# Research data, not source. These were committed early and should not
+# have been: saved ChimeraX sessions and a saved party are unpublished
+# work - which compounds were looked at and what was thought of them.
+# They stay on disk; git just stops carrying them.
+*.cxs
+party*.json
