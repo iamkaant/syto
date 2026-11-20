@@ -29,7 +29,8 @@ class Options:
                  "show_lengths", "show_angles", "detect_strain",
                  "show_clashes", "show_strain_labels", "show_limits",
                  "show_scale", "hover_detail", "line_width",
-                 "handbook_on_click", "annotate_atom_values", "use_active_learning")
+                 "handbook_on_click", "annotate_atom_values",
+                 "use_active_learning", "reveal_partners")
 
     def __init__(self, enabled_nci=None, include_weak_hbonds=False,
                  site_radius=10.0, show_lengths=True, show_angles=False,
@@ -37,7 +38,8 @@ class Options:
                  show_strain_labels=True, show_limits=False,
                  show_scale=True, hover_detail=True, line_width=0.075,
                  handbook_on_click=True,
-                 annotate_atom_values=False, use_active_learning=False):
+                 annotate_atom_values=False, use_active_learning=False,
+                 reveal_partners=False):
         self.enabled_nci = set(C.DEFAULT_ENABLED if enabled_nci is None
                                else enabled_nci)
         self.include_weak_hbonds = include_weak_hbonds
@@ -61,6 +63,10 @@ class Options:
         self.handbook_on_click = handbook_on_click
         self.annotate_atom_values = annotate_atom_values
         self.use_active_learning = use_active_learning
+        # display the receptor residues the interactions point at. A
+        # display change to the user's own models, so it is off until
+        # asked for and it is undoable.
+        self.reveal_partners = reveal_partners
 
     def to_dict(self):
         return {k: (sorted(getattr(self, k)) if k == "enabled_nci"

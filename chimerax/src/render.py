@@ -840,14 +840,37 @@ def clear_torsion(session, all_atoms=None):
         clear_label_layer(session, all_atoms, LAYER_TORSION)
 
 
-def reveal_partners(session, interactions, all_atoms):
-    """Display the atoms an interaction points at.
+# Atoms this tool turned on, per session, so they can be turned off again
+# without touching anything the user displayed themselves.
+_REVEALED = {}
+
+
+def reveal_partners(session, interactions, all_atoms, show=True):
+    """Display the atoms an interaction points at, or put them back.
 
     A line drawn to a hidden atom still reads, but showing the partner makes
     it obvious what is being contacted. Off by default because it changes
     the display state of the user's own models.
+
+    Reversible, and only over what WE changed. `show=False` hides exactly
+    the atoms this function turned on and nothing else - hiding everything
+    an interaction touches would switch off whatever the user had already
+    chosen to see, which is not undoing our own change but making another.
     """
     from chimerax.atomic import Atoms
+
+    if not show:
+        was = _REVEALED.pop(session, None)
+        if not was:
+            return 0
+        try:
+            kept = [a for a in was if not a.deleted]
+            if kept:
+                Atoms(kept).displays = False
+            return len(kept)
+        except Exception:
+            return 0
+
     sel = []
     for it in interactions:
         for i in tuple(it.lig_atoms) + tuple(it.rec_atoms):
@@ -855,14 +878,18 @@ def reveal_partners(session, interactions, all_atoms):
                 sel.append(all_atoms[int(i)])
     if not sel:
         return 0
-    atoms = Atoms(sel)
     try:
+        atoms = Atoms(sel).unique_residues.atoms
+        # Record only what was hidden before we touched it; an atom the
+        # user already had on is not ours to turn off later.
+        hidden = [a for a, on in zip(atoms, atoms.displays) if not on]
         atoms.displays = True
-        residues = atoms.unique_residues
-        residues.atoms.displays = True
     except Exception:
         return 0
-    return len(sel)
+    _REVEALED.setdefault(session, [])
+    have = set(id(a) for a in _REVEALED[session])
+    _REVEALED[session].extend(a for a in hidden if id(a) not in have)
+    return len(hidden)
 
 
 def legend_text(counts):

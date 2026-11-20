@@ -65,6 +65,14 @@
   }
   button:hover { border-color: var(--accent); color: var(--accent); }
   button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .trow { padding:5px 6px; border-radius:6px; cursor:pointer;
+          border:1px solid transparent; }
+  .trow:hover { background:var(--line); }
+  .trow.on { border-color:var(--accent); box-shadow:inset 3px 0 var(--accent); }
+  .trow.warn b { color:var(--strain, #e08030); }
+  .trow-h { display:flex; justify-content:space-between; gap:8px;
+            align-items:baseline; }
+  .trow + .trow { border-top:1px solid var(--line); border-radius:0; }
   label.chk { display: flex; align-items: center; gap: 7px; padding: 3px 0;
               cursor: pointer; user-select: none; }
   .swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
@@ -183,10 +191,25 @@
     Clashes and strain</label>
   <label class="chk"><input type="checkbox" id="opt-scale"
     onchange="hp('scaleplot',{on:this.checked?1:0})">
-    Basicity / pK<sub>a</sub> scale plots</label>
+    Basicity scale plots</label>
   <label class="chk"><input type="checkbox" id="opt-hover"
     onchange="hp('hover',{on:this.checked?1:0})">
     Detail in the hover balloon</label>
+  <label class="chk"><input type="checkbox" id="opt-autoexplain"
+    onchange="hp('autoexplain',{on:this.checked?1:0})"
+    title="Explain an atom in this panel as soon as it is selected">
+    Explain an atom when it is selected</label>
+  <label class="chk"><input type="checkbox" id="opt-reveal"
+    onchange="hp('reveal',{on:this.checked?1:0})"
+    title="Display the receptor residues the interactions point at. Unticking
+hides only what this put on screen, not anything you displayed yourself."
+    >Show the residues being contacted</label>
+  <label class="chk" style="gap:9px">
+    <input type="range" id="opt-width" min="0.02" max="0.2" step="0.005"
+      style="flex:1" onchange="hp('width',{value:this.value})"
+      oninput="document.getElementById('widthval').textContent =
+               (+this.value).toFixed(3)">
+    <span>Line width <b id="widthval">0.075</b></span></label>
   <div class="legend">
     <span><i class="band good"></i>within limits</span>
     <span><i class="band marginal"></i>off ideal</span>
@@ -203,6 +226,8 @@
   </div>
 </div>
 </details>
+
+<div id="torsions"></div>
 
 </div><!-- /col -->
 <div class="col right">
@@ -294,6 +319,7 @@ function hpFoldSummary(s) {
   if (o.show_angles) bits.push("angles");
   if (o.show_clashes) bits.push("clashes");
   if (o.show_scale !== false) bits.push("scales");
+  if (o.reveal_partners) bits.push("contacts shown");
   el.textContent = bits.length ? bits.join(", ") : "nothing extra";
 }
 
@@ -344,16 +370,75 @@ window.hpSetState = function (s) {
     if (os) os.checked = s.options.show_scale !== false;
     var oh = document.getElementById("opt-hover");
     if (oh) oh.checked = s.options.hover_detail !== false;
+    var oa = document.getElementById("opt-autoexplain");
+    if (oa) oa.checked = s.options.handbook_on_click !== false;
+    var orv = document.getElementById("opt-reveal");
+    if (orv) orv.checked = !!s.options.reveal_partners;
+    var ow = document.getElementById("opt-width");
+    if (ow && typeof s.options.line_width === "number") {
+      ow.value = s.options.line_width;
+      document.getElementById("widthval").textContent =
+        s.options.line_width.toFixed(3);
+    }
   }
 
   hpFoldSummary(s);
 
   window.hpShowScale = s.options ? (s.options.show_scale !== false) : true;
   renderPose(s.pose);
+  renderTorsions(s.torsions, s.torsion_warn_kcal);
   // kept so the scale tabs can re-render without a round trip
   window.hpLast = {hit: s.hit, scales: s.scales, torsion: s.torsion};
   renderHit(s.hit, s.scales || (s.scale ? [s.scale] : []), s.torsion);
 };
+
+// Every flagged torsion, worst first. This existed only as `hitpick
+// torsions` in the log and as a word floating by a bond in 3D, neither of
+// which can be read down. The two severity tiers are the point of the
+// list: a torsion measured past the warning threshold is costing the pose
+// real energy, while most flags are a geometric rule being careful.
+function renderTorsions(rows, warnKcal) {
+  var el = document.getElementById("torsions");
+  if (!el) return;
+  if (!rows || !rows.length) { el.innerHTML = ""; return; }
+
+  var bad = rows.filter(function (r) { return r.severity === "warning"; });
+  var sum = bad.length
+    ? bad.length + " over " + (warnKcal || 3) + " kcal/mol"
+    : rows.length + ", none serious";
+
+  var body = rows.map(function (r) {
+    var cls = "trow" + (r.severity === "warning" ? " warn" : "")
+            + (r.selected ? " on" : "");
+    var cost = (r.energy === null || r.energy === undefined)
+      ? '<span class="tiny muted">not measured</span>'
+      : "+" + r.energy.toFixed(1) + " kcal/mol";
+    return '<div class="' + cls + '" onclick="hp(\'torsion\',{bond:\''
+      + esc(r.bond) + '\'})" title="' + esc(r.note || "") + '">'
+      + '<div class="trow-h"><b>' + esc(r.kind) + "</b>"
+      + '<span class="tiny muted">' + esc(r.label) + "</span></div>"
+      + '<div class="trow-h"><span class="tiny">' + esc(r.assessment)
+      + " &middot; " + r.angle.toFixed(0) + "&deg;</span><span>"
+      + cost + "</span></div></div>";
+  }).join("");
+
+  // This section is rebuilt on every pose, so hpRestoreFolds cannot reach
+  // it. A choice the user made sticks; otherwise it opens itself when
+  // something is actually serious and stays shut when nothing is.
+  var remembered = (hpFoldState() || {})["fold-torsions"];
+  var open = (remembered === undefined) ? bad.length > 0 : !!remembered;
+
+  el.innerHTML = '<details class="fold" id="fold-torsions"'
+    + (open ? " open" : "") + ' ontoggle="hpRemember(this)">'
+    + '<summary><span>Torsions worth a look</span>'
+    + '<i class="sum">' + esc(sum) + "</i></summary>"
+    + '<div class="card" style="padding:4px 6px">' + body
+    + '<div class="tiny muted" style="margin-top:6px">'
+    + "Click a row to select the bond and plot its profile. "
+    + "Orange is measured above " + (warnKcal || 3) + " kcal/mol above "
+    + "that bond class&rsquo;s own minimum; the rest are a geometric rule "
+    + "being careful, or a smaller measured cost.</div></div></details>";
+}
 
 function renderPose(p) {
   var el = document.getElementById("pose");

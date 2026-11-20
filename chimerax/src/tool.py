@@ -94,6 +94,9 @@ class HandbookTool(HtmlToolInstance):
                 "worst_overlap": (round(r.strain.worst_overlap, 2)
                                   if r.strain is not None else None),
             }
+            snap["torsions"] = self._torsion_list(st)
+            from hitpicking.strain.torsions import QM_WARN_KCAL
+            snap["torsion_warn_kcal"] = QM_WARN_KCAL
         if st.last_hit is not None:
             snap["hit"] = st.last_hit.to_dict()
             snap["torsion"] = self._torsion_profile(st)
@@ -172,6 +175,19 @@ class HandbookTool(HtmlToolInstance):
             elif path == "hover":
                 from .cmd import hitpick_hover
                 hitpick_hover(session, one("on") == "1")
+            elif path == "reveal":
+                from .cmd import hitpick_reveal
+                hitpick_reveal(session, one("on") == "1")
+            elif path == "autoexplain":
+                from .cmd import hitpick_autoexplain
+                hitpick_autoexplain(session, one("on") == "1")
+                st.notify()
+            elif path == "width":
+                from .cmd import hitpick_width
+                hitpick_width(session, float(one("value", "0.075")))
+                st.notify()
+            elif path == "torsion":
+                self._pick_torsion(one("bond"))
             elif path == "float":
                 self.float_window(one("on") != "0")
             elif path == "labels":
@@ -201,6 +217,67 @@ class HandbookTool(HtmlToolInstance):
                     run(session, c)
         except Exception as e:
             session.logger.warning("hitpick panel: %s" % e)
+
+    def _pick_torsion(self, bond):
+        """Select one torsion from the panel's list.
+
+        The same thing a bond click does, driven from a row instead: the
+        bond is selected in 3D, the torsion is numbered on its atoms, and
+        the profile below follows it. A list you cannot click through to
+        the geometry is just a table.
+        """
+        st = self._state
+        if not bond or st.result is None or st.result.strain is None:
+            return
+        try:
+            want = tuple(sorted(int(x) for x in bond.split(",")))
+        except Exception:
+            return
+        for t in st.result.strain.torsions:
+            if tuple(sorted(t.bond)) != want:
+                continue
+            st.last_torsion = t
+            render.show_torsion(self.session, t, st.all_atoms)
+            try:
+                from chimerax.atomic import Atoms
+                self.session.selection.clear()
+                Atoms([st.all_atoms[i] for i in t.bond
+                       if 0 <= i < len(st.all_atoms)]).selected = True
+            except Exception:
+                pass
+            st.notify()
+            return
+
+    def _torsion_list(self, st):
+        """Every flagged torsion, worst first, for the panel's list.
+
+        Worst first means by measured cost where there is one. A torsion
+        with no QM class has no number and cannot be ranked against one
+        that has, so those come after, in bond order.
+        """
+        if st.result is None or st.result.strain is None:
+            return []
+        ms = st.molsys
+        rows = []
+        for t in st.result.strain.torsions:
+            if not t.flagged:
+                continue
+            rows.append({
+                "bond": "%d,%d" % t.bond,
+                "label": " - ".join(ms.atom_label(a) for a in t.bond)
+                         if ms is not None else "",
+                "kind": t.subtype or t.bond_type,
+                "angle": round(t.angle, 1),
+                "assessment": t.assessment,
+                "severity": t.severity,
+                "energy": (None if t.energy is None else round(t.energy, 2)),
+                "note": t.note,
+                "selected": (st.last_torsion is not None
+                             and st.last_torsion.bond == t.bond),
+            })
+        rows.sort(key=lambda r: (r["energy"] is None, -(r["energy"] or 0.0),
+                                 r["bond"]))
+        return rows
 
     def _torsion_profile(self, st):
         """The QM profile for a clicked bond, or for the worst torsion."""

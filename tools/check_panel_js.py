@@ -59,7 +59,17 @@ window.addEventListener("load", function () {
     foldsOpen: ["fold-nci", "fold-display"].map(function (i) {
       var el = document.getElementById(i);
       return el ? el.open : null;
-    })
+    }),
+    torsions: (document.getElementById("torsions") || {}).innerHTML || "",
+    torsionRows: document.querySelectorAll("#torsions .trow").length,
+    torsionWarn: document.querySelectorAll("#torsions .trow.warn").length,
+    torsionOpen: (document.getElementById("fold-torsions") || {}).open,
+    controls: ["opt-reveal", "opt-autoexplain", "opt-width"].map(
+      function (i) {
+        var el = document.getElementById(i);
+        return el ? [i, el.type, String(el.type === "range"
+                     ? el.value : el.checked)] : null;
+      })
   });
   document.body.appendChild(d);
 });
@@ -212,6 +222,13 @@ def find_chrome():
     return None
 
 
+def _options():
+    """Exactly what Options.to_dict() sends, so the panel is checked
+    against the real shape rather than a hand-picked subset."""
+    from hitpicking.analysis import Options
+    return Options().to_dict()
+
+
 def snapshot(hb, mids, title):
     anns = hb.annotations_for(mids)
     wanted = {"pKBHX"} | {a["quantity"] for a in anns
@@ -224,14 +241,26 @@ def snapshot(hb, mids, title):
                 scales.append(sc)
     return {
         "ready": True, "handbook": hb.describe(), "viewdock": True,
-        "options": {"enabled_nci": ["hbond", "salt_bridge", "pi_stack"],
-                    "show_lengths": True, "show_angles": False,
-                    "show_clashes": True, "show_limits": False,
-                    "show_scale": True, "hover_detail": True},
+        "options": _options(),
         "pose": {"name": "ZINC000123456789.1",
                  "counts": {"hbond": 3, "salt_bridge": 1},
                  "warnings": [], "interactions": [],
                  "strain": {"clash": 1}, "worst_overlap": 0.62},
+        "torsion_warn_kcal": 3.0,
+        "torsions": [
+            {"bond": "4,5", "label": "C4 - N5", "kind": "aniline N",
+             "angle": -90.0, "assessment": "strained", "severity": "warning",
+             "energy": 5.03, "note": "5.0 kcal/mol above the minimum",
+             "selected": False},
+            {"bond": "7,8", "label": "C7 - C8", "kind": "sp3-sp3",
+             "angle": 8.0, "assessment": "eclipsed", "severity": "note",
+             "energy": 1.9, "note": "within 8 deg of eclipsed",
+             "selected": True},
+            {"bond": "9,10", "label": "C9 - C10", "kind": "biaryl",
+             "angle": 12.0, "assessment": "forced planar",
+             "severity": "warning", "energy": None,
+             "note": "ortho-substituted biaryl held flat",
+             "selected": False}],
         "hit": {"atom": 17, "title": title, "moiety_ids": list(mids),
                 "highlight": [], "annotations": anns, "warnings": [],
                 "entries": hb.for_moiety(mids[0])[:3]},
@@ -308,6 +337,22 @@ def main():
         # what a column capped at 100vh inside a taller page produces.
         check(r["scrollers"] in ([], ["page"]),
               "exactly one thing scrolls: %s" % (r["scrollers"] or ["nothing"]))
+        # The controls that only existed as typed commands until now.
+        check(r["controls"] == [["opt-reveal", "checkbox", "false"],
+                                ["opt-autoexplain", "checkbox", "true"],
+                                ["opt-width", "range", "0.075"]],
+              "reveal, autoexplain and line width are on screen and reflect "
+              "the state: %s" % r["controls"])
+        check(r["torsionRows"] == 3,
+              "every flagged torsion has a row (%d)" % r["torsionRows"])
+        check(r["torsionWarn"] == 2,
+              "and the serious ones are marked apart (%d)" % r["torsionWarn"])
+        check(r["torsionOpen"] is True,
+              "the list opens itself when something is serious")
+        check("hp('torsion',{bond:'4,5'})" in r["torsions"],
+              "and each row is clickable through to its bond")
+        check("not measured" in r["torsions"],
+              "a torsion with no QM class says so rather than showing a 0")
         check(r["sumNci"] and r["sumDisplay"],
               "both folds summarise what is on while collapsed (%r / %r)"
               % (r["sumNci"], r["sumDisplay"]))

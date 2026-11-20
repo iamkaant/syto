@@ -449,13 +449,22 @@ hitpick_lengths_desc = CmdDesc(optional=[("show", BoolArg)],
 
 
 def hitpick_reveal(session, show=True):
-    """Display the residues our interactions point at."""
+    """Display the residues our interactions point at, or put them back.
+
+    `show false` hides exactly the atoms this command turned on, and
+    nothing the user displayed themselves. Before, it took the argument
+    and ignored it: there was no way back.
+    """
     ensure_ui(session)
     st = get_state(session)
     if st.result is None:
         raise UserError("nothing analysed yet; run: hitpick analyze")
-    n = render.reveal_partners(session, st.result.interactions, st.all_atoms)
-    session.logger.info("hitpick: revealed %d interacting atom(s)" % n)
+    n = render.reveal_partners(session, st.result.interactions, st.all_atoms,
+                               show=bool(show))
+    st.options.reveal_partners = bool(show)
+    session.logger.info("hitpick: %s %d atom(s)"
+                        % ("revealed" if show else "hid again", n))
+    st.notify()
     return n
 
 
