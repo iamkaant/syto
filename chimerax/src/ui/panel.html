@@ -32,8 +32,14 @@
     .grid > .col { min-width: 0; }
     body { padding-left: 18px; padding-right: 18px; }
     .col h2:first-child { border-top: none; padding-top: 0; }
-    .col.right { position: sticky; top: 0; align-self: start;
-                 max-height: 100vh; overflow-y: auto; }
+    /* The right column used to be its own scroller: sticky, capped at
+       100vh. But it starts below the title, the status card and the
+       buttons, so a column exactly one viewport tall ran exactly that far
+       past the bottom of the page - a page scrollbar AND a column
+       scrollbar, side by side, the moment the scale plot was open.
+       The settings fold away now, which leaves the left column short, so
+       nothing is gained by scrolling the two independently. One page, one
+       scrollbar. */
   }
   @media (min-width: 1180px) {
     .grid { grid-template-columns: minmax(280px, 0.7fr) minmax(460px, 1.3fr); }

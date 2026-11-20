@@ -45,6 +45,12 @@ window.addEventListener("load", function () {
   d.textContent = JSON.stringify({
     errors: window.__jsErrors,
     hit: (document.getElementById("hit") || {}).innerHTML || "",
+    scrollers: [[document.scrollingElement, "page"],
+                [document.querySelector(".col.right"), "right column"],
+                [document.querySelector(".col:not(.right)"), "left column"]]
+      .filter(function (p) {
+        return p[0] && p[0].scrollHeight - p[0].clientHeight > 2;
+      }).map(function (p) { return p[1]; }),
     pose: (document.getElementById("pose") || {}).innerHTML || "",
     toggles: (document.getElementById("toggles") || {}).innerHTML || "",
     sumNci: (document.getElementById("sum-nci") || {}).textContent || "",
@@ -93,12 +99,13 @@ def snapshot(hb, mids, title):
     }
 
 
-def render(chrome, html, workdir, name):
+def render(chrome, html, workdir, name, size=(1100, 800)):
     path = os.path.join(workdir, name + ".html")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(html)
     out = subprocess.run(
         [chrome, "--headless", "--disable-gpu", "--dump-dom",
+         "--window-size=%d,%d" % size,
          "--virtual-time-budget=4000", "file://" + path],
         capture_output=True, text=True, timeout=120).stdout
     m = re.search(r'<pre id="__report">(.*?)</pre>', out, re.S)
@@ -125,24 +132,30 @@ def main():
     src = open(PANEL, encoding="utf-8").read()
     assert "</head>" in src and "</body>" in src, "panel.html lost its shell"
 
+    # 900 and 1200 are two-column; 620 is the narrow docked panel, where
+    # the media query collapses to one column.
     cases = [
-        ("neutral", ["pyridine_n"], "UNL1 N1 - pyridine-type aromatic N"),
-        ("cation", ["amine_n_tertiary"], "UNL1 N2 - tertiary amine"),
-        ("no_data", ["hydrophobic"], "UNL1 C4 - hydrophobic carbon"),
+        ("neutral", ["pyridine_n"], "UNL1 N1 - pyridine-type aromatic N",
+         (900, 700)),
+        ("cation", ["amine_n_tertiary"], "UNL1 N2 - tertiary amine",
+         (1200, 900)),
+        ("no_data", ["hydrophobic"], "UNL1 C4 - hydrophobic carbon",
+         (620, 800)),
     ]
     failures = []
     work = tempfile.mkdtemp(prefix="hp-panel-")
-    for name, mids, title in cases:
+    for name, mids, title, size in cases:
         page = src.replace("</head>", CATCH, 1).replace("</body>", REPORT, 1)
         page = page.replace('hp("ready");',
                             "window.hpSetState(%s);"
                             % json.dumps(snapshot(hb, mids, title)), 1)
-        r = render(chrome, page, work, name)
+        r = render(chrome, page, work, name, size)
 
         def check(cond, msg):
-            print(("  OK   " if cond else "  FAIL ") + "%s: %s" % (name, msg))
+            tag = "%s@%dx%d" % (name, size[0], size[1])
+            print(("  OK   " if cond else "  FAIL ") + "%s: %s" % (tag, msg))
             if not cond:
-                failures.append("%s: %s" % (name, msg))
+                failures.append("%s: %s" % (tag, msg))
 
         check(not r["errors"], "no JavaScript error (%s)"
               % ("; ".join(r["errors"]) or "none"))
@@ -151,6 +164,10 @@ def main():
         check(title.split(" - ")[1][:12] in r["hit"],
               "and it is the atom that was clicked")
         check("checkbox" in r["toggles"], "the interaction toggles rendered")
+        # Nested scrollers put two bars side by side on the right, which is
+        # what a column capped at 100vh inside a taller page produces.
+        check(r["scrollers"] in ([], ["page"]),
+              "exactly one thing scrolls: %s" % (r["scrollers"] or ["nothing"]))
         check(r["sumNci"] and r["sumDisplay"],
               "both folds summarise what is on while collapsed (%r / %r)"
               % (r["sumNci"], r["sumDisplay"]))
