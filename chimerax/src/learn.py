@@ -27,6 +27,8 @@ class LearnState:
         self.keys = {}            # key -> ChimeraX structure
         self.last_ranked = []
         self.waiting = 0          # rated in ViewDock but not yet featurised
+        self.assumed = set()      # graded by assumption, not by a person
+        self.assumed_grade = None
 
     # ------------------------------------------------------------ poses
 
@@ -62,9 +64,138 @@ class LearnState:
                 continue
             if self.learner.grades.rank(key) != int(rating) - 1:
                 self.learner.grade(key, int(rating) - 1)
+            # A real click always wins over an assumption, and stops being
+            # counted as one.
+            self.assumed.discard(key)
             n += 1
         self.waiting = waiting
         return n, waiting
+
+    # -------------------------------------------------------- assumptions
+
+    def assume_unrated(self, grade):
+        """Grade every featurised, unrated pose as `grade`.
+
+        Some people work a hit-picking list by exception: they walk the whole
+        thing, press b or m on what they object to, and leave the rest alone.
+        For them "unrated" is not "unseen", it is "no objection" - and a
+        model trained only on the objections learns what to reject and
+        nothing about what to keep. ViewDock has nowhere to record that
+        distinction, so it has to be asserted here, and only by someone who
+        knows the list was walked end to end.
+
+        The keys are remembered so the assumption stays separable from the
+        grades a person actually gave: `forget_assumed` takes it back, a
+        later click overrides it, and the panel reports the two apart.
+        """
+        self.pull_viewdock_ratings()
+        lr = self.learner
+        n = 0
+        for key in lr.features:
+            if key in lr.grades:
+                continue
+            lr.grade(key, grade)
+            self.assumed.add(key)
+            n += 1
+        if n or self.assumed:
+            self.assumed_grade = grade
+        return n
+
+    def forget_assumed(self):
+        """Drop every assumed grade, keeping the ones a person gave."""
+        n = 0
+        for key in list(self.assumed):
+            self.learner.grades.set(key, None)
+            n += 1
+        self.assumed.clear()
+        self.assumed_grade = None
+        return n
+
+    def human_counts(self):
+        """Grade counts split into what was clicked and what was assumed."""
+        lr = self.learner
+        human = {g: 0 for g in lr.grades.options}
+        assumed = {g: 0 for g in lr.grades.options}
+        for key in lr.grades.keys():
+            lab = lr.grades.label(key)
+            if lab is None:
+                continue
+            (assumed if key in self.assumed else human)[lab] += 1
+        return human, assumed
+
+
+def assumption_evidence(session):
+    """Test "the unrated ones are my good ones" against the trained model.
+
+    The premise is checkable and it is worth checking, because getting it
+    wrong is expensive: on a list where it does not hold, assuming it turns
+    a working model into a worse-than-random one.
+
+    The test is simple. Train on the grades that WERE given, then ask where
+    the model puts the unrated poses. If they really are the ones you would
+    buy, they should score above the ones you rejected AND above the ones
+    you only called maybe. Scoring above bad but below maybe is what you see
+    when the unrated poses are simply the ones nobody got to.
+
+    Returns None when there is no trained model to ask, since this costs
+    nothing on a trained one and a quarter of a minute otherwise.
+    """
+    import numpy as np
+    st = state(session)
+    lr = st.learner
+    if lr.committee is None:
+        return None
+    human = [k for k in lr.grades.keys()
+             if k in lr.features and k not in st.assumed]
+    unrated = [k for k in lr.features if k not in lr.grades]
+    if len(human) < 20 or len(unrated) < 20:
+        return None
+
+    preds = lr.predict(human + unrated)
+    sc = {k: p["score"] for k, p in preds.items()}
+    by_rank = {}
+    for k in human:
+        by_rank.setdefault(lr.grades.rank(k), []).append(sc[k])
+    un = np.array([sc[k] for k in unrated], dtype=float)
+
+    out = {"n_unrated": len(un), "n_human": len(human),
+           "median_unrated": float(np.median(un)), "versus": {}}
+    for rank, vals in sorted(by_rank.items()):
+        vals = np.array(vals, dtype=float)
+        if len(vals) < 10:
+            continue
+        out["versus"][lr.grades.options[rank]] = {
+            "n": len(vals),
+            "median": float(np.median(vals)),
+            "auc": _auc_above(un, vals),
+        }
+    return out
+
+
+def _auc_above(a, b):
+    """P(a random value from `a` outranks one from `b`), ties at half."""
+    import numpy as np
+    a = np.asarray(a, dtype=float)
+    b = np.asarray(b, dtype=float)
+    if not len(a) or not len(b):
+        return float("nan")
+    allv = np.concatenate([a, b])
+    order = np.argsort(allv, kind="mergesort")
+    ranks = np.empty(len(allv), dtype=float)
+    ranks[order] = np.arange(1, len(allv) + 1, dtype=float)
+    v = allv[order]
+    r = ranks[order]
+    i = 0
+    while i < len(v):
+        j = i
+        while j + 1 < len(v) and v[j + 1] == v[i]:
+            j += 1
+        if j > i:
+            r[i:j + 1] = r[i:j + 1].mean()
+        i = j + 1
+    ranks[order] = r
+    return float((ranks[:len(a)].sum() - len(a) * (len(a) + 1) / 2.0)
+                 / (len(a) * len(b)))
 
 
 def state(session, create=True):
@@ -218,11 +349,16 @@ def describe(session, pull=True):
             pass
     lr = st.learner
     counts = lr.grades.counts()
+    human, assumed = st.human_counts()
     ok, why = lr.can_train()
     return {
         "poses": len(lr.features),
         "graded": lr.n_graded,
         "grades": counts,
+        "human_grades": human,
+        "assumed_grades": assumed,
+        "n_assumed": len(st.assumed),
+        "assumed_grade": st.assumed_grade,
         "trained_on": lr.trained_on,
         "ready": bool(lr.committee is not None),
         "can_train": ok,

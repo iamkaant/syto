@@ -87,6 +87,8 @@
   <div class="bar"><div id="barfill"></div></div>
 </div>
 
+<div id="assume" style="display:none"></div>
+
 <h2>This pose</h2>
 <div id="current"></div>
 <div class="grades" id="gradebtns" style="margin-top:7px">
@@ -185,6 +187,8 @@ window.hpLearnState = function (s) {
     document.getElementById(id).disabled = !!r;
   });
 
+  renderAssume(st);
+
   renderCurrent(s);
   document.getElementById("adv").checked = !!s.auto_advance;
   document.getElementById("strategy").value = s.strategy || "uncertainty";
@@ -196,6 +200,17 @@ window.hpLearnState = function (s) {
     + '<span style="color:var(--bad)">bad ' + (g.bad || 0) + "</span>"
     + '<span style="color:var(--maybe)">maybe ' + (g.maybe || 0) + "</span>"
     + '<span style="color:var(--good)">good ' + (g.good || 0) + "</span></span>";
+  // An assumed grade trains the model exactly like a clicked one, so the
+  // panel must never let you forget how many of these numbers you chose.
+  if (st.n_assumed) {
+    var a = st.assumed_grades || {};
+    info += '<br><span class="tiny">of those, <b>' + st.n_assumed
+      + "</b> assumed " + esc(st.assumed_grade || "")
+      + " (" + ["bad", "maybe", "good"].filter(function (k) { return a[k]; })
+          .map(function (k) { return a[k] + " " + k; }).join(", ")
+      + ') &middot; <a href="#" onclick="hp(\'assume\',{forget:1});'
+      + 'return false">undo</a></span>';
+  }
   if (!st.can_train && !st.ready) info += "<br>" + esc(st.why_not || "");
   else if (st.ready) info += "<br>trained on " + st.trained_on + " graded pose(s)";
   document.getElementById("modelinfo").innerHTML = info;
@@ -204,6 +219,31 @@ window.hpLearnState = function (s) {
 
   renderSuggestions(s);
 };
+
+// Rating by exception leaves the model with nothing to aim at: it learns
+// what you reject and never sees what you would buy. Offer the fix exactly
+// when that has happened, and only then.
+function renderAssume(st) {
+  var el = document.getElementById("assume");
+  var g = st.grades || {};
+  var unrated = (st.poses || 0) - (st.graded || 0);
+  var show = !st.n_assumed && st.graded > 20 && unrated > 0
+             && !(g.good || 0);
+  if (!show) { el.style.display = "none"; return; }
+  el.style.display = "";
+  el.className = "card tiny warn";
+  el.innerHTML = "<b>Nothing is graded <i>good</i>.</b> The model can only "
+    + "learn what you reject, and <b>HP Pred Rank</b> will have no 2 to "
+    + "offer. If you worked this list by exception &mdash; walked all of it "
+    + "and pressed b or m only on what you objected to &mdash; then the "
+    + "<b>" + unrated + "</b> unrated pose(s) are your good ones."
+    + '<div class="row" style="margin-top:6px;gap:6px">'
+    + '<button onclick="hp(\'assume\',{value:\'good\'})">'
+    + "Treat " + unrated + " unrated as good</button></div>"
+    + '<div class="muted" style="margin-top:4px">Only if you reached the end '
+    + "of the list. On a half-finished one this labels everything you have "
+    + "not looked at yet.</div>";
+}
 
 function renderCurrent(s) {
   var c = s.current, el = document.getElementById("current");

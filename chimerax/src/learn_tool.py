@@ -181,6 +181,13 @@ class LearnTool(HtmlToolInstance):
                 self.refresh()
             elif path == "grade":
                 self._grade(one("value"))
+            elif path == "assume":
+                from .cmd import hitpick_learn_assume
+                if one("forget") == "1":
+                    hitpick_learn_assume(self.session, forget=True)
+                else:
+                    hitpick_learn_assume(self.session, one("value", "good"))
+                self.refresh()
             elif path == "strategy":
                 self._strategy = one("value", "uncertainty")
                 self.refresh()
