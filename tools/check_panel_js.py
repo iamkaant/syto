@@ -83,6 +83,7 @@ window.addEventListener("load", function () {
     boxes: [].slice.call(document.querySelectorAll("input[data-term]"))
       .map(function (b) {
         return [b.getAttribute("data-term"), b.checked]; }),
+    sum: fold ? (fold.querySelector("summary i.sum") || {}).textContent : null,
     model: (document.getElementById("modelinfo") || {}).innerHTML || "",
     status: (document.getElementById("status") || {}).innerHTML || ""
   });
@@ -185,11 +186,20 @@ def check_learn(chrome, work):
             check(r["open"] is True,
                   "and the section opens itself rather than waiting to be "
                   "found")
+            check("\u26a0" in (r["sum"] or ""),
+                  "with a warning in the folded summary too: %r" % r["sum"])
         if name == "dock":
             check(r["open"] is False,
                   "a working pick stays folded away")
             check("DOCK 3" in r["terms"], "and names the program")
+            # A fold that says nothing while shut is a heading nobody
+            # opens. This one was not found until it was pointed out.
+            check(r["sum"] == "DOCK 3 \u00b7 3 of 7",
+                  "and the summary states the pick while folded: %r"
+                  % r["sum"])
         if name == "none":
+            check(r["sum"] == "off", "folded summary says 'off': %r"
+                  % r["sum"])
             check("No score terms" in r["terms"],
                   "choosing none is reported as a choice, not an error")
     return failures

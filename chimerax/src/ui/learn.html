@@ -71,6 +71,9 @@
   details.fold > summary::before { content:"\25b8\A0"; }
   details.fold[open] > summary::before { content:"\25be\A0"; }
   details.fold > summary b { color:var(--fg); }
+  details.fold > summary i.sum { font-style:normal; color:var(--fg);
+          opacity:.75; }
+  details.fold[open] > summary i.sum { display:none; }
   table.terms { width:100%; border-collapse:collapse; font-size:11px;
           font-variant-numeric:tabular-nums; }
   table.terms td { padding:2px 4px 2px 0; vertical-align:top; }
@@ -295,10 +298,23 @@ function renderTerms(s) {
           : esc(r.verdict)) + "</td></tr>";
   }).join("");
 
+  // A folded section must say what is inside it. The handbook panel's
+  // folds do - "3 of 9", "lengths, clashes, scales" - and this one did
+  // not, so in the common case, where the pick is right and the section
+  // stays shut, it read as an empty heading and was not found at all.
+  var sum;
+  if (!avail.length) sum = "no docking score in these poses";
+  else if (!chosen.length) sum = "off";
+  else if (!t.live) sum = "\u26a0 none of the " + chosen.length
+                        + " selected term(s) is here";
+  else sum = (t.program ? esc(t.program) + " \u00b7 " : "")
+           + t.live + " of " + t.slots;
+
   var over = chosen.length >= t.slots;
   el.innerHTML = '<details class="fold" id="termfold"'
     + (t.live || !avail.length ? "" : " open") + ">"
-    + "<summary>Docking score terms</summary>"
+    + "<summary>Docking score terms <i class=\"sum\">" + sum
+    + "</i></summary>"
     + '<div class="' + cls + '" style="margin:3px 0 6px">' + head + "</div>"
     + (avail.length
         ? '<table class="terms">' + rows + "</table>"
