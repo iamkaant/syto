@@ -57,9 +57,16 @@ COL_CLASH = "HP Clash"
 # rather than reading 25 rows at a time out of the Learn panel.
 #
 # COL_PRED is the predicted grade as a word, which sorts alphabetically -
-# bad, good, maybe - so it is useless for ordering. COL_PRANK is the same
-# thing as 0/1/2 and is what you actually sort by. Both are shown because
-# the word is what a person reads and the number is what the table needs.
+# bad, good, maybe - so it is useless for ordering. COL_PRANK is the number
+# you actually sort by, and it is CONTINUOUS on the same 0..2 axis rather
+# than the decoded 0/1/2.
+#
+# That matters more than it sounds. On a real list the decoded grade puts
+# thousands of poses into two or three blocks with no order inside them:
+# 1472 unrated poses came out 308 at rank 1 and 1164 at rank 0, which is
+# not something you can pick down. The continuous score separates the same
+# poses into over 1300 distinct values. Sort descending and the best the
+# model knows of is at the top, in order.
 COL_PRED = "HP Pred"
 COL_PRANK = "HP Pred Rank"
 COL_UNC = "HP Uncert"
@@ -376,8 +383,13 @@ def write_predictions(session, predictions, keys_to_structures):
                 structure.viewdock_data = data = {}
             except Exception:
                 continue
+        # Fall back to the decoded rank for a model saved before the
+        # continuous score existed, rather than writing an empty column.
+        score = pred.get("score")
+        if not isinstance(score, (int, float)):
+            score = pred["rank"]
         values = {COL_PRED: str(pred["grade"]),
-                  COL_PRANK: int(pred["rank"]),
+                  COL_PRANK: round(float(score), 3),
                   COL_UNC: round(float(pred["uncertainty"]), 4)}
         for title, v in values.items():
             if title in allowed:

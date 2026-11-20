@@ -171,3 +171,52 @@ def test_scaler_survives_a_save_and_load():
         assert before[k]["rank"] == after[k]["rank"]
         assert before[k]["uncertainty"] == pytest.approx(
             after[k]["uncertainty"], rel=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# What you sort the table by.
+#
+# The decoded grade is three values. On a real list - 1472 unrated poses from
+# a PLA2 run - it produced two blocks, 308 and 1164, with no order inside
+# either, which is not something a party can pick down. The continuous score
+# separated the same poses into more than 1300 distinct values.
+# ---------------------------------------------------------------------------
+
+
+def _toy_learner(n=90, seed=0):
+    rng = np.random.default_rng(seed)
+    lr = Learner(seed=seed)
+    for i in range(n):
+        v = rng.normal(size=TOTAL_BITS).astype(np.float32)
+        rank = i % 3
+        v[:64] += rank                      # a signal to find
+        lr.add_features("p%d" % i, v)
+        if i % 3 != 2 or i < n // 2:        # leave some ungraded
+            lr.grade("p%d" % i, rank)
+    lr.train(epochs=30, batch_size=16)
+    return lr
+
+
+def test_prediction_carries_a_continuous_score_as_well_as_a_grade():
+    lr = _toy_learner()
+    preds = lr.predict()
+    assert preds
+    for p in preds.values():
+        assert p["rank"] in (0, 1, 2)
+        assert isinstance(p["score"], float)
+        assert 0.0 <= p["score"] <= 2.0
+        # the number must never contradict the word beside it
+        assert abs(p["score"] - p["rank"]) <= 0.5, p
+
+
+def test_the_score_breaks_the_ties_the_decoded_rank_leaves():
+    """The decoded grade cannot order a list; the score has to."""
+    lr = _toy_learner()
+    preds = lr.predict()
+    ranks = {p["rank"] for p in preds.values()}
+    scores = {round(p["score"], 6) for p in preds.values()}
+    assert len(ranks) <= 3
+    assert len(scores) > 3 * len(ranks), (len(scores), len(ranks))
+    # and sorting by score agrees with the grade it decodes to
+    rows = sorted(preds.values(), key=lambda p: p["score"])
+    assert rows[0]["rank"] <= rows[-1]["rank"]

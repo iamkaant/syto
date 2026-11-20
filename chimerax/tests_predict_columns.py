@@ -106,16 +106,27 @@ try:
     print("\n[4] the values are the kind a table can sort")
     vals = [p.viewdock_data for p in scored]
     check(len(vals) > 0, "there are values to check (not a vacuous pass)")
-    check(all(isinstance(d[VL.COL_PRANK], int) for d in vals),
-          "HP Pred Rank is an int, so the column orders numerically")
+    check(all(isinstance(d[VL.COL_PRANK], float) for d in vals),
+          "HP Pred Rank is a number, so the column orders numerically")
+    check(all(0.0 <= d[VL.COL_PRANK] <= 2.0 for d in vals),
+          "and it stays on the 0..2 grade axis: %.3f to %.3f"
+          % (min(d[VL.COL_PRANK] for d in vals),
+             max(d[VL.COL_PRANK] for d in vals)))
     check(all(d[VL.COL_PRED] in ("bad", "maybe", "good") for d in vals),
           "HP Pred is a readable grade: %s"
           % sorted({d[VL.COL_PRED] for d in vals}))
     check(all(isinstance(d[VL.COL_UNC], float) for d in vals),
           "HP Uncert is a float")
-    check(all(d[VL.COL_PRED] == ("bad", "maybe", "good")[d[VL.COL_PRANK]]
-              for d in vals),
-          "the word and the rank agree with each other")
+    check(all(d[VL.COL_PRED] == ("bad", "maybe", "good")[int(round(
+              d[VL.COL_PRANK]))] for d in vals),
+          "the word and the number agree with each other")
+
+    # The whole reason the column is continuous: a decoded 0/1/2 leaves a
+    # real list in two or three tied blocks that cannot be picked down.
+    distinct = len({round(d[VL.COL_PRANK], 3) for d in vals})
+    check(distinct > min(3, len(vals)),
+          "the column separates the poses rather than tying them: %d "
+          "distinct value(s) over %d pose(s)" % (distinct, len(vals)))
     check(set(stub.struct_table.updated) >= set(VL.PREDICTION_COLUMNS),
           "the table was told to redraw each column: %s"
           % sorted(set(stub.struct_table.updated)))

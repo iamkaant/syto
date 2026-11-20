@@ -195,7 +195,16 @@ class Learner:
             return X
         return (X - self._mean) / self._scale
 
-    def train(self, epochs=100, batch_size=16, patience=20, minimum=8):
+    # 128, not AutoParty's 16. Measured on two real hit-picking sessions
+    # (1017 and 675 human grades, 5 stratified held-out splits each): the
+    # held-out AUC is 0.821 vs 0.820 and 0.745 vs 0.742, which is a wash,
+    # while a fit takes 3.4 s instead of 14.7 and 2.2 s instead of 10.1.
+    # On this hardware the step is a 2069-wide matmul either way; at 16 it
+    # is all Python loop overhead and no arithmetic.
+    DEFAULT_BATCH = 128
+
+    def train(self, epochs=100, batch_size=DEFAULT_BATCH, patience=20,
+              minimum=8):
         ok, why = self.can_train(minimum)
         if not ok:
             raise ValueError(why)
@@ -219,7 +228,19 @@ class Learner:
     # ------------------------------------------------------- prediction
 
     def predict(self, keys=None):
-        """{key: (grade, rank, uncertainty, error_or_None)}."""
+        """{key: {grade, rank, score, uncertainty, error_or_None}}.
+
+        `rank` is the decoded grade, 0..n-1. `score` is the thermometer
+        output before decoding, on the same 0..n-1 axis but continuous.
+
+        Both are reported because they are for different jobs. `rank` is
+        what to show a person: "good". `score` is what to SORT by. On a real
+        list the decoded rank collapses thousands of poses into two or three
+        tied blocks - 1472 unrated poses came out as 308 at rank 1 and 1164
+        at rank 0, in no order at all within either - and a column like that
+        cannot be picked down. The score separates the same poses into over
+        1300 distinct values, which is the ordering the party wants.
+        """
         if self.committee is None:
             raise ValueError("the model has not been trained yet")
         keys = list(keys if keys is not None else self.features)
@@ -229,12 +250,24 @@ class Learner:
         X = self._apply_scaler(np.stack([self.features[k] for k in keys]))
         mean, var = self.committee.predict(X)
         ranks = decode_ordinal(mean)
+        # Sum of the thermometer probabilities, less the always-on first
+        # unit: the expected number of thresholds passed, which is the grade
+        # axis without the rounding.
+        raw = np.asarray(mean, dtype=float).sum(axis=1) - 1.0
+        # decode_ordinal resolves a non-monotone row (0.9, 0.3, 0.8) at the
+        # FIRST crossing, which the sum does not know about, so the two can
+        # in principle disagree. On real data they never did - 0 rows out of
+        # ~600 held-out poses - but a table showing "bad" beside 1.48 would
+        # be indefensible, so the number is held inside the word's bucket.
+        lo = len(self.options) - 1.0
+        scores = np.clip(np.clip(raw, ranks - 0.5, ranks + 0.5), 0.0, lo)
         unc = var.mean(axis=1)
         out = {}
-        for k, r, u in zip(keys, ranks, unc):
+        for k, r, sc, u in zip(keys, ranks, scores, unc):
             human = self.grades.rank(k)
             err = None if human is None else abs(int(r) - int(human))
             out[k] = {"grade": self.options[int(r)], "rank": int(r),
+                      "score": float(sc),
                       "uncertainty": float(u), "error": err}
         return out
 
