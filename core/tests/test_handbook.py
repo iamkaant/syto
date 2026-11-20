@@ -218,3 +218,116 @@ def test_scale_handles_a_moiety_with_no_data():
     assert sc is not None
     assert sc["marker"] is None
     assert not any(f["highlighted"] for f in sc["families"])
+
+
+# ---------------------------------------------------------------------------
+# pKBH+ : the other question about the same atom
+#
+# pKBHX says how well an atom accepts a hydrogen bond. pKBH+ says whether it
+# is holding a proton at all. Laurence et al. measured both and found they
+# barely correlate across families, so the tool must present them as two
+# scales and never let one stand in for the other.
+# ---------------------------------------------------------------------------
+
+
+@needs_hb
+def test_pkbh_plus_scale_exists_and_covers_the_families_that_matter():
+    sc = hb.scale("pKBH+", [], same_element_only=False)
+    assert sc, "no pKBH+ scale produced"
+    labels = [f["label"] for f in sc["families"]]
+    for want in ("3° amine", "pyridine N", "aniline N",
+                 "amide C=O", "nitrile N"):
+        assert any(want == l for l in labels), (want, labels)
+    # every family that has the data is laid out, not just the curated ones
+    assert len(labels) >= 20, labels
+
+
+@needs_hb
+def test_pkbh_plus_is_ordered_by_what_the_axis_shows():
+    """FAMILY_ORDER is a pKBHX reading order and is wrong here.
+
+    A phosphine oxide is near the top of the pKBHX scale and near the bottom
+    of the pKBH+ one. Sorting the pKa plot by the pKBHX order would put P=O
+    above the amines and quietly mislead.
+    """
+    sc = hb.scale("pKBH+", [], same_element_only=False)
+    meds = [f["median"] for f in sc["families"]]
+    assert meds == sorted(meds, reverse=True), \
+        [(f["label"], f["median"]) for f in sc["families"]]
+    labels = [f["label"] for f in sc["families"]]
+    assert labels.index("3° amine") < labels.index("P=O")
+    # ... while pKBHX keeps its curated order, where P=O leads
+    pk = [f["label"] for f in hb.scale("pKBHX", [],
+                                       same_element_only=False)["families"]]
+    assert pk.index("P=O") < pk.index("3° amine")
+
+
+@needs_hb
+def test_pkbh_plus_carries_the_physiological_reference_line():
+    sc = hb.scale("pKBH+", [], same_element_only=False)
+    lines = sc.get("reference_lines") or []
+    assert len(lines) == 1 and abs(lines[0]["value"] - 7.4) < 1e-9, lines
+    assert sc["min"] <= 7.4 <= sc["max"], (sc["min"], sc["max"])
+    # pKBHX has no such line: there is no pH on that axis
+    assert not (hb.scale("pKBHX", [], same_element_only=False)
+                .get("reference_lines"))
+
+
+@needs_hb
+def test_the_two_scales_are_labelled_so_they_cannot_be_confused():
+    a = hb.scale("pKBHX", [], same_element_only=False)
+    b = hb.scale("pKBH+", [], same_element_only=False)
+    assert a["unit"] and b["unit"] and a["unit"] != b["unit"]
+    assert "4-fluorophenol" in a["unit"]
+    assert "conjugate acid" in b["unit"]
+    assert a["title"] != b["title"]
+    # the pKa plot says in words that it is not the H-bond plot
+    assert "NOT the hydrogen-bond scale" in b["caption"]
+
+
+@needs_hb
+def test_protonation_verdict_reads_off_the_marked_value():
+    from hitpicking.handbook.scale import protonation_verdict
+
+    # pyridine, pKa 5.2: neutral at pH 7.4, so it accepts
+    sc = hb.scale("pKBH+", ["pyridine_n"], same_element_only=False)
+    assert sc["marker"] and abs(sc["marker"]["value"] - 5.2) < 0.01
+    v = sc["verdict"]
+    assert v["level"] == "neutral" and v["percent_protonated"] < 2.0
+    assert "accepts" in v["text"]
+
+    # an aliphatic amine at pKa 10.6 is a cation in the pocket
+    v = protonation_verdict(10.6)
+    assert v["level"] == "cation" and v["percent_protonated"] > 99.0
+    assert "salt bridge" in v["text"]
+
+    # right at the line, both forms are present and it is worth arguing about
+    v = protonation_verdict(7.4)
+    assert v["level"] == "mixed" and abs(v["percent_protonated"] - 50.0) < 0.1
+    v = protonation_verdict(8.2)          # ~86%: still genuinely ambiguous
+    assert v["level"] == "mixed"
+    v = protonation_verdict(8.6)          # ~94%: call it a cation
+    assert v["level"] == "cation"
+
+    # pKBHX gets no verdict: a protonation state is not what it measures
+    assert "verdict" not in hb.scale("pKBHX", ["pyridine_n"],
+                                     same_element_only=False)
+
+
+@needs_hb
+def test_wide_axes_get_readable_ticks():
+    """pKBH+ spans ~27 log units; one tick per unit is an unreadable smear."""
+    from hitpicking.handbook.scale import tick_step
+    assert tick_step(6.0, 8) == 1.0
+    assert tick_step(27.0, 8) == 5.0
+    assert tick_step(0.4, 8) <= 0.1
+    lines = hb.scale_text("pKBH+", ["pyridine_n"],
+                          same_element_only=False, width=46)
+    assert lines
+    header = lines[0]
+    # labels on the axis must not run into each other
+    import re
+    nums = re.findall(r"-?\d+(?:\.\d+)?", header)
+    assert 3 <= len(nums) <= 9, header
+    assert any("pH 7.4" in l for l in lines), lines[:4]
+    assert any("protonated" in l for l in lines), lines[-4:]

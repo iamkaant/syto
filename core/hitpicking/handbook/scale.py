@@ -12,6 +12,8 @@ panel, text in the ChimeraX log.
 
 from __future__ import annotations
 
+import math
+
 # Families worth showing on the scale, in a sensible reading order, with the
 # short labels the axis uses. Anything not listed is still included under its
 # entry title, after these.
@@ -23,11 +25,13 @@ FAMILY_ORDER = [
     ("hbond_tertiary_amine_n", "3° amine"),
     ("hbond_secondary_amine_n", "2° amine"),
     ("hbond_primary_amine_n", "1° amine"),
+    ("hbond_aniline_n", "aniline N"),
     ("hbond_amidine_guanidine_imine_n", "amidine/imine N"),
     ("hbond_pyridine_n", "pyridine N"),
     ("hbond_azine_n", "azine N"),
     ("hbond_azole_n", "azole N"),
     ("hbond_amide_carbonyl_o", "amide C=O"),
+    ("hbond_vinylogous_amide_o", "vinylogous amide C=O"),
     ("hbond_lactam_pyridone_o", "lactam C=O"),
     ("hbond_urea_carbamate_imide_o", "urea/carbamate C=O"),
     ("hbond_ketone_carbonyl_o", "ketone C=O"),
@@ -46,10 +50,105 @@ FAMILY_ORDER = [
     ("hbond_furan_thiophene_pyrrole", "furan/thiophene"),
 ]
 
+# ---------------------------------------------------------------------------
+# What each scale actually measures.
+#
+# These two look alike and are not. pKBHX is a hydrogen-bond equilibrium
+# constant measured against 4-fluorophenol in CCl4: how well this atom accepts
+# a hydrogen bond. pKBH+ is the pKa of the conjugate acid in water: whether
+# this atom is carrying a proton at all. Laurence et al. measured both and
+# report that across families they barely correlate (r2 = 0.22, n = 232), so
+# reading one off the other is a mistake the tool should not help anyone make.
+#
+# `order` says how to lay the families out. "curated" keeps FAMILY_ORDER,
+# which was written as a descending pKBHX reading order. On any other scale
+# that order is meaningless - a phosphine oxide is near the top for pKBHX and
+# near the bottom for pKBH+ - so those sort by median instead.
+# ---------------------------------------------------------------------------
+
+QUANTITY_INFO = {
+    "pKBHX": {
+        "title": "Hydrogen-bond basicity",
+        "symbol": "pKBHX",
+        "unit": "log K (4-fluorophenol, CCl4, 298 K)",
+        "means": "how strongly this atom accepts a hydrogen bond",
+        "order": "curated",
+    },
+    "pKBH+": {
+        "title": "Proton basicity",
+        "symbol": "pKBH+",
+        "unit": "pKa of the conjugate acid, water, 298 K",
+        "means": "whether this atom is protonated at physiological pH",
+        "order": "median",
+        "reference_lines": [
+            {"value": 7.4, "label": "pH 7.4",
+             "note": "a group above this line is mostly protonated"},
+        ],
+        "caption": ("This is NOT the hydrogen-bond scale. pKBHX and pKBH+ "
+                    "barely correlate across families (r2 = 0.22, n = 232): "
+                    "a strong acceptor need not be a strong base."),
+    },
+}
+
+PHYSIOLOGICAL_PH = 7.4
+
+
+def quantity_info(quantity):
+    return QUANTITY_INFO.get(quantity, {
+        "title": quantity, "symbol": quantity, "unit": "",
+        "means": "", "order": "median",
+    })
+
+
+def protonation_verdict(pka, ph=PHYSIOLOGICAL_PH):
+    """What a pKBH+ means for the pose in front of you.
+
+    The share protonated is the Henderson-Hasselbalch fraction. It is stated
+    for the PARENT compound the handbook value came from: substituents move
+    a pKa by several log units, so this orients the eye, it does not settle
+    the ligand's state.
+    """
+    frac = 1.0 / (1.0 + 10.0 ** (ph - float(pka)))
+    pct = 100.0 * frac
+    # The bands are the pKa within about a log unit of the pH. Inside that
+    # window neither form can be assumed, and that is exactly the case worth
+    # arguing about at a party rather than deciding silently.
+    if pct >= 99.0:
+        verdict = ("protonated at pH %.1f - it donates and can make a salt "
+                   "bridge; it is not an acceptor here" % ph)
+        level = "cation"
+    elif pct >= 90.0:
+        verdict = ("mostly protonated at pH %.1f - treat it as a cation "
+                   "unless the pocket says otherwise" % ph)
+        level = "cation"
+    elif pct > 10.0:
+        verdict = ("both forms present at pH %.1f - the pocket decides, and "
+                   "this is worth arguing about" % ph)
+        level = "mixed"
+    else:
+        verdict = "neutral at pH %.1f - it accepts rather than donates" % ph
+        level = "neutral"
+    return {"ph": ph, "percent_protonated": round(pct, 1),
+            "level": level, "text": verdict}
+
+
 ELEMENT_OF = {
     "N": ("imidazole N", "3° amine", "2° amine", "1° amine",
-          "amidine/imine N", "pyridine N", "azine N", "azole N", "nitrile N"),
+          "amidine/imine N", "aniline N", "pyridine N", "azine N",
+          "azole N", "nitrile N"),
 }
+
+
+
+def tick_step(span, max_ticks=8):
+    """A round step (1, 2, 5, 10, ...) giving at most `max_ticks` labels."""
+    span = abs(float(span)) or 1.0
+    raw = span / float(max(1, max_ticks))
+    mag = 10.0 ** math.floor(math.log10(raw)) if raw > 0 else 1.0
+    for mult in (1, 2, 5, 10):
+        if mult * mag >= raw:
+            return mult * mag
+    return 10.0 * mag
 
 
 def _element_hint(label):
@@ -139,7 +238,13 @@ def build_scale(handbook, quantity="pKBHX", moiety_ids=(), same_element_only=Fal
         families = [f for f in families
                     if f["element"] == want_element or f["highlighted"]]
 
-    families.sort(key=lambda f: (f["_order"], -f["median"]))
+    info = quantity_info(quantity)
+    if info.get("order") == "curated":
+        families.sort(key=lambda f: (f["_order"], -f["median"]))
+    else:
+        # FAMILY_ORDER is a descending pKBHX reading order and means nothing
+        # on another axis, so lay those out by what the axis actually shows.
+        families.sort(key=lambda f: -f["median"])
     for f in families:
         f.pop("_order", None)
 
@@ -148,10 +253,22 @@ def build_scale(handbook, quantity="pKBHX", moiety_ids=(), same_element_only=Fal
 
     lo = min(f["min"] for f in families)
     hi = max(f["max"] for f in families)
+
+    lines = []
+    for rl in info.get("reference_lines") or ():
+        lines.append(dict(rl))
+        lo = min(lo, rl["value"])
+        hi = max(hi, rl["value"])
+
     pad = max(0.2, (hi - lo) * 0.04)
-    return {
+    out = {
         "quantity": quantity,
-        "unit": "log K (4-fluorophenol, CCl4, 298 K)" if quantity == "pKBHX" else "",
+        "title": info.get("title") or quantity,
+        "symbol": info.get("symbol") or quantity,
+        "means": info.get("means") or "",
+        "unit": info.get("unit", ""),
+        "caption": info.get("caption", ""),
+        "reference_lines": lines,
         "min": round(lo - pad, 2),
         "max": round(hi + pad, 2),
         "families": families,
@@ -159,6 +276,9 @@ def build_scale(handbook, quantity="pKBHX", moiety_ids=(), same_element_only=Fal
         "element": want_element,
         "source": "10.1021/jm801331y",
     }
+    if quantity == "pKBH+" and marker:
+        out["verdict"] = protonation_verdict(marker["value"])
+    return out
 
 
 def text_scale(scale, width=46):
@@ -174,13 +294,17 @@ def text_scale(scale, width=46):
     out = []
     axis = [" "] * width
     ticks = []
-    t = int(lo)
+    # One tick per unit is right for pKBHX (span ~6) and unreadable for
+    # pKBH+ (span ~27): the numbers run together into a smear. Pick a step
+    # that leaves at most ~8 labels whatever the span.
+    step = tick_step(span, 8)
+    t = float(step) * math.ceil(lo / float(step))
     while t <= hi + 1e-9:
         c = col(t)
         if 0 <= c < width:
             axis[c] = "|"
-            ticks.append((c, str(t)))
-        t += 1
+            ticks.append((c, ("%g" % round(t, 2))))
+        t += step
     header = [" "] * width
     for c, s in ticks:
         for k, ch in enumerate(s):
@@ -189,6 +313,15 @@ def text_scale(scale, width=46):
     out.append("    %s   %s" % ("".join(header), scale["quantity"]))
     out.append("    %s" % "".join(axis))
 
+    for rl in scale.get("reference_lines") or ():
+        row = [" "] * width
+        c = col(rl["value"])
+        row[c] = "!"
+        for k, ch in enumerate(" " + rl["label"]):
+            if c + 1 + k < width:
+                row[c + 1 + k] = ch
+        out.append("    %s" % "".join(row))
+
     for f in scale["families"]:
         row = ["·"] * width
         a, b = col(f["min"]), col(f["max"])
@@ -196,6 +329,10 @@ def text_scale(scale, width=46):
             row[c] = "-"
         for p in f["points"]:
             row[col(p["value"])] = "|"
+        for rl in scale.get("reference_lines") or ():
+            c = col(rl["value"])
+            if row[c] in ("\u00b7", "-"):
+                row[c] = ":"
         mark = ">" if f["highlighted"] else " "
         line = "%s   %s  %-22s n=%d" % (mark, "".join(row), f["label"], f["n"])
         out.append(line)
@@ -207,4 +344,12 @@ def text_scale(scale, width=46):
         out.append("    %s" % "".join(pointer))
         out.append("    %s = %.2f (%s)" % (scale["quantity"], m["value"],
                                            m.get("compound") or "this moiety"))
+    v = scale.get("verdict")
+    if v:
+        out.append("    %.0f%% protonated: %s" % (v["percent_protonated"],
+                                                  v["text"]))
+        out.append("    (that is the parent compound's pKa - substituents "
+                   "move it by log units)")
+    if scale.get("caption"):
+        out.append("    " + scale["caption"])
     return out

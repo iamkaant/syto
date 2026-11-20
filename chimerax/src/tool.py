@@ -27,6 +27,9 @@ from . import render, viewdock_link
 UI_DIR = os.path.join(os.path.dirname(__file__), "ui")
 
 
+# The scales the panel offers, in tab order.
+SCALE_QUANTITIES = ("pKBHX", "pKBH+")
+
 class HandbookTool(HtmlToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False
@@ -95,12 +98,24 @@ class HandbookTool(HtmlToolInstance):
             snap["hit"] = st.last_hit.to_dict()
             snap["torsion"] = self._torsion_profile(st)
             if hb is not None and st.options.show_scale:
-                try:
-                    snap["scale"] = hb.scale(
-                        "pKBHX", st.last_hit.moiety_ids,
-                        same_element_only=not st.options.show_angles)
-                except Exception:
-                    snap["scale"] = None
+                # Both scales, because they answer different questions and
+                # the answers do not follow from each other: pKBHX says how
+                # well this atom accepts a hydrogen bond, pKBH+ says whether
+                # it is holding a proton in the first place. The panel shows
+                # whichever the user last looked at; building both here
+                # costs a few ms and saves a round trip on every switch.
+                scales = []
+                for q in SCALE_QUANTITIES:
+                    try:
+                        sc = hb.scale(
+                            q, st.last_hit.moiety_ids,
+                            same_element_only=not st.options.show_angles)
+                    except Exception:
+                        sc = None
+                    if sc:
+                        scales.append(sc)
+                snap["scales"] = scales
+                snap["scale"] = scales[0] if scales else None
         return snap
 
     # ------------------------------------------------------- UI -> state

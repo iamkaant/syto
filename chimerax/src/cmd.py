@@ -5,7 +5,8 @@
     hitpick show <types>                      choose which interactions to draw
     hitpick hide <types>
     hitpick lengths true|false
-    hitpick labels pKBHX | off                put handbook values on atoms
+    hitpick labels pKBHX | pKBH+ | off        put handbook values on atoms
+    hitpick scale [pKBHX|pKBH+]               where the clicked atom sits
     hitpick explain <atom-spec>               handbook entry for an atom
     hitpick clear
     hitpick report                            text summary of the current pose
@@ -733,8 +734,15 @@ def hitpick_labels(session, quantity="pKBHX"):
         "hitpick: each label shows the UNSUBSTITUTED PARENT compound's value "
         "where the data has it, with the family range in brackets. It is not "
         "a value for this exact compound: perception identifies the ring or "
-        "group, not the substitution pattern, and substituents move pKBHX by "
-        "a log unit or more. A * marks values flagged for review.")
+        "group, not the substitution pattern, and substituents move %s by "
+        "a log unit or more. A * marks values flagged for review." % q)
+    if q == "pKBH+":
+        session.logger.info(
+            "hitpick: pKBH+ is the pKa of the conjugate acid, not a "
+            "hydrogen-bond strength - a group above about 7.4 is mostly "
+            "protonated at physiological pH, so it donates and can make a "
+            "salt bridge rather than accepting. The two scales barely "
+            "correlate; for acceptor strength label pKBHX instead.")
     return n
 
 
@@ -802,7 +810,17 @@ hitpick_explain_desc = CmdDesc(optional=[("atoms", Or(AtomsArg, EmptyArg))],
 # ------------------------------------------------------------------- report
 
 def hitpick_scale(session, quantity="pKBHX", all_elements=False):
-    """Print the basicity scale, with the last clicked moiety marked."""
+    """Print a scale, with the last clicked moiety marked.
+
+    Two are worth asking for and they are not interchangeable:
+
+      pKBHX   how strongly the atom accepts a hydrogen bond
+      pKBH+   whether the atom is protonated at pH 7.4
+
+    Across families these barely correlate, so a strong acceptor is not
+    necessarily a strong base, and reading one off the other is the mistake
+    this pair of plots exists to prevent.
+    """
     ensure_ui(session)
     st = get_state(session)
     if st.handbook is None:
@@ -811,7 +829,10 @@ def hitpick_scale(session, quantity="pKBHX", all_elements=False):
     lines = st.handbook.scale_text(quantity, mids,
                                    same_element_only=not all_elements)
     if not lines:
-        session.logger.warning("hitpick: no %s data to plot" % quantity)
+        from hitpicking.handbook.scale import QUANTITY_INFO
+        session.logger.warning(
+            "hitpick: no %s data to plot (the scales with data are: %s)"
+            % (quantity, ", ".join(sorted(QUANTITY_INFO))))
         return None
     if mids:
         session.logger.info("<b>%s scale &mdash; %s</b>"
@@ -1022,6 +1043,113 @@ def hitpick_learn_grade(session, grade, structure=None):
     return ls.learner.grades.counts()
 
 
+def hitpick_learn_assume(session, grade="good", forget=False,
+                         check=True):
+    """Grade every unrated pose, for a list that was walked end to end.
+
+    Rating by exception is a normal way to work a hit-picking list: press b
+    or m on what you object to, leave the rest. The model never sees that.
+    Trained on objections alone it learns a good account of what you reject
+    and nothing at all about what you would buy, and "HP Pred Rank" has no
+    2 to offer because nothing ever showed it one.
+
+    This says the quiet part out loud. Only use it on a list you went
+    through to the end: on a half-finished one it labels everything you
+    have not looked at yet, which is worse than no labels. That is not a
+    figure of speech - on a session where the premise did not hold, taking
+    it up moved held-out bad-vs-maybe AUC from 0.82 to 0.40.
+
+    So when there is a trained model to ask, the premise is tested before
+    it is taken up: if the unrated poses were really your good ones, the
+    model should already rank them above every pose you graded. `check
+    false` skips that.
+
+    `forget true` takes it back and leaves the clicked grades alone.
+    """
+    ensure_ui(session)
+    from . import learn
+    ls = learn.state(session)
+    log = session.logger
+
+    if forget:
+        n = ls.forget_assumed()
+        log.info("hitpick learn: dropped %d assumed grade(s); %d grade(s) "
+                 "given by hand remain" % (n, len(ls.learner.grades)))
+        _refresh_learn_panel(session)
+        return {"forgotten": n}
+
+    if not len(ls.learner.features):
+        raise UserError("no poses analysed yet; run: hitpick learn collect")
+
+    evidence = None
+    if check:
+        evidence = learn.assumption_evidence(session)
+        _report_assumption_evidence(log, evidence, grade)
+
+    try:
+        n = ls.assume_unrated(grade)
+    except ValueError as e:
+        raise UserError(str(e))
+
+    human, assumed = ls.human_counts()
+    n_human = sum(human.values())
+    log.info("hitpick learn: assumed <b>%s</b> for %d unrated pose(s)"
+             % (grade, n), is_html=True)
+    log.info("hitpick learn: by hand %s; assumed %s"
+             % (_grade_line(human), _grade_line(assumed)))
+    if n_human and n > 3 * n_human:
+        log.warning(
+            "hitpick learn: %d assumed label(s) against %d given by hand. "
+            "The assumption now IS the training set, so if it is wrong the "
+            "model will be too - on a session where it was wrong, held-out "
+            "bad-vs-maybe AUC fell from 0.82 to 0.40, which is worse than "
+            "guessing." % (n, n_human))
+    log.warning("hitpick learn: this is an assertion about YOUR list, not a "
+                "measurement. It is right only if you went through every "
+                "pose. Undo it with: hitpick learn assume forget true")
+    _refresh_learn_panel(session)
+    return {"assumed": n, "grade": grade, "evidence": evidence}
+
+
+def _report_assumption_evidence(log, ev, grade):
+    """Say whether the trained model agrees with what is being asserted."""
+    if not ev:
+        log.info("hitpick learn: no trained model to check the assumption "
+                 "against. Train first and run this again to have it tested.")
+        return
+    log.info("hitpick learn: checking the assumption against the model "
+             "trained on the %d grade(s) you gave..." % ev["n_human"])
+    worrying = []
+    for label, v in ev["versus"].items():
+        verdict = ("above" if v["auc"] > 0.55 else
+                   "below" if v["auc"] < 0.45 else "level with")
+        log.info("   the %d unrated pose(s) score %s your %d '%s' pose(s) "
+                 "(AUC %.2f)" % (ev["n_unrated"], verdict, v["n"], label,
+                                 v["auc"]))
+        if v["auc"] < 0.45:
+            worrying.append((label, v["auc"]))
+    if worrying:
+        log.warning(
+            "hitpick learn: the model puts your unrated poses BELOW the ones "
+            "you graded %s. If they were really your '%s' ones they should "
+            "sit above every graded group, so this list does not look like "
+            "it was rated by exception - more like it was rated as far as "
+            "you got. Assuming anyway will teach the model the opposite of "
+            "what you mean."
+            % (", ".join("'%s' (AUC %.2f)" % w for w in worrying), grade))
+
+
+def _grade_line(counts):
+    return ", ".join("%d %s" % (counts[g], g) for g in counts if counts[g]) \
+        or "none"
+
+
+hitpick_learn_assume_desc = CmdDesc(
+    optional=[("grade", StringArg), ("forget", BoolArg),
+              ("check", BoolArg)],
+    synopsis="Treat unrated poses as a grade, for a fully walked list")
+
+
 hitpick_learn_grade_desc = CmdDesc(
     required=[("grade", StringArg)],
     optional=[("structure", StructureArg)],
@@ -1225,6 +1353,7 @@ def register_commands(logger):
             ("panel", hitpick_learn_panel_desc, hitpick_learn_panel),
             ("collect", hitpick_learn_collect_desc, hitpick_learn_collect),
             ("grade", hitpick_learn_grade_desc, hitpick_learn_grade),
+            ("assume", hitpick_learn_assume_desc, hitpick_learn_assume),
             ("train", hitpick_learn_train_desc, hitpick_learn_train),
             ("next", hitpick_learn_next_desc, hitpick_learn_next),
             ("status", hitpick_learn_status_desc, hitpick_learn_status),
