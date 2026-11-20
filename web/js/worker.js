@@ -80,6 +80,10 @@ const METHODS = {
                                a.strain !== false));
   },
   async explain(a) { return toJs(engine.explain(a.index || 0, a.atom)); },
+  async scene() { return toJs(engine.scene()); },
+  async explainAt(a) {
+    return toJs(engine.explain_at(a.x, a.y, a.z, a.tolerance || 0.05));
+  },
 };
 
 self.onmessage = async (ev) => {

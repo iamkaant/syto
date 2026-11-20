@@ -41,6 +41,12 @@ echo "$wp" | tail -5
 echo "$wp" | grep -qE "WEB PARITY OK|skipping the web parity check" || fail=1
 
 echo
+echo "=== the web page, driven in a browser ==="
+wv="$("$PY" "$ROOT/tools/check_web_viewer.py" 2>&1)"
+echo "$wv" | tail -6
+echo "$wv" | grep -qE "WEB VIEWER OK|skipping the web viewer check" || fail=1
+
+echo
 echo "=== panel JavaScript (executed, not just parsed) ==="
 pjs="$("$PY" "$ROOT/tools/check_panel_js.py" 2>&1)"
 echo "$pjs" | tail -4

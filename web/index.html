@@ -1,115 +1,263 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hit Picking</title>
+<link rel="stylesheet" href="vendor/molstar/molstar.css">
 <style>
   :root {
     --bg:#15181d; --card:#1b1f26; --line:#2a2f39; --fg:#e6e9ef;
     --muted:#8b93a3; --accent:#4b9fff; --warn:#c98a00; --bad:#e64646;
   }
   * { box-sizing: border-box; }
-  body { margin:0; padding:14px 16px 40px; background:var(--bg); color:var(--fg);
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--fg); overflow:hidden;
          font:13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-  h1 { font-size:13px; letter-spacing:.04em; text-transform:uppercase;
-       color:var(--muted); margin:0 0 10px; font-weight:600; }
-  h2 { font-size:12px; letter-spacing:.04em; text-transform:uppercase;
-       color:var(--muted); margin:18px 0 8px; font-weight:600;
-       border-top:1px solid var(--line); padding-top:12px; }
+  #shell { display:grid; height:100vh;
+           grid-template-columns:290px minmax(0,1fr) 360px;
+           grid-template-rows:38px minmax(0,1fr); }
+  @media (max-width:1100px) {
+    body { overflow:auto; }
+    #shell { grid-template-columns:1fr; grid-template-rows:auto; height:auto; }
+    #view { height:62vh; }
+    #panel { height:70vh; }
+  }
+  header { grid-column:1/-1; display:flex; align-items:center; gap:12px;
+           padding:0 12px; border-bottom:1px solid var(--line);
+           background:var(--card); }
+  header b { font-size:12px; letter-spacing:.05em; text-transform:uppercase;
+             color:var(--muted); font-weight:600; }
+  #status { font-size:11.5px; color:var(--muted); flex:1;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #status.warn { color:var(--warn); }
+  aside { overflow-y:auto; border-right:1px solid var(--line); padding:10px; }
+  #view { position:relative; background:#0d1014; min-height:300px; }
+  #panel { border-left:1px solid var(--line); border-right:none; padding:0; }
+  #panel iframe { width:100%; height:100%; border:0; display:block; }
+  h2 { font-size:11px; letter-spacing:.05em; text-transform:uppercase;
+       color:var(--muted); margin:14px 0 6px; font-weight:600; }
+  h2:first-child { margin-top:0; }
   .card { background:var(--card); border:1px solid var(--line);
-          border-radius:7px; padding:9px 11px; margin-bottom:8px; }
-  .muted { color:var(--muted); } .tiny { font-size:11.5px; }
+          border-radius:7px; padding:8px 10px; margin-bottom:7px; }
+  .tiny { font-size:11.5px; } .muted { color:var(--muted); }
   .warn { border-color:var(--warn); }
-  .row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .row { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   button { font:inherit; padding:5px 11px; border-radius:6px;
            border:1px solid var(--line); background:var(--card);
            color:var(--fg); cursor:pointer; }
   button.primary { background:var(--accent); border-color:var(--accent);
                    color:#06121f; font-weight:600; }
   button:disabled { opacity:.45; cursor:default; }
-  table { width:100%; border-collapse:collapse; font-size:12px; }
-  td { padding:4px 6px; border-top:1px solid var(--line); vertical-align:top; }
-  .q { height:5px; border-radius:3px; background:var(--accent); }
-  select { font:inherit; background:var(--card); color:var(--fg);
+  input[type=file] { font-size:11px; max-width:100%; }
+  select { font:inherit; background:var(--card); color:var(--fg); width:100%;
            border:1px solid var(--line); border-radius:6px; padding:4px 6px; }
-  .grid { display:grid; gap:0 20px; grid-template-columns:1fr; }
-  @media (min-width:760px) {
-    .grid { grid-template-columns:minmax(260px,.9fr) minmax(340px,1.1fr); }
-  }
+  label.chk { display:flex; align-items:center; gap:7px; cursor:pointer;
+              padding:2px 0; font-size:12px; }
+  .swatch { width:10px; height:10px; border-radius:2px; flex:none; }
   code { background:#11141a; padding:1px 4px; border-radius:4px; }
+  .irow { padding:4px 0; border-top:1px solid var(--line); }
+  .irow:first-child { border-top:0; }
+  .q { height:4px; border-radius:2px; background:var(--accent); }
+  #drop { position:absolute; inset:0; display:flex; align-items:center;
+          justify-content:center; text-align:center; color:var(--muted);
+          font-size:13px; padding:30px; pointer-events:none; }
 </style>
+</head>
+<body>
+<div id="shell">
+  <header>
+    <b>Hit Picking</b>
+    <span id="status">starting&hellip;</span>
+  </header>
 
-<h1>Hit Picking &mdash; web</h1>
-<div id="status" class="card tiny muted">starting the engine&hellip;</div>
-
-<div class="grid">
-<div>
-  <h2>Load</h2>
-  <div class="card">
-    <div class="row"><label class="tiny muted" style="width:72px">receptor</label>
-      <input type="file" id="rec" accept=".pdb,.ent"></div>
-    <div class="row" style="margin-top:6px">
-      <label class="tiny muted" style="width:72px">poses</label>
-      <input type="file" id="lig" accept=".mol2,.sdf,.sd,.mol"></div>
-    <div class="row" style="margin-top:8px">
-      <button class="primary" id="go" disabled>Analyse</button>
-      <select id="pose" style="display:none"></select>
+  <aside>
+    <h2>Load</h2>
+    <div class="card">
+      <div class="tiny muted">receptor &mdash; PDB, with hydrogens</div>
+      <input type="file" id="rec" accept=".pdb,.ent">
+      <div class="tiny muted" style="margin-top:6px">poses &mdash; mol2 or SDF</div>
+      <input type="file" id="lig" accept=".mol2,.sdf,.sd,.mol">
+      <div class="row" style="margin-top:8px">
+        <button class="primary" id="go" disabled>Analyse</button>
+      </div>
+      <div id="loadmsg" class="tiny muted" style="margin-top:6px"></div>
     </div>
-    <div id="loadmsg" class="tiny muted" style="margin-top:6px"></div>
-  </div>
 
-  <h2>Pose</h2>
-  <div id="pose-out"><p class="tiny muted">Nothing analysed yet.</p></div>
+    <div id="posebox" style="display:none">
+      <h2>Pose</h2>
+      <select id="pose"></select>
+      <div class="row tiny" style="margin-top:6px;justify-content:space-between">
+        <button id="prev">&larr;</button>
+        <span id="posen" class="muted"></span>
+        <button id="next">&rarr;</button>
+      </div>
+      <div id="pose-out" style="margin-top:7px"></div>
+    </div>
+
+    <h2>Shown</h2>
+    <div class="card" id="toggles"></div>
+    <div class="card">
+      <label class="chk"><input type="checkbox" id="opt-labels" checked>
+        Labels on the lines</label>
+      <label class="chk"><input type="checkbox" id="opt-clashes" checked>
+        <span class="swatch" style="background:#e64646"></span>
+        Clashes</label>
+    </div>
+
+    <h2>Interactions</h2>
+    <div id="list"><p class="tiny muted">Nothing analysed yet.</p></div>
+  </aside>
+
+  <div id="view"><div id="drop">Load a receptor and a pose file.<br>
+    Everything is computed in this tab; no file leaves your machine.</div></div>
+
+  <div id="panel"><iframe id="hb" title="handbook"></iframe></div>
 </div>
 
-<div>
-  <h2>Interactions</h2>
-  <div id="list"><p class="tiny muted">Load a receptor and some poses.</p></div>
-</div>
-</div>
-
+<script src="vendor/molstar/molstar.js"></script>
+<script src="js/viewer.js"></script>
 <script src="ui/bridge.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const bridge = new HPBridge.WorkerBridge("js/worker.js");
-const files = { rec: null, lig: null };
-let poses = [];
+const files = {rec: null, lig: null};
+let viewer = null, poses = [], current = 0, lastResult = null;
+let enabled = null;   // null = whatever the core defaults to
+
+const TYPES = [
+  ["hbond", "hydrogen bond"], ["hbond_charged", "charged H-bond"],
+  ["salt_bridge", "salt bridge"], ["pi_stack_parallel", "π stack"],
+  ["pi_stack_tshaped", "π stack, T"], ["cation_pi", "cation–π"],
+  ["halogen_bond", "halogen bond"], ["hydrophobic", "hydrophobic"],
+  ["hbond_weak", "weak H-bond"]
+];
 
 function say(text, bad) {
-  $("status").className = "card tiny " + (bad ? "warn" : "muted");
+  $("status").className = bad ? "warn" : "";
   $("status").innerHTML = text;
 }
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+function hex(n) { return "#" + n.toString(16).padStart(6, "0"); }
 
-function ready() {
-  $("go").disabled = !(files.rec && files.lig);
+// ------------------------------------------------------------ the panel
+// The handbook panel is the SAME file the ChimeraX bundle loads. It is
+// written against window.hpHost rather than against either host, so an
+// atom is explained by one renderer in both places - which is the only
+// way the two can be relied on to say the same thing.
+function panelWindow() {
+  const f = $("hb");
+  return f && f.contentWindow;
+}
+function sendPanel(snap) {
+  const w = panelWindow();
+  if (w && w.hpSetState) w.hpSetState(snap);
+}
+$("hb").onload = () => {
+  const w = panelWindow();
+  w.hpBridge = {call: (action, params) => onPanelAction(action, params)};
+  sendPanel(baseSnapshot());
+};
+
+function baseSnapshot(hit, scales) {
+  return {
+    ready: !!lastResult,
+    handbook: window.__handbook || null,
+    viewdock: false,
+    options: {
+      enabled_nci: enabled || TYPES.map((t) => t[0]).slice(0, 8),
+      show_lengths: true, show_angles: false, show_limits: false,
+      show_clashes: $("opt-clashes").checked, show_scale: true,
+      hover_detail: false, line_width: 0.075,
+      handbook_on_click: true, reveal_partners: false
+    },
+    pose: lastResult ? {
+      name: lastResult.name, counts: lastResult.counts,
+      warnings: lastResult.warnings, interactions: lastResult.interactions,
+      strain: lastResult.strain ? lastResult.strain.counts : null,
+      worst_overlap: lastResult.strain ? lastResult.strain.worst_overlap : null
+    } : null,
+    hit: hit || null,
+    scales: scales || [],
+    torsions: [], torsion: null
+  };
 }
 
+async function onPanelAction(action, params) {
+  // The panel's own controls, mapped onto this host. Anything ChimeraX-only
+  // simply has no effect here rather than erroring.
+  if (action === "toggle") {
+    const set = new Set(enabled || TYPES.map((t) => t[0]).slice(0, 8));
+    if (params.on === 1 || params.on === "1") set.add(params.kind);
+    else set.delete(params.kind);
+    enabled = [...set];
+    syncToggles();
+    await analyse(current);
+  } else if (action === "clashes") {
+    $("opt-clashes").checked = params.on === 1 || params.on === "1";
+    await redraw();
+  } else if (action === "analyze") {
+    await analyse(current);
+  }
+}
+
+// The host and theme travel in the URL: the panel reads them as its own
+// script runs, which a property set on the frame from out here could
+// never be early enough for.
+$("hb").src = "ui/panel.html?host=web&theme=dark";
+
+// ------------------------------------------------------------- loading
 async function readFile(input) {
   const f = input.files && input.files[0];
   if (!f) return null;
-  return { name: f.name, text: await f.text() };
+  return {name: f.name, text: await f.text()};
 }
-
-$("rec").onchange = async () => { files.rec = await readFile($("rec")); ready(); };
-$("lig").onchange = async () => { files.lig = await readFile($("lig")); ready(); };
+$("rec").onchange = async () => {
+  files.rec = await readFile($("rec"));
+  $("go").disabled = !(files.rec && files.lig);
+};
+$("lig").onchange = async () => {
+  files.lig = await readFile($("lig"));
+  $("go").disabled = !(files.rec && files.lig);
+};
 
 $("go").onclick = async () => {
   $("go").disabled = true;
   try {
     say("perceiving the receptor&hellip;");
     const r = await bridge.call("setup", files.rec);
-    const p = await bridge.call("loadPoses", { ...files.lig, limit: 500 });
+    window.__handbook = r.handbook;
+    say("reading poses&hellip;");
+    const p = await bridge.call("loadPoses", {...files.lig, limit: 2000});
     poses = p.names;
+
+    $("drop").style.display = "none";
+    if (!viewer) {
+      viewer = new HPViewer.Viewer("view");
+      await viewer.start();
+      viewer.onAtomClick = onAtomClick;
+    }
+    say("drawing&hellip;");
+    const nrec = await viewer.loadReceptor(files.rec.text, "pdb");
+    const fmt = /\.mol2$/i.test(files.lig.name) ? "mol2" : "sdf";
+    const nmod = await viewer.loadPoses(files.lig.text, fmt);
+
+    $("loadmsg").innerHTML = esc(r.receptor) + ": " + r.n_atoms + " atoms"
+      + (r.has_hydrogens ? "" : " &middot; <b>no hydrogens</b>")
+      + "<br>" + p.count + " pose(s)"
+      + (nmod !== p.count ? " (viewer sees " + nmod + ")" : "");
+
     const sel = $("pose");
     sel.innerHTML = poses.map((n, i) =>
-      '<option value="' + i + '">' + esc(n) + "</option>").join("");
-    sel.style.display = poses.length > 1 ? "" : "none";
+      '<option value="' + i + '">' + (i + 1) + ". " + esc(n) + "</option>").join("");
     sel.onchange = () => analyse(+sel.value);
-    $("loadmsg").innerHTML = esc(r.receptor) + ": " + r.n_atoms
-      + " atoms · " + p.count + " pose(s)"
-      + (r.has_hydrogens ? "" : " · <b>no hydrogens in the receptor</b>");
-    say(r.handbook || "handbook not built");
+    $("posebox").style.display = "";
+    renderToggles();
     await analyse(0);
+    viewer.focusPose();
   } catch (e) {
     say("failed: " + esc(e.message), true);
   } finally {
@@ -117,36 +265,88 @@ $("go").onclick = async () => {
   }
 };
 
+$("prev").onclick = () => analyse(Math.max(0, current - 1));
+$("next").onclick = () => analyse(Math.min(poses.length - 1, current + 1));
+$("opt-labels").onchange = redraw;
+$("opt-clashes").onchange = redraw;
+
+// ------------------------------------------------------------ analysing
 async function analyse(i) {
+  current = i;
+  $("pose").value = String(i);
+  $("posen").textContent = (i + 1) + " of " + poses.length;
   say("analysing&hellip;");
-  const res = await bridge.call("analyse", { index: i });
+  const res = await bridge.call("analyse",
+    {index: i, enabled: enabled, strain: true});
+  lastResult = res;
+  await viewer.showPose(i);
   renderPose(res);
   renderList(res);
-  say("ready");
+  await redraw();
+  sendPanel(baseSnapshot());
+  say(esc(res.name) + " &middot; " + esc(res.summary));
 }
 
-function esc(s) {
-  return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+async function redraw() {
+  if (!viewer || !lastResult) return;
+  const scene = await bridge.call("scene", {});
+  const n = await viewer.drawScene(scene, {
+    labels: $("opt-labels").checked,
+    clashes: $("opt-clashes").checked
+  });
+  if (viewer.lastMissed) {
+    say("drew " + n + " line(s); " + viewer.lastMissed
+        + " could not be placed in the viewer", true);
+  }
+}
+
+async function onAtomClick(xyz, name) {
+  try {
+    const hit = await bridge.call("explainAt",
+      {x: xyz[0], y: xyz[1], z: xyz[2]});
+    if (hit.error) { say(esc(hit.error), true); return; }
+    sendPanel(baseSnapshot(hit, hit.scales || []));
+  } catch (e) {
+    say("explain failed: " + esc(e.message), true);
+  }
+}
+
+// ------------------------------------------------------------ rendering
+function renderToggles() {
+  const on = new Set(enabled || (lastResult ? Object.keys(lastResult.counts) : []));
+  $("toggles").innerHTML = TYPES.map((t) =>
+    '<label class="chk"><input type="checkbox" data-kind="' + t[0] + '"'
+    + (enabled === null || on.has(t[0]) ? " checked" : "") + ">"
+    + '<span class="swatch" style="background:'
+    + hex(HPViewer.COLORS[t[0]] || 0x8b93a3) + '"></span>'
+    + t[1] + "</label>").join("");
+  $("toggles").querySelectorAll("input[data-kind]").forEach((b) => {
+    b.onchange = async () => {
+      enabled = [...$("toggles").querySelectorAll("input[data-kind]")]
+        .filter((x) => x.checked).map((x) => x.getAttribute("data-kind"));
+      await analyse(current);
+    };
+  });
+}
+function syncToggles() {
+  const on = new Set(enabled || []);
+  $("toggles").querySelectorAll("input[data-kind]").forEach((b) => {
+    b.checked = on.has(b.getAttribute("data-kind"));
+  });
 }
 
 function renderPose(r) {
   const s = r.strain || {};
-  const bad = (s.clashes || []).filter((c) => c.severe).length;
-  let h = '<div class="card"><b>' + esc(r.name) + "</b>"
-    + '<div class="tiny muted" style="margin-top:3px">' + esc(r.summary)
-    + "</div></div>";
-  if (bad) {
-    h += '<div class="card warn tiny"><b>' + bad + " severe clash"
-      + (bad === 1 ? "" : "es") + "</b> — worst overlap "
+  const severe = (s.clashes || []).filter((c) => c.severe).length;
+  let h = '<div class="card tiny"><b>' + esc(r.name) + "</b><div class='muted'>"
+    + esc(r.summary) + "</div></div>";
+  if (severe) {
+    h += '<div class="card warn tiny"><b>' + severe + " severe clash"
+      + (severe === 1 ? "" : "es") + "</b> &mdash; worst overlap "
       + (s.worst_overlap || 0).toFixed(2) + " Å</div>";
   }
   (r.warnings || []).forEach((w) => {
     h += '<div class="card warn tiny">' + esc(w) + "</div>";
-  });
-  (s.findings || []).slice(0, 8).forEach((f) => {
-    h += '<div class="card tiny"><b>' + esc(f.kind.replace(/_/g, " "))
-      + '</b><div class="muted">' + esc(f.message) + "</div></div>";
   });
   $("pose-out").innerHTML = h;
 }
@@ -158,35 +358,43 @@ function renderList(r) {
       + "selected types.</p>";
     return;
   }
-  let h = '<table>';
-  rows.forEach((i) => {
-    const terms = ["d " + i.distance.toFixed(2) + " Å"];
-    for (const k in (i.angles || {})) {
-      if (i.angles[k] != null) terms.push(k + " " + Math.round(i.angles[k]) + "°");
-    }
-    h += "<tr><td style='width:46px'>"
-      + '<div class="q" style="width:' + Math.round(i.quality * 100)
-      + '%"></div><span class="tiny muted">' + i.quality.toFixed(2)
-      + "</span></td><td><b>" + esc(i.kind.replace(/_/g, " ")) + "</b><br>"
-      + '<span class="tiny muted">' + terms.join(" · ") + "</span><br>"
-      + '<span class="tiny muted">' + esc(i.label) + "</span>"
-      + (i.flags || []).map((f) =>
-          '<br><span class="tiny" style="color:var(--warn)">! '
-          + esc(f) + "</span>").join("")
-      + "</td></tr>";
-  });
-  $("list").innerHTML = h + "</table>";
+  $("list").innerHTML = '<div class="card">' + rows.map((i) =>
+    '<div class="irow"><div class="row" style="justify-content:space-between">'
+    + "<b class='tiny'>" + esc(i.kind.replace(/_/g, " ")) + "</b>"
+    + "<span class='tiny muted'>" + i.distance.toFixed(2) + " Å</span>"
+    + "</div><div class='q' style='width:" + Math.round(i.quality * 100)
+    + "%;background:" + hex(HPViewer.COLORS[i.kind] || 0x8b93a3) + "'></div>"
+    + "<div class='tiny muted'>" + esc(i.label) + "</div></div>").join("")
+    + "</div>";
 }
 
+// A handle on the page's own objects. `const` at the top level of a
+// classic script is not a property of window, so without this the page
+// cannot be driven from outside - which is how tools/check_web_viewer.py
+// checks that what the core asked for is what actually got drawn.
+window.HP = {
+  bridge: bridge,
+  analyse: (i) => analyse(i),
+  redraw: redraw,
+  explainAt: (xyz) => onAtomClick(xyz, "external"),
+  viewer: () => viewer,
+  state: () => ({poses: poses, current: current, result: lastResult,
+                 enabled: enabled})
+};
+
+// --------------------------------------------------------------- start
 (async function () {
   try {
+    renderToggles();
     const v = await bridge.call("version");
-    say("engine ready · " + esc(v.handbook || "no handbook"));
+    window.__handbook = v.handbook;
+    say("engine ready &middot; " + esc(v.handbook || "no handbook")
+        + " &middot; Mol* " + (window.molstar ? molstar.version : "missing"));
   } catch (e) {
     say("the engine failed to start: " + esc(e.message)
-        + "<br>Serve this folder over HTTP: <code>python -m http.server</code>"
-        + " — workers and wasm do not load from file://", true);
+        + " &mdash; serve this folder: <code>python -m http.server</code>", true);
   }
 })();
 </script>
+</body>
 </html>

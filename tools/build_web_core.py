@@ -67,6 +67,16 @@ def main():
                 continue
             shutil.copy2(os.path.join(UI_SRC, n), os.path.join(UI_DST, n))
             n_ui += 1
+        # The handbook panel still lives beside the bundle, because that is
+        # the host that loads it from disk. It is written against a host
+        # abstraction (window.hpHost) rather than against ChimeraX, so the
+        # web page runs the same file in an iframe - which is the only way
+        # the two front ends can be guaranteed to explain an atom
+        # identically: there is one renderer, not two.
+        panel = os.path.join(ROOT, "chimerax", "src", "ui", "panel.html")
+        if os.path.exists(panel):
+            shutil.copy2(panel, os.path.join(UI_DST, "panel.html"))
+            n_ui += 1
 
     size = os.path.getsize(OUT)
     print("%s: %d files, %.1f KB, core hash %s"

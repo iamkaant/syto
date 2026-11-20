@@ -155,11 +155,16 @@ b.on("progress", (d) => say("  " + d));
 </script>"""
 
 
-def run_browser(chrome, port, inbox, timeout=420):
+def run_browser(chrome, port, inbox, timeout=420, page="__parity.html"):
     proc = subprocess.Popen(
-        [chrome, "--headless", "--disable-gpu", "--no-sandbox",
+        [chrome, "--headless", "--no-sandbox",
+         # Mol* needs WebGL. Headless Chrome has no GPU, so without a
+         # software rasteriser it creates no canvas at all and the page
+         # looks like it rendered nothing.
+         "--use-gl=angle", "--use-angle=swiftshader",
+         "--enable-unsafe-swiftshader",
          "--user-data-dir=" + os.path.join(ROOT, ".chrome-parity"),
-         "http://127.0.0.1:%d/__parity.html" % port],
+         "http://127.0.0.1:%d/%s" % (port, page)],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         deadline = time.time() + timeout

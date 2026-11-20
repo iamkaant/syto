@@ -182,7 +182,86 @@ def _pose_dict(res, index):
     return out
 
 
+# ------------------------------------------------------------------ scene
+
+def scene(index=None):
+    """What to draw, as coordinates, for the last analysed pose.
+
+    Endpoints rather than atom indices: the page's viewer parses the same
+    files with its own reader and numbers the atoms its own way, and a
+    shared index would be a silent assumption that two parsers agree.
+    Coordinates are read verbatim from the file by both, so they are the
+    one thing that cannot drift.
+
+    Nothing here decides anything. The interactions, their quality and
+    their labels are exactly what `analyse` already returned; this is the
+    same list expressed as geometry.
+    """
+    res = _STATE.get("last")
+    if res is None or res.combined is None:
+        raise RuntimeError("analyse a pose first")
+    ms = res.combined
+
+    def xyz(i):
+        v = ms.xyz[int(i)]
+        return [round(float(v[0]), 3), round(float(v[1]), 3),
+                round(float(v[2]), 3)]
+
+    lines = []
+    for it in res.interactions:
+        if not it.lig_atoms or not it.rec_atoms:
+            continue
+        lines.append({
+            "kind": it.kind,
+            "quality": round(float(it.quality), 3),
+            "distance": round(float(it.distance), 3),
+            "label": it.label,
+            "a": xyz(it.lig_atoms[0]),
+            "b": xyz(it.rec_atoms[0]),
+            "flags": list(it.flags or ()),
+        })
+
+    clashes = []
+    sr = res.strain
+    if sr is not None:
+        for c in (sr.clashes + sr.internal):
+            clashes.append({
+                "kind": c.kind,
+                "overlap": round(float(c.overlap), 3),
+                "distance": round(float(c.distance), 3),
+                "severe": bool(c.severe),
+                "label": c.label,
+                "a": xyz(c.i), "b": xyz(c.j),
+            })
+
+    return _json({"name": res.name, "lines": lines, "clashes": clashes,
+                  "n_receptor": int(res.n_receptor)})
+
+
 # ------------------------------------------------------------------ click
+
+def explain_at(x, y, z, tolerance=0.05):
+    """The handbook entry for the atom at this position.
+
+    The page clicks an atom in its own viewer and sends where it is, not
+    which number it thinks it is. Matching on position keeps the two
+    parsers from having to agree on ordering - and when the clicked atom
+    is one the analysis did not include (a water the reader dropped, say)
+    this says so rather than explaining the wrong atom.
+    """
+    import numpy as np
+    res = _STATE.get("last")
+    if res is None or res.combined is None:
+        raise RuntimeError("analyse a pose first")
+    ms = res.combined
+    d = ms.xyz - np.array([float(x), float(y), float(z)], dtype=float)
+    i = int(np.argmin((d * d).sum(axis=1)))
+    off = float(np.sqrt((d[i] * d[i]).sum()))
+    if off > float(tolerance):
+        return _json({"error": "that atom is not in the analysis",
+                      "nearest": round(off, 3)})
+    return explain(None, i)
+
 
 def explain(index, atom):
     """The handbook entry for one atom of the analysed pose."""

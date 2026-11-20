@@ -18,6 +18,19 @@
       --good: #5fd08a;
     }
   }
+  /* Asked for outright, rather than inferred from the OS. The web page
+     has a dark frame of its own and embeds this panel inside it, so
+     following the viewer's system theme would put a white panel beside a
+     dark 3D view on half the machines that open it. */
+  :root[data-theme="dark"] {
+    --bg: #1b1e23; --fg: #e6e8eb; --muted: #9aa3ae; --line: #2d323a;
+    --card: #22262c; --accent: #6ba4f8; --warn: #e0b060; --warn-bg: #2e2718;
+    --good: #5fd08a;
+  }
+  /* Controls that only mean something in ChimeraX. The web page has its
+     own file pickers and its own Analyse button; showing a second pair
+     here would be two ways to do one thing, one of which does nothing. */
+  :root[data-host="web"] .host-chimerax { display: none; }
   * { box-sizing: border-box; }
   /* Two columns once there is room for them. Docked in ChimeraX the panel is
      narrow and this stays a single column; detach it and widen it and the
@@ -157,7 +170,7 @@
 
 <div id="status" class="card tiny muted">Connecting&hellip;</div>
 
-<div class="row" style="gap:6px;margin-bottom:4px">
+<div class="row host-chimerax" style="gap:6px;margin-bottom:4px">
   <button class="primary" onclick="hp('analyze')">Analyse pose</button>
   <button onclick="hp('setup')">Re-read receptor</button>
 </div>
@@ -243,7 +256,18 @@ hides only what this put on screen, not anything you displayed yourself."
 // ChimeraX: navigate to a custom scheme URL, caught by handle_scheme().
 // Web: the same calls go over postMessage to the Pyodide worker. The panel
 // itself does not know or care which host it is in.
-var HP_HOST = (window.hpHost || "chimerax");
+// The host declares itself in the query string, not on window: a parent
+// page cannot set a property on this frame before its own script runs, so
+// anything passed that way would arrive one paint too late and the panel
+// would come up in the wrong theme and correct itself in front of you.
+var HP_Q = new URLSearchParams(location.search);
+var HP_HOST = HP_Q.get("host") || window.hpHost || "chimerax";
+if (HP_HOST !== "chimerax") {
+  document.documentElement.setAttribute("data-host", HP_HOST);
+}
+if (HP_Q.get("theme")) {
+  document.documentElement.setAttribute("data-theme", HP_Q.get("theme"));
+}
 
 function hp(action, params) {
   var q = [];
@@ -341,7 +365,9 @@ window.hpSetState = function (s) {
   var st = document.getElementById("status");
   if (!s.ready) {
     st.className = "card tiny warn";
-    st.innerHTML = "No binding site prepared. Run <code>hitpick setup</code>.";
+    st.innerHTML = HP_HOST === "chimerax"
+      ? "No binding site prepared. Run <code>hitpick setup</code>."
+      : "Load a receptor and a pose file to start.";
   } else {
     st.className = "card tiny muted";
     st.innerHTML = (s.handbook ? esc(s.handbook) : "handbook not built")
