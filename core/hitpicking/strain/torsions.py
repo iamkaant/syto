@@ -441,12 +441,55 @@ def analyze_torsions(ms, ligand_only=True):
                 else:
                     qm_note += (" - indicative only: no QM class for this "
                                 "ortho substitution, read from %s" % cls_name)
-            if exact and med >= QM_NOTE_KCAL:
-                assessment = STRAINED
-                note = (note + "; " if note else "") + qm_note
-            elif exact and assessment in (UNJUDGED, OK):
-                assessment = OK
-                note = qm_note
+            if exact:
+                # An exact QM class is a MEASUREMENT of what this torsion
+                # costs. The geometric rules above are a proxy for that
+                # measurement, so where the two disagree the measurement
+                # wins - in both directions.
+                #
+                # It used to win in one direction only. A bond the
+                # geometric rule called eclipsed stayed flagged as eclipsed
+                # even when its own QM scan put the cost at a few tenths of
+                # a kcal, because the "believe the QM" branch only fired for
+                # torsions that were already ok or unjudged. The 3D view
+                # labelled the bond strained while the profile beside it
+                # showed a flat curve saying it was not, which is an
+                # argument the tool should not be having with itself.
+                #
+                # Eclipsed is genuinely the minimum for some bonds, so this
+                # is not a rounding error. The proxy's reason is kept in the
+                # note either way: an override should be visible.
+                if med >= QM_NOTE_KCAL:
+                    if assessment == OK and note:
+                        # The geometric rule had concluded this was fine -
+                        # usually "there is an ortho substituent, so a
+                        # twist is expected, not strain". The QM scan for
+                        # that very class disagrees, and it is the
+                        # measurement, so the verdict flips.
+                        #
+                        # The old sentence used to be appended verbatim,
+                        # which left the tool printing "that is expected,
+                        # not strain" underneath the word STRAINED - the
+                        # label and its own popup contradicting each other
+                        # in the same breath. It is kept, because knowing
+                        # what the geometry expected is useful, but framed
+                        # as the thing being overruled rather than as the
+                        # answer.
+                        note = ("geometry alone would pass this (%s), but "
+                                "the QM scan for this exact bond class "
+                                "measures %s" % (note, qm_note))
+                    else:
+                        note = (note + "; " if note else "") + qm_note
+                    assessment = STRAINED
+                elif assessment in (UNJUDGED, OK):
+                    assessment = OK
+                    note = qm_note
+                else:
+                    note = ("looks %s (%s), but the QM scan for this bond "
+                            "type puts it at only %s, so it is not being "
+                            "called strain"
+                            % (assessment, note or "by geometry", qm_note))
+                    assessment = OK
             else:
                 note = (note + "; " if note else "") + qm_note
             energy = med if exact else None

@@ -273,6 +273,40 @@ def _representative_atom(group, other_group, all_atoms):
 LABEL_ATTR = "hitpick_label"
 _ATTR_REGISTERED = set()
 
+# ---------------------------------------------------------------------------
+# Atom labels come from three independent places and an atom can only carry
+# one label, so they are composed in layers rather than written over each
+# other.
+#
+# What went wrong without this: `label_strain` wrote "eclipsed" onto an atom
+# and `show_torsion` wrote "1".."4" onto the four atoms of the bond you
+# clicked, both into the same attribute. Clicking a strained bond therefore
+# ERASED the word that told you it was strained; clicking the next bond did
+# not bring it back, because nothing remembered it; and the digits from
+# every bond you had clicked stayed on screen for good, because clearing
+# only removed the pseudobonds.
+#
+# Each layer is now stored separately, the drawn text is their join, and a
+# layer can be replaced or dropped without touching the others.
+LAYER_STRAIN = "strain"
+LAYER_TORSION = "torsion"
+LAYER_VALUE = "value"
+# Drawing order, and colour priority: the digits you just asked for outrank
+# a standing strain note, which outranks a handbook value.
+LAYER_ORDER = (LAYER_TORSION, LAYER_STRAIN, LAYER_VALUE)
+LAYER_PARTS = "hitpick_label_parts"
+
+# One label3d call carries one colour, so atoms are grouped by whichever
+# layer is on top. The torsion colour has to be worked out against the
+# current background, which is why this is a function.
+STRAIN_TEXT_COLOR = (200, 90, 30, 255)
+
+
+def _layer_colors(session):
+    return {LAYER_TORSION: _readable_text_color(session, TORSION_COLOR),
+            LAYER_STRAIN: STRAIN_TEXT_COLOR,
+            LAYER_VALUE: None}
+
 
 def _register_attrs(session):
     """Register the per-object label attribute once per session.
@@ -292,7 +326,100 @@ def _register_attrs(session):
                               attr_type=str)
         except Exception:
             pass          # already registered by an earlier session
+    # The layer dict is deliberately NOT registered as a session attribute:
+    # it is scratch state for composing the text, and the composed text is
+    # what a saved session should carry.
     _ATTR_REGISTERED.add(session)
+
+
+# ----------------------------------------------------------- label layers
+
+def _parts(atom):
+    d = getattr(atom, LAYER_PARTS, None)
+    return dict(d) if isinstance(d, dict) else {}
+
+
+def _compose(atom, parts):
+    """Write the layers back, and return the text that should be drawn."""
+    text = " \u00b7 ".join(parts[k] for k in LAYER_ORDER if parts.get(k))
+    try:
+        setattr(atom, LAYER_PARTS, parts)
+        setattr(atom, LABEL_ATTR, text)
+    except Exception:
+        return ""
+    return text
+
+
+def _top_layer(parts):
+    for k in LAYER_ORDER:
+        if parts.get(k):
+            return k
+    return None
+
+
+def set_label_layer(session, all_atoms, layer, texts, color=None):
+    """Replace one layer of atom labels, leaving the other layers alone.
+
+    `texts` maps an atom index to the text for this layer; an index left out
+    loses its text for this layer only. Returns how many atoms carry text
+    in this layer afterwards.
+    """
+    from chimerax.atomic import Atoms
+    from chimerax.core.objects import Objects
+    from chimerax.label.label3d import label, label_delete
+
+    if not all_atoms:
+        return 0
+    _register_attrs(session)
+
+    texts = {int(k): str(v) for k, v in (texts or {}).items() if v}
+    touched = []
+    for i, a in enumerate(all_atoms):
+        parts = _parts(a)
+        want = texts.get(i)
+        if parts.get(layer) == want:
+            if want:
+                touched.append(a)
+            continue
+        if want:
+            parts[layer] = want
+        else:
+            parts.pop(layer, None)
+        _compose(a, parts)
+        touched.append(a) if want else None
+
+    # redraw everything that still has any label, grouped by which layer is
+    # on top, because one label3d call carries one colour
+    labelled = [a for a in all_atoms if getattr(a, LABEL_ATTR, "")]
+    stale = [a for a in all_atoms
+             if getattr(a, LABEL_ATTR, None) is not None
+             and not getattr(a, LABEL_ATTR, "")]
+    try:
+        if stale:
+            label_delete(session, Objects(atoms=Atoms(stale)), "atoms")
+    except Exception:
+        pass
+    if not labelled:
+        return 0
+
+    colors = _layer_colors(session)
+    if color is not None:
+        colors[layer] = color
+    groups = {}
+    for a in labelled:
+        groups.setdefault(_top_layer(_parts(a)), []).append(a)
+    for top, atoms in groups.items():
+        try:
+            label(session, Objects(atoms=Atoms(atoms)), "atoms",
+                  attribute=LABEL_ATTR, bg_color=_label_backdrop(session),
+                  color=colors.get(top), height=ATOM_LABEL_HEIGHT)
+        except Exception:
+            continue
+    return len([a for a in all_atoms if _parts(a).get(layer)])
+
+
+def clear_label_layer(session, all_atoms, layer):
+    return set_label_layer(session, all_atoms, layer, {})
 
 
 # How a geometric term is doing against its literature envelope. The score
@@ -423,41 +550,30 @@ def label_strain(session, strain, all_atoms):
 
     Eclipsed torsions and puckered rings have no two atoms to draw a line
     between, so they are labelled on the atom instead.
+
+    This writes one LAYER, so clicking a bond to read its torsion no longer
+    erases the word that said the bond was strained.
     """
     from chimerax.atomic import Atoms
     from chimerax.core.objects import Objects
     from chimerax.label.label3d import label
 
-    if strain is None or not strain.findings:
-        return 0
-    _register_attrs(session)
-    sel = []
-    for f in strain.findings:
+    texts = {}
+    for f in (strain.findings if strain is not None else ()):
         if not f.atoms:
             continue
         anchor = f.atoms[len(f.atoms) // 2]
         if not (0 <= anchor < len(all_atoms)):
             continue
-        a = all_atoms[anchor]
         short = {"eclipsed_torsion": "eclipsed", "eclipsed": "eclipsed",
                  "nonplanar_ring": "puckered",
                  "twisted_amide": "twisted amide",
                  "twisted_out_of_conjugation": "out of plane %.0f" % abs(f.value),
                  "forced_planar": "forced flat"}.get(f.kind, f.kind)
-        try:
-            setattr(a, LABEL_ATTR, short)
-        except Exception:
-            continue
-        sel.append(a)
-    if not sel:
-        return 0
-    try:
-        label(session, Objects(atoms=Atoms(sel)), "atoms",
-              attribute=LABEL_ATTR, bg_color=_label_backdrop(session),
-              color=(200, 90, 30, 255), height=ATOM_LABEL_HEIGHT)
-    except Exception:
-        return 0
-    return len(sel)
+        texts[int(anchor)] = short
+    # Always set the layer, even when empty: a pose with no strain has to
+    # clear the notes left by the previous one.
+    return set_label_layer(session, all_atoms, LAYER_STRAIN, texts)
 
 
 def label_interactions(session, interactions=None, all_atoms=None,
@@ -584,41 +700,37 @@ def annotate_atoms(session, labels, all_atoms, clear_first=True):
     from chimerax.core.objects import Objects
     from chimerax.label.label3d import label
 
-    _register_attrs(session)
-    sel, texts = [], []
-    for idx, text in labels.items():
-        i = int(idx)
-        if not (0 <= i < len(all_atoms)):
-            continue
-        a = all_atoms[i]
-        try:
-            setattr(a, LABEL_ATTR, str(text))
-        except Exception:
-            continue
-        sel.append(a)
-        texts.append(text)
-    if not sel:
-        return 0
-    atoms = Atoms(sel)
-    if clear_first:
-        clear_atom_labels(session, all_atoms)
-    try:
-        label(session, Objects(atoms=atoms), "atoms", attribute=LABEL_ATTR,
-              bg_color=_label_backdrop(session), height=ATOM_LABEL_HEIGHT)
-    except Exception as e:
-        session.logger.warning("hitpick: labelling failed (%s)" % e)
-        return 0
-    return len(sel)
+    texts = {int(i): str(t) for i, t in labels.items()
+             if 0 <= int(i) < len(all_atoms)}
+    # `clear_first` only ever meant "replace the previous VALUES", which is
+    # what replacing this layer does. It no longer takes the strain notes
+    # and torsion numbers with it.
+    if not clear_first:
+        for i, a in enumerate(all_atoms):
+            keep = _parts(a).get(LAYER_VALUE)
+            if keep and i not in texts:
+                texts[i] = keep
+    return set_label_layer(session, all_atoms, LAYER_VALUE, texts)
 
 
 def clear_atom_labels(session, all_atoms=None):
-    """Delete only the atom labels we created."""
+    """Delete every atom label this tool drew, in all layers.
+
+    This is the "Clear labels" button and `hitpick clear`. To drop one kind
+    of label and leave the rest, use clear_label_layer.
+    """
     from chimerax.atomic import Atoms
     from chimerax.core.objects import Objects
     from chimerax.label.label3d import label_delete
     if not all_atoms:
         return
     ours = [a for a in all_atoms if getattr(a, LABEL_ATTR, None)]
+    for a in ours:
+        try:
+            setattr(a, LAYER_PARTS, {})
+            setattr(a, LABEL_ATTR, "")
+        except Exception:
+            pass
     if not ours:
         return
     try:
@@ -706,23 +818,26 @@ def show_torsion(session, torsion, all_atoms, label=True):
         if st is not None:
             st._suppress_selection = False
 
-    if label:
-        try:
-            for k, a in enumerate(atoms):
-                setattr(a, LABEL_ATTR, "%d" % (k + 1))
-            label3d(session, Objects(atoms=Atoms(atoms)), "atoms",
-                    attribute=LABEL_ATTR, bg_color=_label_backdrop(session),
-                    color=_readable_text_color(session, TORSION_COLOR),
-                    height=ATOM_LABEL_HEIGHT)
-        except Exception:
-            pass
+    # One layer, replaced wholesale, so the digits from the bond clicked
+    # before this one go away instead of piling up on the model, and the
+    # strain note on an atom that happens to be in this torsion survives
+    # beside its number rather than being overwritten by it.
+    set_label_layer(session, all_atoms, LAYER_TORSION,
+                    {idx[k]: "%d" % (k + 1) for k in range(4)} if label
+                    else {})
     return len(atoms)
 
 
 def clear_torsion(session, all_atoms=None):
+    """Drop the torsion marks, and ONLY those.
+
+    This used to call clear_atom_labels, which deletes every label the tool
+    has drawn - handbook values and strain notes included - because they all
+    shared one attribute.
+    """
     clear_groups(session, (TORSION_GROUP,))
     if all_atoms:
-        clear_atom_labels(session, all_atoms)
+        clear_label_layer(session, all_atoms, LAYER_TORSION)
 
 
 def reveal_partners(session, interactions, all_atoms):
