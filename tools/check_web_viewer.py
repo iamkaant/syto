@@ -68,6 +68,11 @@ async function until(fn, ms, what) {
       d.getElementById("status").textContent); }, 300000, "the engine");
     log("engine up: " + d.getElementById("status").textContent);
     out.molstar = w.molstar ? w.molstar.version : null;
+    // Offline support: the page must have asked for it on a served origin.
+    try {
+      var reg = await w.navigator.serviceWorker.getRegistration();
+      out.offline = !!reg;
+    } catch (e) { out.offline = false; }
 
     var rec = await (await fetch("__rec")).text();
     var lig = await (await fetch("__lig")).text();
@@ -162,6 +167,38 @@ def check(cond, msg, failures):
         failures.append(msg)
 
 
+def check_file_protocol(chrome, failures):
+    """What a person sees when they double-click index.html.
+
+    This is the first thing anyone tries, and the browser's answer to it
+    is a flat refusal that has nothing to do with this page being broken.
+    The page has to say so itself, immediately, and say what to do - not
+    sit on "starting..." while a worker fails to construct.
+
+    Loaded directly rather than through a probe frame: a file:// parent
+    cannot read a file:// child, because each gets its own opaque origin.
+    """
+    import re
+    import subprocess
+    dom = subprocess.run(
+        [chrome, "--headless=new", "--disable-gpu", "--no-sandbox",
+         "--dump-dom", "--virtual-time-budget=6000",
+         "file://" + os.path.join(WEB, "index.html")],
+        capture_output=True, text=True, timeout=120).stdout
+    m = re.search(r'<div id="drop"[^>]*>(.*?)</div>\s*</div>', dom, re.S)
+    drop = re.sub(r"<[^>]+>", " ", m.group(1)) if m else ""
+    drop = " ".join(drop.split())
+    check("will not let a file run it" in drop,
+          "opened from a file, the page says so rather than looking "
+          "broken: %r" % drop[:90], failures)
+    check("serve_web" in drop or "hosted" in drop,
+          "and says what to do instead", failures)
+    check('id="go" disabled' in dom.replace("' ", '" ')
+          or re.search(r'id="go"[^>]*disabled', dom) is not None,
+          "with Analyse disabled, so there is nothing to press in vain",
+          failures)
+
+
 def main():
     chrome = find_chrome()
     if chrome is None:
@@ -203,8 +240,12 @@ def main():
 
     f = []
     print("the page ran in %.0f s, Mol* %s" % (secs, got.get("molstar")))
+    check_file_protocol(chrome, f)
     check(not got.get("errors"), "no JavaScript error (%s)"
           % ("; ".join(got["errors"]) or "none"), f)
+    check(got.get("offline") is True,
+          "the page registered for offline use, so a second visit needs "
+          "no network", f)
     check(got["recAtoms"] > 1000,
           "the receptor is in the viewer: %d atoms" % got["recAtoms"], f)
     check(got["ligAtoms"] > 5,

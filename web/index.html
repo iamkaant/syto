@@ -120,7 +120,13 @@
 <script src="ui/bridge.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
-const bridge = new HPBridge.WorkerBridge("js/worker.js");
+// Constructed lazily, and only after the file:// check.
+//
+// `new Worker()` THROWS from a file:// origin rather than failing later,
+// which killed this whole script at its first line - so the page sat on
+// "starting..." with no handlers attached and no message, which is
+// exactly what it looked like when someone opened it from disk.
+let bridge = null;
 const files = {rec: null, lig: null};
 let viewer = null, poses = [], current = 0, lastResult = null;
 let enabled = null;   // null = whatever the core defaults to
@@ -373,7 +379,7 @@ function renderList(r) {
 // cannot be driven from outside - which is how tools/check_web_viewer.py
 // checks that what the core asked for is what actually got drawn.
 window.HP = {
-  bridge: bridge,
+  get bridge() { return bridge; },
   analyse: (i) => analyse(i),
   redraw: redraw,
   explainAt: (xyz) => onAtomClick(xyz, "external"),
@@ -383,16 +389,55 @@ window.HP = {
 };
 
 // --------------------------------------------------------------- start
+
+// Opened by double-clicking the file. Worth catching before anything
+// else, because the failure three seconds later - a worker that cannot
+// be constructed - reads like a broken page rather than a browser rule.
+function fileProtocolNotice() {
+  $("drop").innerHTML =
+    "<div style='max-width:460px'><b style='color:var(--warn)'>This page "
+    + "is open from a file, and a browser will not let a file run it."
+    + "</b><br><br>Both the background worker and WebAssembly are blocked "
+    + "for pages with no origin. That is a security rule; nothing on this "
+    + "page can opt out of it.<br><br>Open the hosted copy instead &mdash; "
+    + "it needs no install and it keeps working offline once you have "
+    + "visited it once &mdash; or serve this folder:<br>"
+    + "<code style='display:inline-block;margin-top:6px'>python "
+    + "tools/serve_web.py</code></div>";
+  $("drop").style.color = "var(--fg)";
+  say("opened from file:// &mdash; a browser cannot run this page that way",
+      true);
+  $("go").disabled = true;
+  $("rec").disabled = $("lig").disabled = true;
+}
+
+// Cached whole on the first visit, so the hosted copy then opens with no
+// network at all. This is what makes it usable "locally" without anyone
+// running a server: the page is local after you have seen it once.
+function registerOffline() {
+  if (!("serviceWorker" in navigator)) return;
+  if (location.protocol !== "https:" && location.hostname !== "localhost"
+      && location.hostname !== "127.0.0.1") return;
+  navigator.serviceWorker.register("sw.js").then(function (reg) {
+    window.__offline = reg;
+  }).catch(function () { /* offline use is a bonus, not a requirement */ });
+}
+
 (async function () {
+  renderToggles();
+  if (location.protocol === "file:") { fileProtocolNotice(); return; }
+  registerOffline();
   try {
-    renderToggles();
+    bridge = new HPBridge.WorkerBridge("js/worker.js");
     const v = await bridge.call("version");
     window.__handbook = v.handbook;
     say("engine ready &middot; " + esc(v.handbook || "no handbook")
-        + " &middot; Mol* " + (window.molstar ? molstar.version : "missing"));
+        + " &middot; Mol* " + (window.molstar ? molstar.version : "missing")
+        + " &middot; <span class='muted'>everything runs in this tab</span>");
   } catch (e) {
     say("the engine failed to start: " + esc(e.message)
-        + " &mdash; serve this folder: <code>python -m http.server</code>", true);
+        + " &mdash; serve this folder: <code>python tools/serve_web.py</code>",
+        true);
   }
 })();
 </script>

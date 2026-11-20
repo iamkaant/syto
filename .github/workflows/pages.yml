@@ -1,0 +1,83 @@
+# Publish web/ to GitHub Pages.
+#
+# The point of this file is that nobody has to run a server. Push, and the
+# page is a URL: open it, upload a receptor and some poses, get the
+# analysis. The files never leave the browser - the hosting only serves
+# the page, the chemistry happens in the tab.
+#
+# The browser runtime (Pyodide, numpy, Mol*) is NOT in the repository: it
+# is 22 MB of someone else's build product and does not belong in the
+# history. It is fetched here, pinned to the versions in
+# tools/fetch_web_deps.py, so the deployed page is reproducible without
+# the repository carrying it.
+
+name: web page
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "core/**"
+      - "web/**"
+      - "ui/**"
+      - "chimerax/src/ui/panel.html"
+      - "data-src/**"
+      - "tools/fetch_web_deps.py"
+      - "tools/build_web_core.py"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the handbook
+        run: python tools/build_data.py
+
+      - name: Fetch the browser runtime (Pyodide, numpy, Mol*)
+        run: python tools/fetch_web_deps.py
+
+      - name: Pack the core into web/vendor
+        run: python tools/build_web_core.py
+
+      - name: Check the page is complete
+        run: |
+          set -e
+          for f in web/index.html web/sw.js web/js/viewer.js \
+                   web/js/worker.js web/js/engine.py web/ui/panel.html \
+                   web/vendor/hitpicking.zip \
+                   web/vendor/molstar/molstar.js \
+                   web/vendor/pyodide/pyodide.mjs; do
+            test -s "$f" || { echo "missing or empty: $f"; exit 1; }
+          done
+          echo "web/ is $(du -sh web | cut -f1)"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

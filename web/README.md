@@ -7,7 +7,43 @@ from `core/hitpicking`, so an interaction is decided in exactly one place.
 Load a receptor and a pose file, get the pose in 3D with the scored
 interactions drawn on it, and click any atom for the handbook entry.
 
-## Running it
+## The three ways to run it, and why there are only three
+
+**A hosted URL is the one to use.** `.github/workflows/pages.yml`
+publishes `web/` to GitHub Pages on every push. Open the link, upload a
+receptor and some poses, done - no install, no server, nothing to
+remember. The hosting serves the page and nothing else: your files are
+read and analysed inside the tab and never cross the network.
+
+**That URL then works offline.** `sw.js` caches the whole runtime on the
+first visit, so afterwards it opens with no network at all. This is what
+"have it locally" means in a browser: the page is local once you have
+seen it once.
+
+**Double-clicking `index.html` cannot be made to work.** From a `file://`
+origin Chrome refuses both of the things this needs:
+
+```
+new Worker("js/worker.js", {type:"module"})
+  -> SecurityError: ... cannot be accessed from origin 'null'
+fetch("vendor/hitpicking.zip")
+  -> TypeError: Failed to fetch
+```
+
+That is a browser security rule about origins, not a limitation of this
+page, and no page can opt out of it. The only way around it would be to
+inline all 22 MB of Pyodide, numpy and Mol* as base64 in one ~30 MB HTML
+file *and* monkey-patch Pyodide's internal asset loading - unsupported,
+and it would break on the next version bump. So the page detects
+`file://` and says so plainly instead of sitting on "starting..." while a
+worker fails to construct.
+
+For a copy served from your own machine, `python tools/serve_web.py`
+binds loopback and opens it.
+
+## Building it
+
+
 
 ```
 python tools/fetch_web_deps.py     # once: Pyodide + numpy + Mol* into web/vendor
@@ -15,14 +51,8 @@ python tools/build_web_core.py     # after any change to core/ or ui/
 python tools/serve_web.py          # serves web/ and opens it
 ```
 
-**It will not work from `file://`.** Module workers and WebAssembly are
-both blocked there - a browser rule, not something the page can work
-around - and the page says so rather than failing silently. That is the
-whole reason `serve_web.py` exists.
-
-**Nothing is uploaded.** The server hands the browser the page; the
-receptor and the poses are read by the tab from your disk and analysed in
-it. They never cross the network, not even to localhost.
+The Pages workflow runs exactly these three steps, so what is deployed is
+what you get locally.
 
 ## What is here
 
@@ -34,6 +64,7 @@ it. They never cross the network, not even to localhost.
 | `js/engine.py` | the thin Python boundary - loads files, calls the core, returns JSON |
 | `ui/panel.html` | the handbook panel, the same file ChimeraX loads |
 | `ui/bridge.js` | the call interface both hosts implement |
+| `sw.js` | caches the runtime so the hosted page works offline |
 | `vendor/` | Pyodide 314.0.8 + numpy 2.4.6 + Mol* 5.13.1 + the core zip. Gitignored, ~23 MB |
 
 ## Why the pieces are shaped this way
