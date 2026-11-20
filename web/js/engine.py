@@ -182,6 +182,81 @@ def _pose_dict(res, index):
     return out
 
 
+# ------------------------------------------------- active learning (wip)
+
+def _learner():
+    """The one learner for this tab.
+
+    Created on first use so a page that only wants the handbook never
+    imports the model, its features or numpy's linear algebra paths -
+    which is the same reason the ChimeraX bundle defers them.
+    """
+    if _STATE.get("learner") is None:
+        from hitpicking.al import Learner
+        _STATE["learner"] = Learner(seed=0)
+    return _STATE["learner"]
+
+
+def featurise(start=0, count=1, strain=True):
+    """Analyse poses and turn them into feature vectors.
+
+    This is the slow step of a hit-picking party and the one that decides
+    whether the web page can host one: a few thousand poses have to go
+    through the full interaction and strain analysis before the model has
+    anything to learn from. Reported with its own timing so the cost is a
+    measurement rather than a guess.
+    """
+    import time
+    ctx = _STATE["context"]
+    if ctx is None:
+        raise RuntimeError("load a receptor first")
+    poses = _STATE["poses"]
+    if not poses:
+        raise RuntimeError("load poses first")
+    from hitpicking.al.features import pose_features
+
+    lr = _learner()
+    opts = Options()
+    opts.detect_strain = bool(strain)
+
+    start = max(0, int(start))
+    end = min(len(poses), start + int(count))
+    t0 = time.perf_counter()
+    t_analyse = 0.0
+    done = 0
+    for i in range(start, end):
+        name = _pose_name(poses[i], i)
+        a0 = time.perf_counter()
+        res = ctx.analyze(poses[i], options=opts, name=name)
+        t_analyse += time.perf_counter() - a0
+        key = "%d|%s" % (i, name)
+        lr.add_features(key, pose_features(res, terms=lr.score_terms),
+                        res.scores)
+        done += 1
+    total = time.perf_counter() - t0
+
+    return _json({
+        "featurised": done,
+        "total_known": len(lr.features),
+        "of": len(poses),
+        "next": end,
+        "seconds": round(total, 3),
+        "per_pose": round(total / done, 4) if done else None,
+        "analyse_share": round(t_analyse / total, 3) if total else None,
+    })
+
+
+def al_status():
+    lr = _STATE.get("learner")
+    if lr is None:
+        return _json({"poses": 0, "graded": 0, "trained": False})
+    ok, why = lr.can_train()
+    return _json({"poses": len(lr.features), "graded": lr.n_graded,
+                  "grades": lr.grades.counts(), "trained": lr.committee
+                  is not None, "can_train": ok, "why_not": why,
+                  "score_terms": list(lr.score_terms)})
+
+
 # ------------------------------------------------------------------ scene
 
 def scene(index=None):

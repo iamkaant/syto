@@ -81,6 +81,11 @@ const METHODS = {
   },
   async explain(a) { return toJs(engine.explain(a.index || 0, a.atom)); },
   async scene() { return toJs(engine.scene()); },
+  async featurise(a) {
+    return toJs(engine.featurise(a.start || 0, a.count || 1,
+                                 a.strain !== false));
+  },
+  async alStatus() { return toJs(engine.al_status()); },
   async explainAt(a) {
     return toJs(engine.explain_at(a.x, a.y, a.z, a.tolerance || 0.05));
   },

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -53,6 +54,14 @@ def serve(directory, port, inbox):
     class Handler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, *a):
             pass
+
+        def end_headers(self):
+            # Never cache anything under test. Without this the browser
+            # happily served a worker.js from a previous run and reported
+            # "no such method" for a method that was plainly in the file,
+            # which is a very long way to chase a stale cache.
+            self.send_header("Cache-Control", "no-store, max-age=0")
+            super().end_headers()
 
         def do_POST(self):
             n = int(self.headers.get("Content-Length") or 0)
@@ -156,6 +165,12 @@ b.on("progress", (d) => say("  " + d));
 
 
 def run_browser(chrome, port, inbox, timeout=420, page="__parity.html"):
+    # A fresh profile every run. The page registers a service worker that
+    # caches the whole runtime, which is the point in production and a
+    # trap in a test: an old worker would go on serving the previous
+    # build's files from an origin that looks identical.
+    profile = os.path.join(ROOT, ".chrome-parity")
+    shutil.rmtree(profile, ignore_errors=True)
     proc = subprocess.Popen(
         [chrome, "--headless", "--no-sandbox",
          # Mol* needs WebGL. Headless Chrome has no GPU, so without a
