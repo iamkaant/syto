@@ -25,3 +25,10 @@ chimerax/build/
 
 # fetched QM scans: large, reproducible with tools/fetch_qm_torsions.py
 data-src/external/qm_torsions/raw/
+
+# built from core/ and ui/ by tools/build_web_core.py
+web/ui/
+web/vendor/hitpicking.zip
+
+# headless-browser profiles from the test harnesses
+.chrome-*/

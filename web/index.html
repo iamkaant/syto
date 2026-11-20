@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hit Picking</title>
+<style>
+  :root {
+    --bg:#15181d; --card:#1b1f26; --line:#2a2f39; --fg:#e6e9ef;
+    --muted:#8b93a3; --accent:#4b9fff; --warn:#c98a00; --bad:#e64646;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:14px 16px 40px; background:var(--bg); color:var(--fg);
+         font:13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  h1 { font-size:13px; letter-spacing:.04em; text-transform:uppercase;
+       color:var(--muted); margin:0 0 10px; font-weight:600; }
+  h2 { font-size:12px; letter-spacing:.04em; text-transform:uppercase;
+       color:var(--muted); margin:18px 0 8px; font-weight:600;
+       border-top:1px solid var(--line); padding-top:12px; }
+  .card { background:var(--card); border:1px solid var(--line);
+          border-radius:7px; padding:9px 11px; margin-bottom:8px; }
+  .muted { color:var(--muted); } .tiny { font-size:11.5px; }
+  .warn { border-color:var(--warn); }
+  .row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  button { font:inherit; padding:5px 11px; border-radius:6px;
+           border:1px solid var(--line); background:var(--card);
+           color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent);
+                   color:#06121f; font-weight:600; }
+  button:disabled { opacity:.45; cursor:default; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  td { padding:4px 6px; border-top:1px solid var(--line); vertical-align:top; }
+  .q { height:5px; border-radius:3px; background:var(--accent); }
+  select { font:inherit; background:var(--card); color:var(--fg);
+           border:1px solid var(--line); border-radius:6px; padding:4px 6px; }
+  .grid { display:grid; gap:0 20px; grid-template-columns:1fr; }
+  @media (min-width:760px) {
+    .grid { grid-template-columns:minmax(260px,.9fr) minmax(340px,1.1fr); }
+  }
+  code { background:#11141a; padding:1px 4px; border-radius:4px; }
+</style>
+
+<h1>Hit Picking &mdash; web</h1>
+<div id="status" class="card tiny muted">starting the engine&hellip;</div>
+
+<div class="grid">
+<div>
+  <h2>Load</h2>
+  <div class="card">
+    <div class="row"><label class="tiny muted" style="width:72px">receptor</label>
+      <input type="file" id="rec" accept=".pdb,.ent"></div>
+    <div class="row" style="margin-top:6px">
+      <label class="tiny muted" style="width:72px">poses</label>
+      <input type="file" id="lig" accept=".mol2,.sdf,.sd,.mol"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="primary" id="go" disabled>Analyse</button>
+      <select id="pose" style="display:none"></select>
+    </div>
+    <div id="loadmsg" class="tiny muted" style="margin-top:6px"></div>
+  </div>
+
+  <h2>Pose</h2>
+  <div id="pose-out"><p class="tiny muted">Nothing analysed yet.</p></div>
+</div>
+
+<div>
+  <h2>Interactions</h2>
+  <div id="list"><p class="tiny muted">Load a receptor and some poses.</p></div>
+</div>
+</div>
+
+<script src="ui/bridge.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const bridge = new HPBridge.WorkerBridge("js/worker.js");
+const files = { rec: null, lig: null };
+let poses = [];
+
+function say(text, bad) {
+  $("status").className = "card tiny " + (bad ? "warn" : "muted");
+  $("status").innerHTML = text;
+}
+
+function ready() {
+  $("go").disabled = !(files.rec && files.lig);
+}
+
+async function readFile(input) {
+  const f = input.files && input.files[0];
+  if (!f) return null;
+  return { name: f.name, text: await f.text() };
+}
+
+$("rec").onchange = async () => { files.rec = await readFile($("rec")); ready(); };
+$("lig").onchange = async () => { files.lig = await readFile($("lig")); ready(); };
+
+$("go").onclick = async () => {
+  $("go").disabled = true;
+  try {
+    say("perceiving the receptor&hellip;");
+    const r = await bridge.call("setup", files.rec);
+    const p = await bridge.call("loadPoses", { ...files.lig, limit: 500 });
+    poses = p.names;
+    const sel = $("pose");
+    sel.innerHTML = poses.map((n, i) =>
+      '<option value="' + i + '">' + esc(n) + "</option>").join("");
+    sel.style.display = poses.length > 1 ? "" : "none";
+    sel.onchange = () => analyse(+sel.value);
+    $("loadmsg").innerHTML = esc(r.receptor) + ": " + r.n_atoms
+      + " atoms · " + p.count + " pose(s)"
+      + (r.has_hydrogens ? "" : " · <b>no hydrogens in the receptor</b>");
+    say(r.handbook || "handbook not built");
+    await analyse(0);
+  } catch (e) {
+    say("failed: " + esc(e.message), true);
+  } finally {
+    $("go").disabled = false;
+  }
+};
+
+async function analyse(i) {
+  say("analysing&hellip;");
+  const res = await bridge.call("analyse", { index: i });
+  renderPose(res);
+  renderList(res);
+  say("ready");
+}
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function renderPose(r) {
+  const s = r.strain || {};
+  const bad = (s.clashes || []).filter((c) => c.severe).length;
+  let h = '<div class="card"><b>' + esc(r.name) + "</b>"
+    + '<div class="tiny muted" style="margin-top:3px">' + esc(r.summary)
+    + "</div></div>";
+  if (bad) {
+    h += '<div class="card warn tiny"><b>' + bad + " severe clash"
+      + (bad === 1 ? "" : "es") + "</b> — worst overlap "
+      + (s.worst_overlap || 0).toFixed(2) + " Å</div>";
+  }
+  (r.warnings || []).forEach((w) => {
+    h += '<div class="card warn tiny">' + esc(w) + "</div>";
+  });
+  (s.findings || []).slice(0, 8).forEach((f) => {
+    h += '<div class="card tiny"><b>' + esc(f.kind.replace(/_/g, " "))
+      + '</b><div class="muted">' + esc(f.message) + "</div></div>";
+  });
+  $("pose-out").innerHTML = h;
+}
+
+function renderList(r) {
+  const rows = r.interactions || [];
+  if (!rows.length) {
+    $("list").innerHTML = '<p class="tiny muted">No interactions of the '
+      + "selected types.</p>";
+    return;
+  }
+  let h = '<table>';
+  rows.forEach((i) => {
+    const terms = ["d " + i.distance.toFixed(2) + " Å"];
+    for (const k in (i.angles || {})) {
+      if (i.angles[k] != null) terms.push(k + " " + Math.round(i.angles[k]) + "°");
+    }
+    h += "<tr><td style='width:46px'>"
+      + '<div class="q" style="width:' + Math.round(i.quality * 100)
+      + '%"></div><span class="tiny muted">' + i.quality.toFixed(2)
+      + "</span></td><td><b>" + esc(i.kind.replace(/_/g, " ")) + "</b><br>"
+      + '<span class="tiny muted">' + terms.join(" · ") + "</span><br>"
+      + '<span class="tiny muted">' + esc(i.label) + "</span>"
+      + (i.flags || []).map((f) =>
+          '<br><span class="tiny" style="color:var(--warn)">! '
+          + esc(f) + "</span>").join("")
+      + "</td></tr>";
+  });
+  $("list").innerHTML = h + "</table>";
+}
+
+(async function () {
+  try {
+    const v = await bridge.call("version");
+    say("engine ready · " + esc(v.handbook || "no handbook"));
+  } catch (e) {
+    say("the engine failed to start: " + esc(e.message)
+        + "<br>Serve this folder over HTTP: <code>python -m http.server</code>"
+        + " — workers and wasm do not load from file://", true);
+  }
+})();
+</script>
+</html>

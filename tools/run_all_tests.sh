@@ -35,6 +35,12 @@ for t in tests_viewdock_contract tests_labels tests_json_returns tests_clash_par
 done
 
 echo
+echo "=== web parity (the same core, in a browser) ==="
+wp="$("$PY" "$ROOT/tools/check_web_parity.py" 2>&1)"
+echo "$wp" | tail -5
+echo "$wp" | grep -qE "WEB PARITY OK|skipping the web parity check" || fail=1
+
+echo
 echo "=== panel JavaScript (executed, not just parsed) ==="
 pjs="$("$PY" "$ROOT/tools/check_panel_js.py" 2>&1)"
 echo "$pjs" | tail -4
