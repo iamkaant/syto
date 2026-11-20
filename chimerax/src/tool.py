@@ -104,8 +104,19 @@ class HandbookTool(HtmlToolInstance):
                 # it is holding a proton in the first place. The panel shows
                 # whichever the user last looked at; building both here
                 # costs a few ms and saves a round trip on every switch.
+                # pKBHX is the scale. pKBH+ joins it only when it
+                # changes the answer - when this atom is protonated at
+                # pH 7.4, so the pKBHX number is for a species that is not
+                # in the pocket. Otherwise one tab, and no tab bar at all.
+                # `hitpick scale pKBH+` still prints it on demand.
+                wanted = {"pKBHX"}
+                for a in (snap["hit"].get("annotations") or []):
+                    if a.get("changes_the_answer"):
+                        wanted.add(a["quantity"])
                 scales = []
                 for q in SCALE_QUANTITIES:
+                    if q not in wanted:
+                        continue
                     try:
                         sc = hb.scale(
                             q, st.last_hit.moiety_ids,

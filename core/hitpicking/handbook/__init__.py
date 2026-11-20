@@ -250,12 +250,31 @@ class Handbook:
                     # switched off.
                     from .scale import quantity_info, protonation_verdict
                     ann["means"] = quantity_info(q).get("means") or ""
+                    # `changes_the_answer` is what a front end shows by
+                    # default. For most quantities the number IS the answer.
+                    #
+                    # pKBH+ is different: it is a precondition, not an
+                    # opinion. Where the atom is neutral at pH 7.4 it adds
+                    # nothing that pKBHX did not already say, and a second
+                    # plot on every click is noise. Where it is protonated,
+                    # the pKBHX value is for a species that is not in the
+                    # pocket at all - the atom is a cation that donates.
+                    #
+                    # Measured over the real ligands in three saved
+                    # sessions: 0 of 240 checkable atoms in one, 5 of 53 in
+                    # another, and 55 of 359 in a third, where the common
+                    # offenders are amidines and tertiary amines - exactly
+                    # the groups a picker stops to look at.
+                    ann["changes_the_answer"] = True
                     if q == "pKBH+":
                         v = (rep or {}).get("value")
                         if v is None and s["n"] >= MIN_N_FOR_MEDIAN:
                             v = s["median"]
                         if isinstance(v, (int, float)):
                             ann["verdict"] = protonation_verdict(v)
+                        ann["changes_the_answer"] = bool(
+                            ann.get("verdict")
+                            and ann["verdict"]["level"] != "neutral")
                     out.append(ann)
         return out
 

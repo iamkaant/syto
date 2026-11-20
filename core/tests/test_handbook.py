@@ -335,3 +335,39 @@ def test_wide_axes_get_readable_ticks():
     assert 3 <= len(nums) <= 9, header
     assert any("pH 7.4" in l for l in lines), lines[:4]
     assert any("protonated" in l for l in lines), lines[-4:]
+
+
+@needs_hb
+def test_pkbh_plus_only_speaks_when_it_overrides_pkbhx():
+    """One scale is the default; the second has to earn each appearance.
+
+    Measured over the real ligands of three saved sessions, a pKBH+ that
+    says "neutral at pH 7.4" adds nothing to pKBHX and fired on 240 of 240
+    checkable atoms in one of them. The case it exists for - the atom is a
+    cation, so the pKBHX number is for a species that is not in the pocket
+    - was 15% of atoms in another.
+    """
+    def ann(mids, q):
+        for a in hb.annotations_for(mids):
+            if a["quantity"] == q:
+                return a
+        return None
+
+    # a neutral acceptor: pKBHX is the whole story
+    a = ann(["pyridine_n"], "pKBH+")
+    assert a is not None, "the value is still in the data layer"
+    assert a["verdict"]["level"] == "neutral"
+    assert a["changes_the_answer"] is False
+
+    # a tertiary amine is a cation at pH 7.4: pKBHX 1.9 would call it a
+    # good acceptor, and in the pocket it donates instead
+    a = ann(["amine_n_tertiary"], "pKBH+")
+    assert a is not None and a["changes_the_answer"] is True, a
+    assert a["verdict"]["level"] == "cation"
+    x = ann(["amine_n_tertiary"], "pKBHX")
+    assert x["value"] if "value" in x else x["median"] > 1.0
+
+    # pKBHX itself is never suppressed
+    for mids in (["pyridine_n"], ["amine_n_tertiary"], ["amide_o"]):
+        x = ann(mids, "pKBHX")
+        assert x is not None and x["changes_the_answer"] is True, mids

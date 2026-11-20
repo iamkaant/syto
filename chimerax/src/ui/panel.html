@@ -537,6 +537,9 @@ function renderHit(hit, scales, torsion) {
   });
 
   (hit.annotations || []).forEach(function (a) {
+    // A pKBH+ that says "neutral at pH 7.4" tells you nothing pKBHX did
+    // not. It is here for the case where it overrides pKBHX entirely.
+    if (a.changes_the_answer === false) return;
     // Lead with the parent compound's own cited value where there is one.
     // A family median is the fallback, not the headline: the azine family
     // runs 0.3 to 2.0 while pyrazine itself is 0.92.
