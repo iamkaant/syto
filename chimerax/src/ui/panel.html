@@ -532,6 +532,43 @@ function renderHit(hit, scales, torsion) {
   }
   var h = '<div class="card"><b>' + esc(hit.title) + '</b></div>';
 
+  (hit.warnings || []).forEach(function (w) {
+    h += '<div class="card warn tiny">' + esc(w) + '</div>';
+  });
+
+  (hit.annotations || []).forEach(function (a) {
+    // Lead with the parent compound's own cited value where there is one.
+    // A family median is the fallback, not the headline: the azine family
+    // runs 0.3 to 2.0 while pyrazine itself is 0.92.
+    var rep = a.representative;
+    var lead = (rep && typeof rep.value === "number")
+      ? '<span class="val"><b>' + n2(rep.value) + "</b></span>"
+      : '<span class="val">median <b>' + n2(a.median) + "</b></span>";
+    h += '<div class="card"><div class="row spread">'
+      + '<b>' + esc(a.quantity) + '</b>' + lead + '</div>';
+    if (a.means) {
+      h += '<div class="tiny muted">' + esc(a.means) + '</div>';
+    }
+    if (rep && typeof rep.value === "number") {
+      h += '<div class="tiny muted val">' + esc(rep.compound || "parent")
+        + (a.n > 1 ? " &middot; family " + n2(a.min) + " to " + n2(a.max)
+                     + " over " + a.n + " compounds" : "")
+        + (a.n_flagged ? ' &middot; <span class="flag">' + a.n_flagged
+           + ' flagged for review</span>' : "") + '</div>';
+    } else {
+      h += '<div class="tiny muted val">range ' + n2(a.min) + " to " + n2(a.max)
+        + " over " + a.n + " compounds"
+        + (a.n_flagged ? ' &middot; <span class="flag">' + a.n_flagged
+           + ' flagged for review</span>' : "") + '</div>';
+    }
+    if (a.verdict) {
+      h += '<div class="tiny' + (a.verdict.level === "cation"
+          ? ' flag' : " muted") + '"><b>' + a.verdict.percent_protonated
+        + '%</b> protonated &mdash; ' + esc(a.verdict.text) + '</div>';
+    }
+    h += '<div class="tiny muted">' + esc(a.entry_title) + '</div></div>';
+  });
+
   var sv = (window.hpShowScale === false) ? "" : renderScales(scales);
   if (sv) {
     h += '<h2 style="border:none;padding-top:4px">Where this sits</h2>' + sv;
@@ -540,21 +577,6 @@ function renderHit(hit, scales, torsion) {
   if (tv) {
     h += '<h2 style="border:none;padding-top:4px">Torsion profile</h2>' + tv;
   }
-
-  (hit.warnings || []).forEach(function (w) {
-    h += '<div class="card warn tiny">' + esc(w) + '</div>';
-  });
-
-  (hit.annotations || []).forEach(function (a) {
-    h += '<div class="card"><div class="row spread">'
-      + '<b>' + esc(a.quantity) + '</b>'
-      + '<span class="val">median <b>' + a.median + '</b></span></div>'
-      + '<div class="tiny muted val">range ' + a.min + " to " + a.max
-      + " over " + a.n + " compounds"
-      + (a.n_flagged ? ' &middot; <span class="flag">' + a.n_flagged
-         + ' flagged for review</span>' : "") + '</div>'
-      + '<div class="tiny muted">' + esc(a.entry_title) + '</div></div>';
-  });
 
   (hit.entries || []).slice(0, 6).forEach(function (e) {
     h += '<div class="entry"><h3>' + esc(e.title || e.id) + '</h3>';

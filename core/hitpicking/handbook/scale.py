@@ -73,6 +73,10 @@ QUANTITY_INFO = {
         "unit": "log K (4-fluorophenol, CCl4, 298 K)",
         "means": "how strongly this atom accepts a hydrogen bond",
         "order": "curated",
+        "caption": ("Acceptor strength only, and only for a NEUTRAL "
+                    "acceptor. Whether the atom is carrying a proton - "
+                    "which decides whether it accepts anything at all - is "
+                    "the pKBH+ tab."),
     },
     "pKBH+": {
         "title": "Proton basicity",
@@ -84,9 +88,12 @@ QUANTITY_INFO = {
             {"value": 7.4, "label": "pH 7.4",
              "note": "a group above this line is mostly protonated"},
         ],
-        "caption": ("This is NOT the hydrogen-bond scale. pKBHX and pKBH+ "
-                    "barely correlate across families (r2 = 0.22, n = 232): "
-                    "a strong acceptor need not be a strong base."),
+        "caption": ("Not the same quantity as pKBHX. Both measure "
+                    "basicity, but pKBHX is measured against a hydrogen-bond "
+                    "donor (4-fluorophenol in CCl4) and pKBH+ against a "
+                    "proton in water. Across families they correlate at only "
+                    "r2 = 0.22 (n = 232), so a strong acceptor need not be a "
+                    "strong base - which is why both are here."),
     },
 }
 

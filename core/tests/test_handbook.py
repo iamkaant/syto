@@ -281,8 +281,12 @@ def test_the_two_scales_are_labelled_so_they_cannot_be_confused():
     assert "4-fluorophenol" in a["unit"]
     assert "conjugate acid" in b["unit"]
     assert a["title"] != b["title"]
-    # the pKa plot says in words that it is not the H-bond plot
-    assert "NOT the hydrogen-bond scale" in b["caption"]
+    # each plot says what it is not, by name rather than by implication:
+    # "the hydrogen-bond scale" reads as if there were only one
+    assert "pKBHX" in b["caption"] and "r2 = 0.22" in b["caption"]
+    assert "pKBH+" in a["caption"]
+    for cap in (a["caption"], b["caption"]):
+        assert "the hydrogen-bond scale" not in cap, cap
 
 
 @needs_hb

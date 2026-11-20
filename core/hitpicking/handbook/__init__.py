@@ -243,6 +243,19 @@ class Handbook:
                     rep = self.representative_for(moiety_ids, q)
                     if rep and rep.get("entry") == e["id"]:
                         ann["representative"] = rep
+                    # What the quantity measures, and - for a proton
+                    # basicity with a value behind it - what that means for
+                    # the pose. The card has to stand on its own: the scale
+                    # plot carries the same verdict, and the plots can be
+                    # switched off.
+                    from .scale import quantity_info, protonation_verdict
+                    ann["means"] = quantity_info(q).get("means") or ""
+                    if q == "pKBH+":
+                        v = (rep or {}).get("value")
+                        if v is None and s["n"] >= MIN_N_FOR_MEDIAN:
+                            v = s["median"]
+                        if isinstance(v, (int, float)):
+                            ann["verdict"] = protonation_verdict(v)
                     out.append(ann)
         return out
 
