@@ -58,6 +58,12 @@ _QM_TRIED = False
 
 # A torsion costing less than this is not worth mentioning; past the second
 # value it is worth a warning rather than a note.
+#
+# Both are read against the QM scan for the torsion's OWN bond class, so
+# they are a cost above that class's minimum rather than an absolute
+# energy. 1.5 is roughly where a rotamer stops being thermally accessible
+# at room temperature; 3.0 is where the pose is paying for the twist with
+# something it had better be getting back from the site.
 QM_NOTE_KCAL = 1.5
 QM_WARN_KCAL = 3.0
 
@@ -178,6 +184,27 @@ class Torsion:
         return self.assessment not in (OK, UNJUDGED)
 
     @property
+    def severity(self):
+        """How loudly this flag deserves to be made: 'warning' or 'note'.
+
+        A torsion with an exact QM class has a measured cost, so the cost
+        decides: past QM_WARN_KCAL the pose is paying real energy for the
+        twist and that belongs in the warning band; between QM_NOTE_KCAL
+        and QM_WARN_KCAL it is worth saying and not worth alarm.
+
+        Where no QM class covers the bond there is no number, and the
+        geometric rule that flagged it - eclipsed, or twisted out of a
+        conjugation nothing was forcing it out of - is a yes/no. Those
+        stay warnings rather than being quietly demoted on the strength of
+        evidence that does not exist.
+        """
+        if not self.flagged:
+            return None
+        if self.energy is None:
+            return "warning"
+        return "warning" if self.energy >= QM_WARN_KCAL else "note"
+
+    @property
     def bond(self):
         return (self.atoms[1], self.atoms[2])
 
@@ -192,6 +219,7 @@ class Torsion:
                                 else round(self.energy, 2)),
                 "assessment": self.assessment,
                 "note": self.note, "flagged": self.flagged,
+                "severity": self.severity,
                 "ortho_substituted": self.ortho_substituted}
 
 

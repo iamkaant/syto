@@ -615,7 +615,10 @@ def hitpick_torsions(session, all=False):
         if not (all or t.flagged):
             continue
         shown += 1
-        mark = "!" if t.flagged else " "
+        # Two tiers, not one. A torsion the QM scan for its own bond class
+        # measures past QM_WARN_KCAL is costing the pose real energy; one
+        # between the two thresholds is worth saying and not worth alarm.
+        mark = {"warning": "!!", "note": " !"}.get(t.severity, "  ")
         cost = ("  %+.1f kcal/mol" % t.energy) if t.energy is not None else ""
         log.info("  %s %-16s %7.1f deg%s   %s - %s"
                  % (mark, t.subtype or t.bond_type, t.angle, cost,
@@ -623,9 +626,15 @@ def hitpick_torsions(session, all=False):
         if t.note:
             log.info("      %s" % t.note)
     if not all:
+        from hitpicking.strain.torsions import QM_WARN_KCAL
         n_un = sum(1 for t in ts if t.assessment == "unjudged")
-        log.info("  %d torsion(s) total; %d flagged. Use 'hitpick torsions "
-                 "true' for all of them." % (len(ts), shown))
+        n_warn = sum(1 for t in ts if t.severity == "warning"
+                     and t.energy is not None)
+        log.info("  %d torsion(s) total; %d flagged%s. Use 'hitpick "
+                 "torsions true' for all of them."
+                 % (len(ts), shown,
+                    (", %d (!!) measured above %.0f kcal/mol"
+                     % (n_warn, QM_WARN_KCAL)) if n_warn else ""))
         if n_un:
             log.info("  %d could not be judged: there is no redistributable "
                      "CSD torsion library, so bond types without an "

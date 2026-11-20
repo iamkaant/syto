@@ -335,6 +335,16 @@ class StrainReport:
         return [t for t in self.torsions if t.flagged]
 
     @property
+    def serious_torsions(self):
+        """Flagged torsions whose own QM scan puts them past QM_WARN_KCAL.
+
+        These are the ones that cost the pose real energy, as opposed to
+        the ones a geometric rule could only call suspect.
+        """
+        return [t for t in self.torsions if t.severity == "warning"
+                and t.energy is not None]
+
+    @property
     def worst_overlap(self):
         allc = self.clashes + self.internal
         return max((c.overlap for c in allc), default=0.0)
@@ -349,6 +359,7 @@ class StrainReport:
             "strain_flags": len(self.findings),
             "torsions": len(self.torsions),
             "flagged_torsions": len(self.flagged_torsions),
+            "serious_torsions": len(self.serious_torsions),
         }
 
     def summary(self):
@@ -365,9 +376,13 @@ class StrainReport:
             bits.append("%d strain flag%s"
                         % (c["strain_flags"], "" if c["strain_flags"] == 1 else "s"))
         if c["flagged_torsions"]:
-            bits.append("%d torsion%s worth a look"
+            from .torsions import QM_WARN_KCAL
+            bits.append("%d torsion%s worth a look%s"
                         % (c["flagged_torsions"],
-                           "" if c["flagged_torsions"] == 1 else "s"))
+                           "" if c["flagged_torsions"] == 1 else "s",
+                           (" (%d measured over %.0f kcal/mol)"
+                            % (c["serious_torsions"], QM_WARN_KCAL))
+                           if c["serious_torsions"] else ""))
         return "; ".join(bits) if bits else "no clashes or strain flags"
 
     def to_dict(self):
@@ -428,7 +443,11 @@ def analyze_strain(ms, **kw):
     for t in torsions:
         if not t.flagged:
             continue
+        # 'warning' or 'note', decided by what the QM scan for this bond
+        # class measures - see Torsion.severity. Every one of these used to
+        # be a warning, which made QM_WARN_KCAL a constant the code
+        # declared and never read.
         findings.append(StrainFinding(
             t.assessment.replace(" ", "_"), t.atoms, t.angle, "deg",
-            t.note, severity="warning"))
+            t.note, severity=t.severity or "note"))
     return StrainReport(clashes, internal, findings, torsions)

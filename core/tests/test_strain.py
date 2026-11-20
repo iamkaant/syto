@@ -379,3 +379,74 @@ def test_unjudged_is_never_counted_as_fine():
         if t.assessment == T.UNJUDGED:
             assert not t.flagged
             assert t.assessment != T.OK     # silence is not approval
+
+
+# --------------------------------------------------------------------------
+# The warning tier. QM_WARN_KCAL was declared, documented as "past this it
+# is worth a warning rather than a note", and then never read by anything:
+# every flagged torsion was emitted at severity "warning", so the constant
+# was a promise the code did not keep.
+# --------------------------------------------------------------------------
+
+from hitpicking.strain.torsions import (  # noqa: E402
+    QM_NOTE_KCAL, QM_WARN_KCAL, Torsion, STRAINED, OK, ECLIPSED, UNJUDGED)
+
+
+def _torsion(assessment, energy):
+    t = Torsion((0, 1, 2, 3), 60.0, "conjugated", assessment)
+    t.energy = energy
+    return t
+
+
+def test_the_two_thresholds_are_ordered():
+    assert 0 < QM_NOTE_KCAL < QM_WARN_KCAL
+
+
+def test_a_measured_torsion_is_graded_by_what_it_costs():
+    assert _torsion(STRAINED, QM_WARN_KCAL + 0.5).severity == "warning"
+    assert _torsion(STRAINED, QM_WARN_KCAL).severity == "warning"
+    assert _torsion(STRAINED, QM_WARN_KCAL - 0.1).severity == "note"
+    assert _torsion(STRAINED, QM_NOTE_KCAL).severity == "note"
+
+
+def test_an_unmeasured_flag_stays_a_warning():
+    # A geometric rule produces no number, so there is nothing to grade
+    # the flag by. Demoting it would be inventing evidence.
+    assert _torsion(ECLIPSED, None).severity == "warning"
+
+
+def test_an_unflagged_torsion_has_no_severity():
+    assert _torsion(OK, 0.2).severity is None
+    assert _torsion(UNJUDGED, None).severity is None
+
+
+def test_the_severity_reaches_the_finding_and_the_counts():
+    # Built by hand rather than loaded: what is under test is the wiring
+    # from Torsion.severity to StrainFinding.severity, not the chemistry.
+    from hitpicking.strain import StrainReport
+    ts = [_torsion(STRAINED, QM_WARN_KCAL + 1.0),
+          _torsion(STRAINED, QM_NOTE_KCAL + 0.1),
+          _torsion(ECLIPSED, None)]
+    r = StrainReport([], [], [], ts)
+    assert r.counts["flagged_torsions"] == 3
+    assert r.counts["serious_torsions"] == 1
+    assert "measured over %.0f kcal/mol" % QM_WARN_KCAL in r.summary()
+
+
+def test_the_split_is_not_vacuous_on_real_poses():
+    """Both tiers must actually occur, or the threshold is decorative."""
+    path = ("/Users/ak87/ownCloud/owncloud/Calculations/TMP/AutoParty/"
+            "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2")
+    if not os.path.exists(path):
+        pytest.skip("the sample mol2 is not on this machine")
+    from hitpicking.io.mol2 import read_mol2
+    from hitpicking.strain import analyze_strain
+    seen = {"warning": 0, "note": 0}
+    for m in read_mol2(path, limit=60):
+        for t in analyze_strain(m).torsions:
+            if t.severity:
+                seen[t.severity] += 1
+    assert seen["warning"] > 0 and seen["note"] > 0, seen
+    # and the quiet tier is the larger one - the point of the split is
+    # that most flags were not worth the alarm they were raising
+    assert seen["note"] > seen["warning"], seen
