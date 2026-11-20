@@ -13,7 +13,14 @@
 // so there is no staleness to reason about - a new deploy bumps CACHE and
 // the old one is dropped whole.
 
-const CACHE = "hitpicking-v1";
+// The cache name carries the build hash, written by
+// tools/build_web_core.py. This is not tidiness: a service worker that
+// keeps its name across a deploy goes on serving the previous build from
+// an origin that looks identical, and the symptom is a method that is
+// plainly in the file coming back as "no such method". It cost an hour
+// once; it is not going to be a thing anyone has to remember.
+try { self.importScripts("./build.js"); } catch (e) { /* dev tree */ }
+const CACHE = "hitpicking-" + (self.__BUILD__ || "dev");
 
 // The big, pinned runtime. Pre-cached on install so the first offline use
 // cannot find a hole; everything else is cached as it is asked for.
@@ -25,6 +32,7 @@ const CORE = [
   "./js/engine.py",
   "./ui/bridge.js",
   "./ui/panel.html",
+  "./build.js",
   "./vendor/hitpicking.zip",
   "./vendor/molstar/molstar.js",
   "./vendor/molstar/molstar.css",

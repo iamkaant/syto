@@ -59,6 +59,23 @@
   .irow { padding:4px 0; border-top:1px solid var(--line); }
   .irow:first-child { border-top:0; }
   .q { height:4px; border-radius:2px; background:var(--accent); }
+  .grades { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .grades button { padding:7px 4px; font-weight:600; }
+  .grades button i { font-style:normal; opacity:.55; font-weight:400; }
+  .g-bad { color:#e88; border-color:#5a3030; }
+  .g-maybe { color:#e3c07a; border-color:#5a4d30; }
+  .g-good { color:#8ad6a0; border-color:#2f5a3e; }
+  .grades button.on { outline:2px solid currentColor; outline-offset:-2px; }
+  .bar { height:4px; border-radius:2px; background:var(--line);
+         margin-top:7px; overflow:hidden; }
+  .bar > i { display:block; height:100%; background:var(--accent); width:0; }
+  .srow { display:flex; justify-content:space-between; gap:6px;
+          padding:3px 4px; border-radius:4px; cursor:pointer;
+          font-size:11.5px; }
+  .srow:hover { background:var(--line); }
+  .srow.on { outline:1px solid var(--accent); }
+  .srow .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .counts span { margin-right:9px; }
   #drop { position:absolute; inset:0; display:flex; align-items:center;
           justify-content:center; text-align:center; color:var(--muted);
           font-size:13px; padding:30px; pointer-events:none; }
@@ -103,6 +120,46 @@
       <label class="chk"><input type="checkbox" id="opt-clashes" checked>
         <span class="swatch" style="background:#e64646"></span>
         Clashes</label>
+    </div>
+
+    <h2>Grade</h2>
+    <div class="card">
+      <div class="grades">
+        <button class="g-bad" id="g-bad">bad <i>b</i></button>
+        <button class="g-maybe" id="g-maybe">maybe <i>m</i></button>
+        <button class="g-good" id="g-good">good <i>g</i></button>
+      </div>
+      <label class="chk tiny" style="margin-top:6px">
+        <input type="checkbox" id="opt-advance" checked>
+        Move to the next suggestion after grading</label>
+      <div id="gradestate" class="tiny muted" style="margin-top:6px"></div>
+    </div>
+
+    <h2>Model</h2>
+    <div class="card">
+      <div class="row">
+        <button id="featurise">Analyse all poses</button>
+        <button class="primary" id="train" disabled>Train</button>
+      </div>
+      <div class="bar" id="featbar" style="display:none"><i></i></div>
+      <div id="modelstate" class="tiny muted" style="margin-top:6px"></div>
+      <div class="row" style="margin-top:7px">
+        <button id="save" class="tiny">Save party</button>
+        <button id="load" class="tiny">Load&hellip;</button>
+        <input type="file" id="loadfile" accept=".json" style="display:none">
+      </div>
+    </div>
+
+    <div id="suggestbox" style="display:none">
+      <h2>Look at these next</h2>
+      <div class="card" style="padding:6px 8px">
+        <select id="strategy">
+          <option value="uncertainty">what teaches the model most</option>
+          <option value="disagreement">where it disagrees with you</option>
+          <option value="prediction">best predicted</option>
+        </select>
+        <div id="suggestions" style="margin-top:6px"></div>
+      </div>
     </div>
 
     <h2>Interactions</h2>
@@ -256,10 +313,14 @@ $("go").onclick = async () => {
       + "<br>" + p.count + " pose(s)"
       + (nmod !== p.count ? " (viewer sees " + nmod + ")" : "");
 
-    const sel = $("pose");
-    sel.innerHTML = poses.map((n, i) =>
-      '<option value="' + i + '">' + (i + 1) + ". " + esc(n) + "</option>").join("");
-    sel.onchange = () => analyse(+sel.value);
+    const restored = restoreLocal();
+    if (restored) {
+      myGrades = restored;
+      say("found grades for this file from a previous visit; they will be "
+          + "applied as the poses are analysed");
+    }
+    renderPoseOptions();
+    $("pose").onchange = () => analyse(+$("pose").value);
     $("posebox").style.display = "";
     renderToggles();
     await analyse(0);
@@ -273,6 +334,43 @@ $("go").onclick = async () => {
 
 $("prev").onclick = () => analyse(Math.max(0, current - 1));
 $("next").onclick = () => analyse(Math.min(poses.length - 1, current + 1));
+$("g-bad").onclick = () => gradePose("bad");
+$("g-maybe").onclick = () => gradePose("maybe");
+$("g-good").onclick = () => gradePose("good");
+$("featurise").onclick = featuriseAll;
+$("strategy").onchange = refreshSuggestions;
+$("save").onclick = savePartyFile;
+$("load").onclick = () => $("loadfile").click();
+$("loadfile").onchange = async () => {
+  if ($("loadfile").files[0]) await loadPartyFile($("loadfile").files[0]);
+};
+$("train").onclick = async () => {
+  $("train").disabled = true;
+  say("training&hellip;");
+  try {
+    const r = await bridge.call("train", {epochs: 100});
+    if (!r.trained) { say(esc(r.why_not), true); }
+    else {
+      say("trained on " + r.trained_on + " graded pose(s) in "
+          + r.seconds + " s");
+    }
+  } catch (e) {
+    say("training failed: " + esc(e.message), true);
+  }
+  await refreshAl();
+};
+
+// b / m / g, the hotkeys ViewDock uses, so the two front ends are graded
+// the same way. Ignored while typing in a field.
+document.addEventListener("keydown", (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target;
+  if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+  const k = {b: "bad", m: "maybe", g: "good"}[e.key];
+  if (k) { e.preventDefault(); gradePose(k); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); $("next").click(); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); $("prev").click(); }
+});
 $("opt-labels").onchange = redraw;
 $("opt-clashes").onchange = redraw;
 
@@ -290,6 +388,17 @@ async function analyse(i) {
   renderList(res);
   await redraw();
   sendPanel(baseSnapshot());
+  setGradeButtons(gradeOf(i));
+  $("gradestate").innerHTML = gradeOf(i)
+    ? "you graded this <b>" + esc(gradeOf(i)) + "</b>"
+    : (predicted[i]
+       ? "the model predicts <b>" + esc(predicted[i].grade) + "</b> ("
+         + predicted[i].score.toFixed(2) + ")"
+       : "not graded");
+  $("pose").value = String(i);
+  document.querySelectorAll("#suggestions .srow").forEach((el) => {
+    el.classList.toggle("on", +el.getAttribute("data-i") === i);
+  });
   say(esc(res.name) + " &middot; " + esc(res.summary));
 }
 
@@ -317,6 +426,180 @@ async function onAtomClick(xyz, name) {
   }
 }
 
+// ------------------------------------------------------ active learning
+//
+// The same loop the ChimeraX bundle runs: analyse the poses, grade a
+// handful, train, and be handed the ones worth looking at next. The model
+// is hitpicking.al in the zip - the same committee, the same acquisition,
+// the same features - so a party started here can be finished there.
+
+let alState = {poses: 0, graded: 0, trained: false};
+let suggestions = [], featurising = false;
+const GRADES = ["bad", "maybe", "good"];
+
+function setGradeButtons(current) {
+  GRADES.forEach((g) => {
+    const b = $("g-" + g);
+    b.classList.toggle("on", current === g);
+    b.disabled = !featurisedNow();
+  });
+}
+function featurisedNow() {
+  return alState.poses > 0 && current < alState.poses;
+}
+
+// Chunked, so a few thousand poses show progress instead of a dead tab.
+// Each chunk is one worker call; between them the page repaints and a
+// grade or a pose change still gets through.
+async function featuriseAll() {
+  if (featurising) { featurising = false; return; }
+  featurising = true;
+  $("featurise").textContent = "Stop";
+  $("featbar").style.display = "";
+  const total = poses.length;
+  const t0 = performance.now();
+  let at = alState.poses || 0;
+  try {
+    while (featurising && at < total) {
+      const r = await bridge.call("featurise",
+        {start: at, count: Math.min(16, total - at)});
+      at = r.next;
+      alState.poses = r.total_known;
+      const pct = Math.round(100 * at / total);
+      $("featbar").firstElementChild.style.width = pct + "%";
+      const rate = (performance.now() - t0) / 1000 / Math.max(1, at);
+      $("modelstate").innerHTML = at + " of " + total + " analysed &middot; "
+        + Math.round(rate * 1000) + " ms each &middot; about "
+        + Math.max(1, Math.round(rate * (total - at))) + " s left";
+      await new Promise((r2) => setTimeout(r2, 0));
+    }
+  } catch (e) {
+    say("analysing failed: " + esc(e.message), true);
+  }
+  featurising = false;
+  $("featurise").textContent = "Analyse all poses";
+  $("featbar").style.display = "none";
+  await refreshAl();
+}
+
+async function refreshAl() {
+  try { alState = await bridge.call("alStatus", {}); }
+  catch (e) { return; }
+  const g = alState.grades || {};
+  const n = alState.graded || 0;
+  $("modelstate").innerHTML =
+    (alState.poses || 0) + " pose(s) analysed &middot; " + n + " graded"
+    + (n ? "<br><span class='counts'>"
+        + "<span style='color:#e88'>bad " + (g.bad || 0) + "</span>"
+        + "<span style='color:#e3c07a'>maybe " + (g.maybe || 0) + "</span>"
+        + "<span style='color:#8ad6a0'>good " + (g.good || 0) + "</span>"
+        + "</span>" : "")
+    + (alState.can_train ? "" : "<br>" + esc(alState.why_not || ""));
+  $("train").disabled = !alState.can_train;
+  setGradeButtons(gradeOf(current));
+  if (alState.trained) await refreshSuggestions();
+  saveLocal();
+}
+
+let myGrades = {};          // index -> grade, mirrored for the UI
+function gradeOf(i) { return myGrades[i] || null; }
+
+async function gradePose(value) {
+  if (!featurisedNow()) {
+    say("analyse the poses first &mdash; the model needs the features "
+        + "before a grade means anything", true);
+    return;
+  }
+  try {
+    alState = await bridge.call("grade", {index: current, value: value});
+  } catch (e) {
+    say("could not grade: " + esc(e.message), true);
+    return;
+  }
+  myGrades[current] = value;
+  await refreshAl();
+  renderPoseOptions();
+  if ($("opt-advance").checked) await advance();
+}
+
+async function advance() {
+  for (const s of suggestions) {
+    if (s.index !== current && s.index >= 0) { await analyse(s.index); return; }
+  }
+  if (current + 1 < poses.length) await analyse(current + 1);
+}
+
+async function refreshSuggestions() {
+  let r;
+  try {
+    r = await bridge.call("predictions",
+      {strategy: $("strategy").value, count: 20});
+  } catch (e) { return; }
+  if (!r.ready) { $("suggestbox").style.display = "none"; return; }
+  suggestions = r.next || [];
+  predicted = {};
+  (r.rows || []).forEach((row) => { predicted[row.index] = row; });
+  $("suggestbox").style.display = "";
+  $("suggestions").innerHTML = suggestions.map((s) =>
+    '<div class="srow' + (s.index === current ? " on" : "")
+    + '" data-i="' + s.index + '"><span class="nm">' + esc(s.name)
+    + '</span><span class="muted">' + s.grade.slice(0, 1)
+    + " \u00b7 " + s.uncertainty.toFixed(3) + "</span></div>").join("")
+    || '<p class="tiny muted">nothing left to suggest</p>';
+  $("suggestions").querySelectorAll(".srow").forEach((el) => {
+    el.onclick = () => analyse(+el.getAttribute("data-i"));
+  });
+  renderPoseOptions();
+}
+
+let predicted = {};         // index -> {grade, score, uncertainty}
+
+// ------------------------------------------------------- party on disk
+function saveLocal() {
+  try {
+    localStorage.setItem("hitpicking.grades", JSON.stringify(
+      {file: files.lig ? files.lig.name : null, grades: myGrades}));
+  } catch (e) { /* private window, or full: not worth failing over */ }
+}
+function restoreLocal() {
+  try {
+    const raw = localStorage.getItem("hitpicking.grades");
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!files.lig || d.file !== files.lig.name) return null;
+    return d.grades || null;
+  } catch (e) { return null; }
+}
+
+async function savePartyFile() {
+  try {
+    const st = await bridge.call("saveParty", {});
+    const blob = new Blob([JSON.stringify(st)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "party.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } catch (e) {
+    say("nothing to save yet: " + esc(e.message), true);
+  }
+}
+
+async function loadPartyFile(file) {
+  try {
+    const r = await bridge.call("loadParty", {text: await file.text()});
+    myGrades = {};
+    say("restored " + r.restored + " grade(s)"
+        + (r.unmatched ? " \u00b7 " + r.unmatched
+           + " did not match a pose in this file" : ""),
+        !!r.unmatched);
+    await refreshAl();
+    renderPoseOptions();
+  } catch (e) {
+    say("could not load that party: " + esc(e.message), true);
+  }
+}
+
 // ------------------------------------------------------------ rendering
 function renderToggles() {
   const on = new Set(enabled || (lastResult ? Object.keys(lastResult.counts) : []));
@@ -339,6 +622,22 @@ function syncToggles() {
   $("toggles").querySelectorAll("input[data-kind]").forEach((b) => {
     b.checked = on.has(b.getAttribute("data-kind"));
   });
+}
+
+// The list has to show what you said and what the model thinks, or it is
+// just a list of names - which is unusable past a few dozen poses.
+function renderPoseOptions() {
+  const sel = $("pose");
+  const at = sel.value;
+  sel.innerHTML = poses.map((n, i) => {
+    const mine = gradeOf(i);
+    const p = predicted[i];
+    const mark = mine ? "[" + mine[0] + "] " : (p ? p.grade[0] + "  " : "   ");
+    const sc = p ? "  " + p.score.toFixed(2) : "";
+    return '<option value="' + i + '">' + mark + (i + 1) + ". "
+      + esc(n) + sc + "</option>";
+  }).join("");
+  sel.value = at || String(current);
 }
 
 function renderPose(r) {
@@ -385,7 +684,12 @@ window.HP = {
   explainAt: (xyz) => onAtomClick(xyz, "external"),
   viewer: () => viewer,
   state: () => ({poses: poses, current: current, result: lastResult,
-                 enabled: enabled})
+                 enabled: enabled, al: alState, grades: myGrades,
+                 suggestions: suggestions}),
+  featuriseAll: featuriseAll,
+  grade: (v) => gradePose(v),
+  train: () => $("train").click(),
+  refreshAl: refreshAl
 };
 
 // --------------------------------------------------------------- start

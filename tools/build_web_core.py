@@ -78,11 +78,19 @@ def main():
             shutil.copy2(panel, os.path.join(UI_DST, "panel.html"))
             n_ui += 1
 
+    # The service worker names its cache after this, so a deploy drops the
+    # previous one whole instead of serving it forever. See web/sw.js.
+    stamp = os.path.join(os.path.dirname(OUT), "..", "build.js")
+    stamp = os.path.normpath(stamp)
+    with open(stamp, "w", encoding="utf-8") as fh:
+        fh.write('self.__BUILD__ = "%s";\n' % digest.hexdigest())
+
     size = os.path.getsize(OUT)
     print("%s: %d files, %.1f KB, core hash %s"
           % (os.path.relpath(OUT, ROOT), len(files), size / 1024.0,
              digest.hexdigest()))
     print("web/ui: %d shared panel file(s)" % n_ui)
+    print("web/build.js: cache stamp %s" % digest.hexdigest())
     return 0
 
 

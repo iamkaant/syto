@@ -112,6 +112,12 @@ easier to believe when the arithmetic is the same build.
 hosts and compares every interaction term for term, plus the handbook
 answer for several atoms.
 
+`tools/check_web_al.py` runs a whole party in a browser: featurise,
+grade ten poses across all three grades, grade one more by hotkey, train,
+check the suggestions exclude what you already graded, then save the
+party and load it back - including a party from a different file, which
+must be reported rather than applied to whatever is at that index.
+
 `tools/check_web_viewer.py` drives this page in a real browser: feeds it
 the files, waits for the analysis, and asserts that every endpoint the
 core produced was matched to an atom in the viewer, that all the lines
@@ -121,12 +127,40 @@ switching pose redraws instead of accumulating.
 
 Both run in `tools/run_all_tests.sh`.
 
+## Running a party
+
+Analyse all poses, grade with **b** / **m** / **g** (ViewDock's keys, so
+both front ends are graded the same way), train, and the page hands you
+the ones worth looking at next. It is `hitpicking.al` in the tab - the
+same committee, the same acquisition, the same features as ChimeraX - so
+a party started here can be saved and finished there.
+
+Featurising is the slow step and the one that decides whether this can
+host a party rather than only review one. Measured with
+`tools/bench_web_al.py` on a real receptor:
+
+| | native Python | Pyodide |
+|---|---|---|
+| per pose | 0.063 s | 0.144 s |
+| 500 poses | 31 s | 72 s |
+| 2000 poses | 2.1 min | 4.8 min |
+
+2.3x slower, and 99% of it is the interaction and strain analysis rather
+than building the vector - so a pose you have already looked at is
+effectively already featurised. It runs in chunks with a progress bar,
+and the model trains on whatever is done, so the first useful ranking is
+seconds away rather than minutes.
+
+Grades are kept in `localStorage` against the pose file's name, so a
+reload does not lose the afternoon. **Save party** writes the same JSON
+`hitpick learn save` writes.
+
 ## Not done yet
 
-- **No active learning.** The core supports it; this page has no grading
-  UI. The ChimeraX bundle is where a party is run today.
 - No torsion list or strain panel in the web page; the data is there
   (`analyse` returns it) and the 3D view does not yet show it.
+- No ViewDock-style sortable table. The pose list carries your grade and
+  the predicted score, but a few thousand poses want filtering.
 - Pyodide boot is ~2 s and Mol* adds 5.3 MB. Acceptable, not optimised.
 - The pose list is flat. A few thousand poses want sorting and filtering,
   which is what ViewDock gives the other front end.

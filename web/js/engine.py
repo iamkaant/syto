@@ -229,9 +229,10 @@ def featurise(start=0, count=1, strain=True):
         a0 = time.perf_counter()
         res = ctx.analyze(poses[i], options=opts, name=name)
         t_analyse += time.perf_counter() - a0
-        key = "%d|%s" % (i, name)
+        key = _key(i, name)
         lr.add_features(key, pose_features(res, terms=lr.score_terms),
                         res.scores)
+        _STATE.setdefault("keys", {})[i] = key
         done += 1
     total = time.perf_counter() - t0
 
@@ -244,6 +245,143 @@ def featurise(start=0, count=1, strain=True):
         "per_pose": round(total / done, 4) if done else None,
         "analyse_share": round(t_analyse / total, 3) if total else None,
     })
+
+
+def _key(i, name=None):
+    """A pose's identity for the learner.
+
+    The index alone would not survive a saved party being reloaded
+    against a re-ordered file, and the name alone is not unique - a mol2
+    can hold the same compound in several poses. Both, so a grade given
+    today still means something tomorrow.
+    """
+    if name is None:
+        poses = _STATE["poses"]
+        name = _pose_name(poses[i], i) if 0 <= i < len(poses) else "?"
+    return "%d|%s" % (int(i), name)
+
+
+def _index_of(key):
+    for i, k in (_STATE.get("keys") or {}).items():
+        if k == key:
+            return int(i)
+    head = str(key).split("|", 1)[0]
+    return int(head) if head.isdigit() else -1
+
+
+def grade(index, value):
+    """Record one human judgement. `value` is bad / maybe / good, or None."""
+    lr = _learner()
+    key = (_STATE.get("keys") or {}).get(int(index))
+    if key is None:
+        raise RuntimeError("pose %s has not been featurised yet" % index)
+    lr.grade(key, value if value else None)
+    return al_status()
+
+
+def train(epochs=100, batch_size=None, patience=20):
+    import time
+    lr = _learner()
+    ok, why = lr.can_train()
+    if not ok:
+        return _json({"trained": False, "why_not": why})
+    t0 = time.perf_counter()
+    lr.train(epochs=int(epochs),
+             batch_size=int(batch_size) if batch_size else lr.DEFAULT_BATCH,
+             patience=int(patience))
+    secs = time.perf_counter() - t0
+    d = json.loads(al_status())
+    d["trained"] = True
+    d["seconds"] = round(secs, 2)
+    d["trained_on"] = lr.trained_on
+    d["block_variance"] = {k: round(v, 3)
+                           for k, v in lr.block_variance().items()}
+    return _json(d)
+
+
+def predictions(strategy="uncertainty", count=25):
+    """Every featurised pose, scored, plus what to look at next.
+
+    `rows` is the whole set so the pose list can be sorted by it -  a 25
+    row panel is the wrong shape for picking from a few thousand poses,
+    which is the lesson the ChimeraX side already learned.
+    """
+    lr = _STATE.get("learner")
+    if lr is None or lr.committee is None:
+        return _json({"ready": False,
+                      "why_not": "the model has not been trained yet"})
+    from hitpicking.al import DISAGREEMENT, PREDICTION, UNCERTAINTY
+    strat = {"uncertainty": UNCERTAINTY, "disagreement": DISAGREEMENT,
+             "prediction": PREDICTION}.get(str(strategy), UNCERTAINTY)
+
+    preds = lr.predict()
+    rows = []
+    for key, p in preds.items():
+        i = _index_of(key)
+        rows.append({"index": i, "key": key, "name": key.split("|", 1)[-1],
+                     "grade": p["grade"], "score": round(p["score"], 3),
+                     "uncertainty": round(p["uncertainty"], 4),
+                     "error": p["error"],
+                     "yours": lr.grades.label(key)})
+    rows.sort(key=lambda r: -r["score"])
+
+    ranked = lr.rank_poses(strategy=strat,
+                           exclude_graded=(strat != DISAGREEMENT))
+    nxt = []
+    for key, p in ranked[:int(count)]:
+        nxt.append({"index": _index_of(key), "name": key.split("|", 1)[-1],
+                    "grade": p["grade"], "score": round(p["score"], 3),
+                    "uncertainty": round(p["uncertainty"], 4),
+                    "yours": lr.grades.label(key), "error": p["error"]})
+    return _json({"ready": True, "strategy": strategy,
+                  "rows": rows, "next": nxt})
+
+
+def save_party():
+    """The grades and the model, as JSON the page can hand to the user.
+
+    Feature vectors are deliberately not in here: they are reproducible
+    from the files in seconds and would make the download enormous. This
+    is the same thing `hitpick learn save` writes, so a party started in
+    the browser can be finished in ChimeraX.
+    """
+    lr = _STATE.get("learner")
+    if lr is None:
+        raise RuntimeError("nothing to save yet")
+    st = lr.state()
+    st["poses"] = {str(i): k for i, k in (_STATE.get("keys") or {}).items()}
+    st["receptor"] = _STATE.get("receptor")
+    return _json(st)
+
+
+def load_party(text):
+    """Grades and model back in, matched to the poses now loaded.
+
+    The grades are keyed on index-and-name, so a grade is only restored
+    to a pose that is still the same pose. Anything that does not match
+    is reported rather than quietly dropped - a party that loses half its
+    opinions in silence is worse than one that refuses to load.
+    """
+    from hitpicking.al import Learner
+    data = json.loads(text) if isinstance(text, str) else dict(text)
+    lr = Learner.from_state(data)
+    _STATE["learner"] = lr
+
+    have = {}
+    poses = _STATE["poses"]
+    for i in range(len(poses)):
+        have[_key(i)] = i
+    matched, orphan = 0, []
+    for key in list(lr.grades.keys()):
+        if key in have:
+            matched += 1
+        else:
+            orphan.append(key)
+    d = json.loads(al_status())
+    d["restored"] = matched
+    d["unmatched"] = len(orphan)
+    d["unmatched_names"] = [k.split("|", 1)[-1] for k in orphan[:8]]
+    return _json(d)
 
 
 def al_status():

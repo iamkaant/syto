@@ -86,6 +86,17 @@ const METHODS = {
                                  a.strain !== false));
   },
   async alStatus() { return toJs(engine.al_status()); },
+  async grade(a) { return toJs(engine.grade(a.index, a.value || null)); },
+  async train(a) {
+    return toJs(engine.train(a.epochs || 100, a.batch || null,
+                             a.patience || 20));
+  },
+  async predictions(a) {
+    return toJs(engine.predictions(a.strategy || "uncertainty",
+                                   a.count || 25));
+  },
+  async saveParty() { return toJs(engine.save_party()); },
+  async loadParty(a) { return toJs(engine.load_party(a.text)); },
   async explainAt(a) {
     return toJs(engine.explain_at(a.x, a.y, a.z, a.tolerance || 0.05));
   },

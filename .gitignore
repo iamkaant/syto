@@ -32,3 +32,4 @@ web/vendor/hitpicking.zip
 
 # headless-browser profiles from the test harnesses
 .chrome-*/
+web/build.js

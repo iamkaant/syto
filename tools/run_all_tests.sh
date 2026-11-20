@@ -47,6 +47,12 @@ echo "$wv" | tail -6
 echo "$wv" | grep -qE "WEB VIEWER OK|skipping the web viewer check" || fail=1
 
 echo
+echo "=== the grading loop, in a browser ==="
+wal="$("$PY" "$ROOT/tools/check_web_al.py" 2>&1)"
+echo "$wal" | tail -6
+echo "$wal" | grep -qE "WEB AL OK|skipping" || fail=1
+
+echo
 echo "=== panel JavaScript (executed, not just parsed) ==="
 pjs="$("$PY" "$ROOT/tools/check_panel_js.py" 2>&1)"
 echo "$pjs" | tail -4
