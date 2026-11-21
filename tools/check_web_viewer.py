@@ -136,6 +136,25 @@ async function until(fn, ms, what) {
     out.gradeHint = d.getElementById("gradestate").textContent
       .replace(/\s+/g, " ").trim();
     out.gradeEnabled = !d.getElementById("g-good").disabled;
+    // Resizing: drag the left gutter 90px and see the column follow,
+    // then survive a re-read of the stored preferences.
+    try {
+      var g = d.getElementById("gut-l");
+      var before = d.getElementById("gut-l").getBoundingClientRect().left;
+      var opts = {bubbles: true, clientX: before + 4, pointerId: 1,
+                  pointerType: "mouse", isPrimary: true};
+      g.setPointerCapture = function () {}; g.releasePointerCapture = function () {};
+      g.dispatchEvent(new w.PointerEvent("pointerdown", opts));
+      opts.clientX = before + 94;
+      g.dispatchEvent(new w.PointerEvent("pointermove", opts));
+      g.dispatchEvent(new w.PointerEvent("pointerup", opts));
+      await sleep(250);
+      out.leftAfterDrag = parseFloat(w.getComputedStyle(
+        d.documentElement).getPropertyValue("--left"));
+      var stored = JSON.parse(w.localStorage.getItem("hitpicking.view") || "{}");
+      out.leftStored = stored.left;
+      out.gutters = d.querySelectorAll(".gutter").length;
+    } catch (e) { out.dragErr = String(e); }
     out.ribbonDefault = d.getElementById("opt-ribbon").checked;
     out.stickSize = V.siteSize;
 
@@ -306,6 +325,15 @@ def main():
                  "  ERROR: " + c["err"] if c["err"] else ""))
     check(not got.get("stateErrors"),
           "no state node failed: %s" % got.get("stateErrors"), f)
+    if got.get("dragErr"):
+        print("   drag error: %s" % got["dragErr"])
+    check(got.get("gutters") == 2,
+          "both columns have a drag handle (%s)" % got.get("gutters"), f)
+    check(got.get("leftAfterDrag") and abs(got["leftAfterDrag"] - 380) < 3,
+          "dragging the left gutter 90px widened the column to %s (from 290)"
+          % got.get("leftAfterDrag"), f)
+    check(got.get("leftStored") and abs(got["leftStored"] - 380) < 3,
+          "and the width was remembered (%s)" % got.get("leftStored"), f)
     check(got.get("ribbonDefault") is False,
           "the protein ribbon starts hidden, so the pocket is not buried "
           "in it", f)
