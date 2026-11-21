@@ -3,7 +3,21 @@
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CX="${CHIMERAX_APP:-/Applications/ChimeraX-1.12.app}/Contents/bin/ChimeraX"
-PY="${HITPICK_PYTHON:-/Users/ak87/miniforge3/envs/admet_ai/bin/python}"
+# The Python that runs the core tests and the browser harnesses; it
+# needs numpy. $HITPICK_PYTHON wins, then the usual conda environment,
+# then whatever python3 is on PATH. It used to be one laptop's
+# absolute path, which is why the suite only ever ran on one machine.
+PY="${HITPICK_PYTHON:-}"
+if [ -z "$PY" ] && [ -x "$HOME/miniforge3/envs/admet_ai/bin/python" ]; then
+  PY="$HOME/miniforge3/envs/admet_ai/bin/python"
+fi
+if [ -z "$PY" ]; then
+  PY=$(command -v python3)
+fi
+if [ -z "$PY" ]; then
+  echo "no python found; set HITPICK_PYTHON"
+  exit 1
+fi
 fail=0
 
 # Install FIRST. The ChimeraX scripts import the INSTALLED bundle, so without

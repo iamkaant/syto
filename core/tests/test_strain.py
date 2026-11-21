@@ -12,7 +12,9 @@ from hitpicking.molsys import (MolSystem, HYB_SP2, HYB_SP3,  # noqa: E402
                                PART_LIGAND, PART_RECEPTOR)
 from hitpicking import strain as S  # noqa: E402
 
-AUTOPARTY = "/Users/ak87/ownCloud/owncloud/Calculations/TMP/AutoParty"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "tools"))
+from samples import AUTOPARTY  # noqa: E402
 REC = os.path.join(AUTOPARTY, "autoparty/inputs/rec.crg.pdb")
 LIG = os.path.join(AUTOPARTY, "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2")
 needs_data = pytest.mark.skipif(not os.path.exists(REC), reason="no sample data")
@@ -435,8 +437,7 @@ def test_the_severity_reaches_the_finding_and_the_counts():
 
 def test_the_split_is_not_vacuous_on_real_poses():
     """Both tiers must actually occur, or the threshold is decorative."""
-    path = ("/Users/ak87/ownCloud/owncloud/Calculations/TMP/AutoParty/"
-            "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2")
+    from samples import POSES as path
     if not os.path.exists(path):
         pytest.skip("the sample mol2 is not on this machine")
     from hitpicking.io.mol2 import read_mol2

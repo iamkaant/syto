@@ -7,6 +7,7 @@ measured angle, those atoms have to be visible rather than implicit.
 
 Run:  ChimeraX --nogui --silent --exit --script chimerax/tests_torsion_click.py
 """
+import os
 import sys
 
 from chimerax.core.commands import run
@@ -21,7 +22,14 @@ def check(cond, msg):
         failures.append(msg)
 
 
-A = "/Users/ak87/ownCloud/owncloud/Calculations/TMP/AutoParty/"
+# The sample data is not in this repository and its location is not this
+# laptop's home directory. tools/samples.py resolves it; a test that
+# cannot find it skips.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "tools"))
+from samples import AUTOPARTY          # noqa: E402
+
+A = AUTOPARTY + "/"
 import os
 if not os.path.exists(A + "autoparty/inputs/rec.crg.pdb"):
     print("sample data unavailable; skipping")

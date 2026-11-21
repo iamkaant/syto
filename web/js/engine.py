@@ -448,7 +448,48 @@ def scene(index=None):
             })
 
     return _json({"name": res.name, "lines": lines, "clashes": clashes,
-                  "n_receptor": int(res.n_receptor)})
+                  "n_receptor": int(res.n_receptor),
+                  "site": site_atoms(res)})
+
+
+# How close a receptor atom has to be to the ligand to be worth drawing.
+# 4.5 A is the usual "lining the pocket" cut: it takes the residues an
+# interaction could plausibly come from without dragging in the second
+# shell, which turns a pocket into a hairball.
+SITE_RADIUS = 4.5
+
+
+def site_atoms(res):
+    """Receptor atoms lining the pocket, as coordinates.
+
+    Chosen here rather than in the viewer for the same reason the
+    interaction lines are: the browser's reader numbers atoms its own
+    way, and anything decided there is something that can disagree with
+    ChimeraX. The page turns these into whole residues and draws them.
+    """
+    import numpy as np
+    ms = res.combined
+    n_rec = int(res.n_receptor)
+    if ms is None or n_rec <= 0 or n_rec >= ms.n_atoms:
+        return []
+    lig = ms.xyz[n_rec:]
+    rec = ms.xyz[:n_rec]
+    heavy = ms.element[n_rec:] != "H"
+    if heavy.any():
+        lig = lig[heavy]
+    # one pass, chunked: a 2800-atom receptor against 40 ligand atoms is
+    # small, but a big site would otherwise allocate n_rec x n_lig
+    near = np.zeros(n_rec, dtype=bool)
+    r2 = SITE_RADIUS * SITE_RADIUS
+    for k in range(0, len(lig), 32):
+        d = rec[:, None, :] - lig[None, k:k + 32, :]
+        near |= (d * d).sum(axis=2).min(axis=1) <= r2
+    out = []
+    for i in np.flatnonzero(near):
+        v = ms.xyz[int(i)]
+        out.append([round(float(v[0]), 3), round(float(v[1]), 3),
+                    round(float(v[2]), 3)])
+    return out
 
 
 # ------------------------------------------------------------------ click

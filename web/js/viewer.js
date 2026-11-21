@@ -100,6 +100,7 @@
     await p.builders.structure.representation.applyPreset(struct, "auto");
     this.pose = struct;
     this._index = null;
+    this.siteLoci = null;
     return struct.data.elementCount;
   };
 
@@ -184,6 +185,84 @@
     return SE.Loci(hit.structure,
                    [{unit: hit.unit, indices: [hit.offset]}]);
   }
+
+  // ------------------------------------------------------- binding site
+  //
+  // The residues lining the pocket, as sticks. Which atoms those are is
+  // decided by the core (engine.site_atoms) and arrives as coordinates,
+  // for the same reason the interaction endpoints do: the viewer's reader
+  // numbers atoms its own way and anything decided here could disagree
+  // with ChimeraX. The page turns them into whole residues - half an
+  // arginine is not a thing anyone wants to look at.
+
+  Viewer.prototype.clearSite = async function () {
+    if (!this.site) return;
+    try { await this.plugin.build().delete(this.site).commit(); }
+    catch (e) { /* already gone */ }
+    this.site = null;
+  };
+
+  Viewer.prototype.showSite = async function (coords) {
+    await this.clearSite();
+    if (!coords || !coords.length || !this.receptor) return 0;
+    if (!this._index) this._buildIndex();
+
+    var SE = global.molstar.lib.structure.StructureElement;
+    var byUnit = new Map();
+    var found = 0;
+    for (var i = 0; i < coords.length; i++) {
+      var hit = this.atomAt(coords[i]);
+      if (!hit || hit.structure !== this.receptor.data) continue;
+      if (!byUnit.has(hit.unit)) byUnit.set(hit.unit, []);
+      byUnit.get(hit.unit).push(hit.offset);
+      found++;
+    }
+    if (!found) return 0;
+
+    var elements = [];
+    byUnit.forEach(function (offsets, unit) {
+      offsets.sort(function (a, b) { return a - b; });
+      elements.push({unit: unit, indices: offsets});
+    });
+    var loci = SE.Loci(this.receptor.data, elements);
+    try { loci = SE.Loci.extendToWholeResidues(loci); } catch (e) { /* as-is */ }
+    this.siteLoci = loci;
+
+    var ST = global.molstar.lib.plugin.StateTransforms;
+    var bundle = SE.Bundle.fromLoci(loci);
+    var update = this.plugin.build().to(this.receptor)
+      .apply(ST.Model.StructureSelectionFromBundle,
+             {bundle: bundle, label: "binding site"})
+      .apply(ST.Representation.StructureRepresentation3D, {
+        type: {name: "ball-and-stick",
+               params: {sizeFactor: 0.22, aromaticBonds: false}},
+        colorTheme: {name: "element-symbol",
+                     params: {carbonColor: {name: "element-symbol",
+                                            params: {}}}},
+        sizeTheme: {name: "physical", params: {}}
+      });
+    await update.commit();
+    this.site = update.selector ? update.selector.ref : null;
+    if (!this.site) {
+      // find it back by label so a later clear still works
+      this.site = null;
+    }
+    return found;
+  };
+
+  // Frame the pocket, not the whole protein. Opening on a 2800-atom
+  // cartoon and making the user hunt for the ligand is the single most
+  // annoying thing a viewer can do.
+  Viewer.prototype.focusSite = function () {
+    var loci = this.siteLoci;
+    if (!loci && this.pose) {
+      loci = global.molstar.lib.structure.Structure.Loci(this.pose.data);
+    }
+    if (!loci) return;
+    try {
+      this.plugin.managers.camera.focusLoci(loci, {durationMs: 0});
+    } catch (e) { /* no camera yet */ }
+  };
 
   // ------------------------------------------------------------- lines
 

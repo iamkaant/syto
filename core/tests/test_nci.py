@@ -15,7 +15,9 @@ from hitpicking.nci import criteria as C  # noqa: E402
 from hitpicking.nci.detect import (detect_interactions, distance_score,  # noqa: E402
                                    angle_score)
 
-AUTOPARTY = "/Users/ak87/ownCloud/owncloud/Calculations/TMP/AutoParty"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "tools"))
+from samples import AUTOPARTY  # noqa: E402
 REC = os.path.join(AUTOPARTY, "autoparty/inputs/rec.crg.pdb")
 LIG = os.path.join(AUTOPARTY, "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2")
 

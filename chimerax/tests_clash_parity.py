@@ -18,7 +18,14 @@ import sys
 
 from chimerax.core.commands import run
 
-A = "/Users/ak87/ownCloud/owncloud/Calculations/TMP/AutoParty/"
+# The sample data is not in this repository and its location is not this
+# laptop's home directory. tools/samples.py resolves it; a test that
+# cannot find it skips.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "tools"))
+from samples import AUTOPARTY          # noqa: E402
+
+A = AUTOPARTY + "/"
 REC = A + "autoparty/inputs/rec.crg.pdb"
 HERE = os.path.dirname(os.path.abspath(__file__))
 POSES = os.path.join(HERE, "..", "..", "poses3.mol2")

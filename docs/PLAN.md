@@ -61,7 +61,7 @@ HitPickingTool/
 ```
 
 Critical files to create first: `core/hitpicking/molsys.py`, `core/hitpicking/perceive/matcher.py`, `ui/bridge.js`, `chimerax/src/tool.py`.
-Reference for the AL port: `/Users/ak87/ownCloud/owncloud/Calculations/TMP/AutoParty/app/base/models.py` (`BaseModel`, `EnsembleModel`, `FingerprintDataset`) and the training loop in `app/base/tasks.py::task_train_model`.
+Reference for the AL port: `../AutoParty/app/base/models.py` (`BaseModel`, `EnsembleModel`, `FingerprintDataset`) and the training loop in `app/base/tasks.py::task_train_model`.
 
 ---
 

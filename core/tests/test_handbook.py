@@ -9,7 +9,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from hitpicking.handbook import Handbook  # noqa: E402
 from hitpicking.perceive.features import MOIETY_IDS  # noqa: E402
 
-AUTOPARTY = "/Users/ak87/ownCloud/owncloud/Calculations/TMP/AutoParty"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "tools"))
+from samples import AUTOPARTY  # noqa: E402
 LIG_MOL2 = os.path.join(AUTOPARTY,
                         "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2")
 

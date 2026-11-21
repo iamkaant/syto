@@ -7,6 +7,7 @@ salt bridge. Reported on ZINCmn0000027Q3g, whose ring nitrogen is neutral.
 
 Run:  ChimeraX --nogui --silent --exit --script chimerax/tests_formal_charge.py
 """
+import os
 import sys
 
 from chimerax.core.commands import run
@@ -64,9 +65,10 @@ check([x for x in perceive_all(ms)["charged"] if x.kind == "cation"],
 run(session, "close #%s" % m.id_string)
 
 print("\n[3] the reported ligand: one charge, on the right nitrogen")
-CXS = ("/Users/ak87/ownCloud/owncloud/Calculations/TMP/HitPickingTool/"
-       "charge_plus1_H20_H25-SV.cxs")
-import os
+# A saved session kept beside the repository rather than in it: it is
+# research data, not source. Absent from a fresh clone, and skipped then.
+CXS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
+                   "charge_plus1_H20_H25-SV.cxs")
 if not os.path.exists(CXS):
     print("    session file unavailable; skipping")
 else:

@@ -26,8 +26,9 @@ from hitpicking.al.features import (SCORE_SLICE, TOTAL_BITS,  # noqa: E402
                                     descriptors, score_block)
 
 HERE = os.path.dirname(__file__)
-SAMPLE = ("/Users/ak87/ownCloud/owncloud/Calculations/TMP/AutoParty/"
-          "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "tools"))
+from samples import POSES as SAMPLE  # noqa: E402
 
 
 def dock_samples(n=40):

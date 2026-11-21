@@ -112,6 +112,11 @@ async function until(fn, ms, what) {
     out.sceneLines = scene.lines.length;
     out.sceneClashes = scene.clashes.length;
     out.kinds = scene.lines.map(function (l) { return l.kind; });
+    out.siteAtoms = (scene.site || []).length;
+    out.siteDrawn = !!V.site;
+    out.siteFocused = !!V.siteLoci;
+    out.gradeHint = d.getElementById("gradestate").textContent
+      .replace(/\s+/g, " ").trim();
 
     // --- the click path, end to end --------------------------------
     if (scene.lines.length) {
@@ -266,6 +271,17 @@ def main():
           "(%d unplaced)" % got["missed"], f)
     check(got["drawn"] == want,
           "and all %d line(s) were drawn (%d)" % (want, got["drawn"]), f)
+    # The pocket as sticks, framed from the start.
+    check(got["siteAtoms"] > 20,
+          "the core picked %d pocket atom(s) to draw" % got["siteAtoms"], f)
+    check(got["siteDrawn"],
+          "and the viewer made them into a component", f)
+    check(got["siteFocused"],
+          "with a loci to frame, so the view opens on the pocket rather "
+          "than on 2800 atoms of cartoon", f)
+    check("Analyse all poses" in (got.get("gradeHint") or ""),
+          "grading says what it needs rather than just being disabled: %r"
+          % (got.get("gradeHint") or "")[:80], f)
     check(got["rows"] == got["sceneLines"] or got["rows"] > 0,
           "the list beside the view has %d row(s)" % got["rows"], f)
     check(got["toggles"] >= 8,

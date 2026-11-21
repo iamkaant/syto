@@ -65,24 +65,55 @@ self.addEventListener("activate", (e) => {
   })());
 });
 
+// Two strategies, and the split matters more than it looks.
+//
+// vendor/ is pinned: Pyodide 314.0.8, numpy 2.4.6, Mol* 5.13.1. Those
+// bytes never change under a given URL, they are 22 MB, and they are the
+// whole reason for caching. Cache-first.
+//
+// Everything else is OUR code, and it changes whenever the tool does.
+// Cache-first on that was a real defect, not a tuning choice: it served
+// an old index.html against a newer worker.js, so the page threw on an
+// element the new script expected and the old markup did not have. The
+// cache name could not save it either - it was derived from the core
+// zip, which does not change when index.html does. Network-first here,
+// falling back to the cache, so being online always means being current
+// and being offline still works.
+function isPinned(url) {
+  return url.pathname.includes("/vendor/");
+}
+
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
-  e.respondWith((async () => {
-    const hit = await caches.match(e.request, {ignoreSearch: false});
-    if (hit) return hit;
-    try {
+
+  if (isPinned(url)) {
+    e.respondWith((async () => {
+      const hit = await caches.match(e.request);
+      if (hit) return hit;
       const res = await fetch(e.request);
       if (res && res.ok && res.type === "basic") {
-        const c = await caches.open(CACHE);
-        c.put(e.request, res.clone());
+        (await caches.open(CACHE)).put(e.request, res.clone());
+      }
+      return res;
+    })());
+    return;
+  }
+
+  e.respondWith((async () => {
+    try {
+      const res = await fetch(e.request, {cache: "no-store"});
+      if (res && res.ok && res.type === "basic") {
+        (await caches.open(CACHE)).put(e.request, res.clone());
       }
       return res;
     } catch (err) {
-      // Offline and not cached: let the page report it rather than
-      // showing the browser's own error, which says nothing useful.
-      const fallback = await caches.match("./index.html");
-      if (fallback && e.request.mode === "navigate") return fallback;
+      const hit = await caches.match(e.request);
+      if (hit) return hit;
+      if (e.request.mode === "navigate") {
+        const page = await caches.match("./index.html");
+        if (page) return page;
+      }
       throw err;
     }
   })());

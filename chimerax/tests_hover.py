@@ -6,6 +6,7 @@ against its limits, a clash's overlap, a bond's torsion.
 
 Run:  ChimeraX --nogui --silent --exit --script chimerax/tests_hover.py
 """
+import os
 import sys
 
 failures = []
@@ -20,7 +21,14 @@ import re, sys
 from chimerax.core.commands import run
 from chimerax.atomic import AtomicStructure, PseudobondGroup
 
-A = "/Users/ak87/ownCloud/owncloud/Calculations/TMP/AutoParty/"
+# The sample data is not in this repository and its location is not this
+# laptop's home directory. tools/samples.py resolves it; a test that
+# cannot find it skips.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "tools"))
+from samples import AUTOPARTY          # noqa: E402
+
+A = AUTOPARTY + "/"
 run(session, "open %s" % (A + "autoparty/inputs/rec.crg.pdb"))
 run(session, "open %s format mol2 showTool false"
     % (A + "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2"))

@@ -78,19 +78,37 @@ def main():
             shutil.copy2(panel, os.path.join(UI_DST, "panel.html"))
             n_ui += 1
 
-    # The service worker names its cache after this, so a deploy drops the
-    # previous one whole instead of serving it forever. See web/sw.js.
-    stamp = os.path.join(os.path.dirname(OUT), "..", "build.js")
-    stamp = os.path.normpath(stamp)
+    # The service worker names its cache after this. It used to be the
+    # core hash alone, which meant editing index.html left the name
+    # unchanged and the old page was served forever - against newer
+    # worker code, so the page threw on markup it did not have. The stamp
+    # now covers every file the page loads.
+    webdir = os.path.normpath(os.path.join(os.path.dirname(OUT), ".."))
+    stampd = hashlib.blake2b(digest.digest(), digest_size=8)
+    served = []
+    for base, dirs, names in os.walk(webdir):
+        dirs[:] = [d for d in dirs
+                   if d not in ("vendor", "__pycache__") and not d.startswith(".")]
+        for n in sorted(names):
+            if n in ("build.js",) or n.startswith("__"):
+                continue
+            served.append(os.path.join(base, n))
+    for f in sorted(served):
+        stampd.update(os.path.relpath(f, webdir).encode("utf-8"))
+        with open(f, "rb") as fh:
+            stampd.update(fh.read())
+
+    stamp = os.path.join(webdir, "build.js")
     with open(stamp, "w", encoding="utf-8") as fh:
-        fh.write('self.__BUILD__ = "%s";\n' % digest.hexdigest())
+        fh.write('self.__BUILD__ = "%s";\n' % stampd.hexdigest())
 
     size = os.path.getsize(OUT)
     print("%s: %d files, %.1f KB, core hash %s"
           % (os.path.relpath(OUT, ROOT), len(files), size / 1024.0,
              digest.hexdigest()))
     print("web/ui: %d shared panel file(s)" % n_ui)
-    print("web/build.js: cache stamp %s" % digest.hexdigest())
+    print("web/build.js: cache stamp %s (covers every served file)"
+          % stampd.hexdigest())
     return 0
 
 

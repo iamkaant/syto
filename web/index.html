@@ -120,6 +120,8 @@
       <label class="chk"><input type="checkbox" id="opt-clashes" checked>
         <span class="swatch" style="background:#e64646"></span>
         Clashes</label>
+      <label class="chk"><input type="checkbox" id="opt-site" checked>
+        Pocket residues as sticks</label>
     </div>
 
     <h2>Grade</h2>
@@ -324,7 +326,7 @@ $("go").onclick = async () => {
     $("posebox").style.display = "";
     renderToggles();
     await analyse(0);
-    viewer.focusPose();
+    viewer.focusSite();
   } catch (e) {
     say("failed: " + esc(e.message), true);
   } finally {
@@ -373,6 +375,7 @@ document.addEventListener("keydown", (e) => {
 });
 $("opt-labels").onchange = redraw;
 $("opt-clashes").onchange = redraw;
+$("opt-site").onchange = redraw;
 
 // ------------------------------------------------------------ analysing
 async function analyse(i) {
@@ -389,12 +392,7 @@ async function analyse(i) {
   await redraw();
   sendPanel(baseSnapshot());
   setGradeButtons(gradeOf(i));
-  $("gradestate").innerHTML = gradeOf(i)
-    ? "you graded this <b>" + esc(gradeOf(i)) + "</b>"
-    : (predicted[i]
-       ? "the model predicts <b>" + esc(predicted[i].grade) + "</b> ("
-         + predicted[i].score.toFixed(2) + ")"
-       : "not graded");
+  $("gradestate").innerHTML = gradeState(i);
   $("pose").value = String(i);
   document.querySelectorAll("#suggestions .srow").forEach((el) => {
     el.classList.toggle("on", +el.getAttribute("data-i") === i);
@@ -405,6 +403,8 @@ async function analyse(i) {
 async function redraw() {
   if (!viewer || !lastResult) return;
   const scene = await bridge.call("scene", {});
+  if ($("opt-site").checked) await viewer.showSite(scene.site);
+  else await viewer.clearSite();
   const n = await viewer.drawScene(scene, {
     labels: $("opt-labels").checked,
     clashes: $("opt-clashes").checked
@@ -446,6 +446,22 @@ function setGradeButtons(current) {
 }
 function featurisedNow() {
   return alState.poses > 0 && current < alState.poses;
+}
+
+// A disabled button with no explanation is the worst of both worlds: it
+// looks broken and it teaches nothing. Grading needs the pose featurised,
+// so when it is not, say so and point at the button that fixes it.
+function gradeState(i) {
+  if (!featurisedNow()) {
+    return "<b>Analyse all poses</b> first (under Model) &mdash; a grade "
+         + "only means something once the model has the features.";
+  }
+  if (gradeOf(i)) return "you graded this <b>" + esc(gradeOf(i)) + "</b>";
+  if (predicted[i]) {
+    return "the model predicts <b>" + esc(predicted[i].grade) + "</b> ("
+         + predicted[i].score.toFixed(2) + ")";
+  }
+  return "not graded &middot; <b>b</b> / <b>m</b> / <b>g</b>";
 }
 
 // Chunked, so a few thousand poses show progress instead of a dead tab.
@@ -497,6 +513,7 @@ async function refreshAl() {
     + (alState.can_train ? "" : "<br>" + esc(alState.why_not || ""));
   $("train").disabled = !alState.can_train;
   setGradeButtons(gradeOf(current));
+  $("gradestate").innerHTML = gradeState(current);
   if (alState.trained) await refreshSuggestions();
   saveLocal();
 }
