@@ -182,6 +182,41 @@ async function until(fn, ms, what) {
     var far = await w.HP.bridge.call("explainAt", {x: 999, y: 999, z: 999});
     out.farRefused = !!far.error;
 
+    // --- the torsion list, end to end -------------------------------
+    //
+    // The panel has had this section since the ChimeraX bundle grew it;
+    // the web page was handing it an empty array. Check the rows arrive,
+    // that a click reaches the viewer as geometry, and that the profile
+    // lands beside the handbook entry.
+    var pt = d.getElementById("hb").contentDocument;
+    out.torsionRows = pt.querySelectorAll("#torsions .trow").length;
+    out.torsionSum = (pt.querySelector("#fold-torsions .sum") || {}).textContent
+                     || "";
+    var first = pt.querySelector("#torsions .trow");
+    if (first) {
+      out.torsionRow = first.textContent.replace(/\s+/g, " ").trim();
+      first.click();
+      await sleep(2000);
+      out.torsionSelected = pt.querySelectorAll("#torsions .trow.on").length;
+      out.torsionRef = !!V.torsion;
+      // The representation is a CHILD of the selection node, and it is
+      // labelled by its type ("Ball & Stick"), not by what it shows - so
+      // it is found by the tag the viewer puts on it, not by label.
+      var tcell = null;
+      V.plugin.state.data.cells.forEach(function (c) {
+        var tags = (c.transform && c.transform.tags) || [];
+        if (typeof tags === "string") tags = [tags];
+        if (tags.indexOf("hp-torsion") < 0) return;
+        if (c.obj && c.obj.data && c.obj.data.repr) {
+          tcell = c.obj.data.repr.renderObjects.length;
+        }
+      });
+      out.torsionReprs = tcell;
+      out.torsionPanel = pt.getElementById("hit").textContent
+        .replace(/\s+/g, " ").trim();
+      out.torsionProfile = /QM scans/.test(out.torsionPanel);
+    }
+
     // --- switching pose redraws, it does not accumulate -------------
     var t1 = Date.now();
     d.getElementById("next").click();
@@ -195,6 +230,11 @@ async function until(fn, ms, what) {
     var scene2 = await w.HP.bridge.call("scene", {});
     out.sceneLines2 = scene2.lines.length;
     out.sceneClashes2 = scene2.clashes.length;
+    // A new pose means new torsions and no selection carried over: the
+    // highlight hangs off the pose node that was just deleted.
+    out.torsionRows2 = d.getElementById("hb").contentDocument
+      .querySelectorAll("#torsions .trow").length;
+    out.torsionRef2 = !!V.torsion;
     out.ok = true;
   } catch (e) {
     out.error = String((e && e.stack) || e);
@@ -382,6 +422,23 @@ def main():
     check(got.get("farRefused") is True,
           "an atom that is not in the analysis is refused, not guessed at", f)
 
+    # The torsion list, which the web page used to render as nothing.
+    check(got.get("torsionRows", 0) > 0,
+          "the panel lists %s strained torsion(s): %s"
+          % (got.get("torsionRows"), got.get("torsionSum")), f)
+    check((got.get("torsionRow") or "").strip() != "",
+          "worst first: %r" % (got.get("torsionRow") or "")[:90], f)
+    check(got.get("torsionSelected") == 1,
+          "clicking a row selects exactly one (%s)"
+          % got.get("torsionSelected"), f)
+    check(got.get("torsionRef"),
+          "and the viewer made a component for the bond", f)
+    check((got.get("torsionReprs") or 0) > 0,
+          "which actually rendered (reprs=%s)" % got.get("torsionReprs"), f)
+    check(got.get("torsionProfile") is True,
+          "with its QM profile beside the handbook entry: %r"
+          % (got.get("torsionPanel") or "")[:90], f)
+
     # Switching pose must redraw, not accumulate.
     check(got["posen"].startswith("1 of") and got["secondMs"] is not None,
           "the pose selector moved: %r" % got.get("posen"), f)
@@ -389,6 +446,8 @@ def main():
           "the second pose drew %d line(s)" % got["drawn2"], f)
     check(got["missed2"] == 0,
           "with nothing unplaced (%d)" % got["missed2"], f)
+    check(got.get("torsionRef2") is False,
+          "the torsion highlight went with the pose it belonged to", f)
     check(got["drawn2"] == got["sceneLines2"] + got.get("sceneClashes2", 0)
           or got["drawn2"] >= got["sceneLines2"],
           "and every one of them was placed (%d for %d interaction(s))"

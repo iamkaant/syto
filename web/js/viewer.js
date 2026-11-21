@@ -30,6 +30,7 @@
   };
   var CLASH = 0xe64646;
   var SEVERE = 0xff2020;
+  var TORSION = 0xffb020;  // the picked torsion, a colour nothing else uses
 
   // Thin enough to see the ligand through. 0.22 drew the pocket as
   // tubing and buried the pose inside it.
@@ -50,6 +51,7 @@
     this.trajectory = null;
     this.pose = null;
     this.measurements = [];
+    this.torsion = null;      // the highlighted torsion, if any
     this._index = null;       // rounded coordinate -> {unit, element}
     this.onAtomClick = null;
   }
@@ -113,6 +115,10 @@
     this.pose = struct;
     this._index = null;
     this.siteLoci = null;
+    // The torsion highlight hangs off the pose node, so deleting the pose
+    // already removed it. Forgetting the ref keeps a later clear from
+    // trying to delete a node that is not there.
+    this.torsion = null;
     return struct.data.elementCount;
   };
 
@@ -302,6 +308,68 @@
     try {
       this.plugin.managers.camera.focusLoci(loci, {durationMs: 0});
     } catch (e) { /* no camera yet */ }
+  };
+
+  // ---------------------------------------------------------- torsions
+  //
+  // One torsion, picked from the panel's list, shown as its four atoms in
+  // a colour nothing else uses. A list of strained bonds you cannot click
+  // through to the geometry is just a table - the whole point is to see
+  // which part of the molecule is paying.
+
+  Viewer.prototype.clearTorsion = async function () {
+    if (!this.torsion) return;
+    try { await this.plugin.build().delete(this.torsion).commit(); }
+    catch (e) { /* already gone with the pose */ }
+    this.torsion = null;
+  };
+
+  // coords are the torsion's atoms, in order, from the core. They are all
+  // ligand atoms (the core measures torsions ligand-only), so they belong
+  // to the pose structure; anything that does not match it is skipped
+  // rather than guessed at.
+  Viewer.prototype.showTorsion = async function (coords, focus) {
+    await this.clearTorsion();
+    if (!coords || !coords.length || !this.pose) return 0;
+    if (!this._index) this._buildIndex();
+
+    var SE = global.molstar.lib.structure.StructureElement;
+    var byUnit = new Map();
+    var found = 0;
+    for (var i = 0; i < coords.length; i++) {
+      var hit = this.atomAt(coords[i]);
+      if (!hit || hit.structure !== this.pose.data) continue;
+      if (!byUnit.has(hit.unit)) byUnit.set(hit.unit, []);
+      byUnit.get(hit.unit).push(hit.offset);
+      found++;
+    }
+    if (!found) return 0;
+
+    var elements = [];
+    byUnit.forEach(function (offsets, unit) {
+      offsets.sort(function (a, b) { return a - b; });
+      elements.push({unit: unit, indices: offsets});
+    });
+    var loci = SE.Loci(this.pose.data, elements);
+
+    var ST = global.molstar.lib.plugin.StateTransforms;
+    var update = this.plugin.build().to(this.pose)
+      .apply(ST.Model.StructureSelectionFromBundle,
+             {bundle: SE.Bundle.fromLoci(loci), label: "torsion"})
+      .apply(ST.Representation.StructureRepresentation3D, {
+        type: {name: "ball-and-stick",
+               params: {sizeFactor: 0.45, aromaticBonds: false,
+                        sizeAspectRatio: 0.6}},
+        colorTheme: {name: "uniform", params: {value: TORSION}},
+        sizeTheme: {name: "physical", params: {}}
+      }, {tags: ["hp-torsion"]});
+    await update.commit();
+    this.torsion = update.selector ? update.selector.ref : null;
+    if (focus) {
+      try { this.plugin.managers.camera.focusLoci(loci, {durationMs: 250}); }
+      catch (e) { /* no camera yet */ }
+    }
+    return found;
   };
 
   // ------------------------------------------------------------- lines

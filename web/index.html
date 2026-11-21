@@ -220,6 +220,11 @@ const $ = (id) => document.getElementById(id);
 let bridge = null;
 const files = {rec: null, lig: null};
 let viewer = null, poses = [], current = 0, lastResult = null;
+// The flagged torsions of the current pose, which row is picked, and
+// that bond's QM profile. The panel renders all three; this page is
+// only keeping them so a re-send of the snapshot does not lose them.
+let torsionRows = [], torsionWarn = null, torsionPick = null,
+    torsionProfile = null;
 let enabled = null;   // null = whatever the core defaults to
 
 const TYPES = [
@@ -279,7 +284,9 @@ function baseSnapshot(hit, scales) {
     } : null,
     hit: hit || null,
     scales: scales || [],
-    torsions: [], torsion: null
+    torsions: torsionRows.map((r) => ({...r, selected: r.bond === torsionPick})),
+    torsion_warn_kcal: torsionWarn,
+    torsion: torsionProfile
   };
 }
 
@@ -298,6 +305,8 @@ async function onPanelAction(action, params) {
     await redraw();
   } else if (action === "analyze") {
     await analyse(current);
+  } else if (action === "torsion") {
+    await pickTorsion(params.bond);
   }
 }
 
@@ -534,6 +543,7 @@ async function analyse(i) {
   const res = await bridge.call("analyse",
     {index: i, enabled: enabled, strain: true});
   lastResult = res;
+  await loadTorsions();
   await viewer.showPose(i);
   renderPose(res);
   renderList(res);
@@ -561,6 +571,54 @@ async function redraw() {
     say("drew " + n + " line(s); " + viewer.lastMissed
         + " could not be placed in the viewer", true);
   }
+}
+
+// The strained torsions of this pose, for the panel's list. Wrapped
+// because a stale cached worker will not have the method, and a pose
+// that still analyses and draws is worth more than one that throws over
+// a list.
+async function loadTorsions() {
+  torsionRows = []; torsionWarn = null;
+  torsionPick = null; torsionProfile = null;
+  if (viewer) await viewer.clearTorsion();
+  try {
+    const t = await bridge.call("torsions", {});
+    torsionRows = t.rows || [];
+    torsionWarn = t.warn_kcal;
+    // The worst one by default, exactly as the ChimeraX panel does, so
+    // the profile is there before anything has been clicked.
+    if (torsionRows.length) {
+      torsionProfile = await bridge.call("torsionProfile", {});
+    }
+  } catch (e) {
+    say("torsions unavailable: " + esc(e.message), true);
+  }
+}
+
+// A row click: select the bond in 3D, plot its profile, and open the
+// handbook on one of its atoms. The handbook entry is what makes the
+// profile visible at all - the panel draws it under the entry - and it
+// is also the right answer to "what is this bond I am being warned
+// about".
+async function pickTorsion(bond) {
+  const row = torsionRows.find((r) => r.bond === bond);
+  if (!row || !lastResult) return;
+  torsionPick = bond;
+  try {
+    torsionProfile = await bridge.call("torsionProfile", {bond: bond});
+  } catch (e) { torsionProfile = null; }
+  let hit = null;
+  try {
+    const h = await bridge.call("explainAt",
+      {x: row.a[0], y: row.a[1], z: row.a[2]});
+    if (!h.error) hit = h;
+  } catch (e) { /* the panel still gets the list and the profile */ }
+  if (viewer) await viewer.showTorsion(row.xyz || [row.a, row.b], true);
+  sendPanel(baseSnapshot(hit, hit ? (hit.scales || []) : []));
+  say(esc(row.kind) + " &middot; " + esc(row.label) + " &middot; "
+      + row.angle.toFixed(0) + "&deg;"
+      + (row.energy === null || row.energy === undefined
+         ? "" : ", costing " + row.energy.toFixed(1) + " kcal/mol"));
 }
 
 async function onAtomClick(xyz, name) {

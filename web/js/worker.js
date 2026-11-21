@@ -101,6 +101,10 @@ const METHODS = {
   async explainAt(a) {
     return toJs(engine.explain_at(a.x, a.y, a.z, a.tolerance || 0.05));
   },
+  async torsions() { return toJs(engine.torsions()); },
+  async torsionProfile(a) {
+    return toJs(engine.torsion_profile(a.bond || null));
+  },
 };
 
 self.onmessage = async (ev) => {

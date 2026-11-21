@@ -84,6 +84,28 @@ Requires PyYAML to build the handbook. If ChimeraX's Python lacks it:
 HITPICK_PYTHON=/path/to/python/with/pyyaml tools/install_bundle.sh
 ```
 
+### Releasing to the ChimeraX Toolshed
+
+```bash
+python tools/release_bundle.py --version 0.2.0     # build and verify
+python tools/release_bundle.py --check             # checks only, no build
+```
+
+`devel build` makes a wheel; it does not tell you whether the wheel is the one
+you meant to publish. A Toolshed version is public and can never be reused, so
+this does the whole path and stops at the first thing that is wrong: a `.dev`
+version left over from an interrupted `install_bundle.sh`, a version already
+published, an uncommitted tree, handbook data that was not rebuilt, a vendored
+core that has drifted from `core/`. Then it opens the finished wheel and checks
+it file by file against `chimerax/src`, and imports the vendored core out of it
+in a fresh process — a missing module gets past every check that only reads
+names.
+
+The wheel lands in `dist/`. Submitting it stays manual: sign in at
+[cxtoolshed.rbvi.ucsf.edu](https://cxtoolshed.rbvi.ucsf.edu) (Google sign-in
+only), use **Submit a Bundle**, and upload it. The first submission waits for
+ChimeraX staff to approve it; later ones from the same account appear at once.
+
 ## Use
 
 ```
@@ -209,7 +231,8 @@ core/hitpicking/     the shared engine (numpy only)
   analysis.py        ReceptorContext: perceive once, analyse many poses
 data-src/            handbook sources; external/ holds extracted literature
 chimerax/            the bundle (adapter.py is the only ChimeraX-aware file)
-tools/               build_data.py, vendor_core.py, install_bundle.sh
+tools/               build_data.py, vendor_core.py, install_bundle.sh,
+                     release_bundle.py (the Toolshed wheel)
 ```
 
 ---

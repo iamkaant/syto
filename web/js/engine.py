@@ -618,6 +618,104 @@ def site_atoms(res):
     return out
 
 
+# --------------------------------------------------------------- torsions
+#
+# The flagged torsions of the analysed pose, and the QM profile for one of
+# them. Both already existed in the ChimeraX bundle and both were built
+# from these same objects; the web page was simply never given them, so
+# its panel showed an empty list where ChimeraX shows the strain.
+
+
+def _xyz(ms, i):
+    v = ms.xyz[int(i)]
+    return [round(float(v[0]), 3), round(float(v[1]), 3), round(float(v[2]), 3)]
+
+
+def torsions():
+    """Every flagged torsion, worst first.
+
+    Worst first means by measured cost where there is one. A torsion with
+    no QM class has no number and cannot be ranked against one that has,
+    so those come after, in bond order - the ordering the ChimeraX list
+    uses, because the two lists are meant to be the same list.
+
+    Each row carries the two bond atoms as coordinates as well as their
+    indices. The page's viewer matches atoms on position, never on index,
+    for the same reason the interaction endpoints do.
+    """
+    res = _STATE.get("last")
+    if res is None or res.strain is None or res.combined is None:
+        return _json({"rows": [], "warn_kcal": None})
+    from hitpicking.strain.torsions import QM_WARN_KCAL
+    ms = res.combined
+    rows = []
+    for t in res.strain.torsions:
+        if not t.flagged:
+            continue
+        i, j = t.bond
+        rows.append({
+            "bond": "%d,%d" % (i, j),
+            "label": " - ".join(ms.atom_label(a) for a in t.bond),
+            "kind": t.subtype or t.bond_type,
+            "angle": round(t.angle, 1),
+            "assessment": t.assessment,
+            "severity": t.severity,
+            "energy": (None if t.energy is None else round(t.energy, 2)),
+            "note": t.note,
+            "atoms": [int(a) for a in t.atoms],
+            "a": _xyz(ms, i),
+            "b": _xyz(ms, j),
+            # all four, in order: the pair is the bond, the outer two are
+            # what the angle is measured between, and the viewer wants to
+            # light up what is actually twisted rather than one bond.
+            "xyz": [_xyz(ms, a) for a in t.atoms],
+        })
+    rows.sort(key=lambda r: (r["energy"] is None, -(r["energy"] or 0.0),
+                             r["bond"]))
+    return _json({"rows": rows, "warn_kcal": QM_WARN_KCAL})
+
+
+def torsion_profile(bond=None):
+    """The QM profile for one bond, or for the worst flagged torsion.
+
+    A torsion belongs to a bond, so the clicked row decides it. Returns
+    null rather than raising when there is no QM class for that bond
+    class: most bonds have none, and an empty plot is the honest answer.
+    """
+    res = _STATE.get("last")
+    if res is None or res.strain is None:
+        return _json(None)
+    from hitpicking.strain import torsions as T
+    if T.qm_reference() is None:
+        return _json(None)
+    ts = list(res.strain.torsions)
+    if not ts:
+        return _json(None)
+
+    chosen = None
+    if bond:
+        try:
+            want = tuple(sorted(int(x) for x in str(bond).split(",")))
+        except (TypeError, ValueError):
+            want = None
+        if want is not None:
+            for t in ts:
+                if tuple(sorted(t.bond)) == want:
+                    chosen = t
+                    break
+    if chosen is None:
+        flagged = [t for t in ts if t.flagged]
+        flagged.sort(key=lambda t: (t.energy is None, -(t.energy or 0.0)))
+        chosen = flagged[0] if flagged else None
+    if chosen is None:
+        return _json(None)
+    try:
+        return _json(T.profile_view(chosen.bond_type, chosen.subtype,
+                                    chosen.ortho_substituted, chosen.angle))
+    except Exception:
+        return _json(None)
+
+
 # ------------------------------------------------------------------ click
 
 def explain_at(x, y, z, tolerance=0.05):
