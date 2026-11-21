@@ -27,7 +27,7 @@ fail=0
 echo "=== installing the bundle under test ==="
 bash "$ROOT/tools/install_bundle.sh" >/dev/null 2>&1 || {
   echo "   install FAILED"; exit 1; }
-INST="$HOME/Library/Application Support/ChimeraX/1.12/lib/python/site-packages/chimerax/hitpickingtool"
+INST="$HOME/Library/Application Support/ChimeraX/1.12/lib/python/site-packages/chimerax/syto"
 if [ -d "$INST" ]; then
   for f in render.py cmd.py viewdock_link.py; do
     if ! diff -q "$ROOT/chimerax/src/$f" "$INST/$f" >/dev/null 2>&1; then

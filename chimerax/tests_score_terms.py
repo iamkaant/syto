@@ -49,11 +49,11 @@ run(session, "open %s format mol2 showTool false"
     % (A + "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2"))
 run(session, "hitpick setup")
 
-import chimerax.hitpickingtool.learn as L
-import chimerax.hitpickingtool.viewdock_link as VL
-from chimerax.hitpickingtool import adapter
-from chimerax.hitpickingtool.learn_tool import LearnTool
-from chimerax.hitpickingtool.state import get_state
+import chimerax.syto.learn as L
+import chimerax.syto.viewdock_link as VL
+from chimerax.syto import adapter
+from chimerax.syto.learn_tool import LearnTool
+from chimerax.syto.state import get_state
 from hitpicking.al import scoreterms as S
 from hitpicking.al.features import SCORE_SLICE
 

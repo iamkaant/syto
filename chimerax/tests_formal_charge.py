@@ -33,7 +33,7 @@ def build(atoms, name):
     return run(session, "open %s" % p)[0]
 
 
-from chimerax.hitpickingtool.adapter import from_structures
+from chimerax.syto.adapter import from_structures
 from hitpicking.perceive.features import perceive_all
 
 print("[1] a neutral three-coordinate amine is not charged")

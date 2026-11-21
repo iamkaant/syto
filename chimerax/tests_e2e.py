@@ -51,7 +51,7 @@ run(session, "hitpick show all")
 
 print("\n--- hitpick explain (a ligand nitrogen) ---")
 
-import chimerax.hitpickingtool.state as hpstate
+import chimerax.syto.state as hpstate
 st = hpstate.get_state(session)
 target = None
 for i, a in enumerate(st.all_atoms):

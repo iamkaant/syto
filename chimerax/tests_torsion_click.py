@@ -44,9 +44,9 @@ lig = [x for x in m if x is not rec][0]
 run(session, "hitpick setup")
 run(session, "hitpick analyze #%s" % lig.id_string)
 
-import chimerax.hitpickingtool.state as S
-import chimerax.hitpickingtool.cmd as C
-from chimerax.hitpickingtool.tool import HandbookTool
+import chimerax.syto.state as S
+import chimerax.syto.cmd as C
+from chimerax.syto.tool import HandbookTool
 
 st = S.get_state(session)
 named = [t for t in st.result.strain.torsions if t.subtype]

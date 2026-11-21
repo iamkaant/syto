@@ -47,10 +47,10 @@ SRC = os.path.join(BUNDLE, "src")
 TOML = os.path.join(BUNDLE, "pyproject.toml")
 DIST = os.path.join(ROOT, "dist")
 
-PKG = "chimerax/hitpickingtool"       # where src/ lands inside the wheel
+PKG = "chimerax/syto"                 # where src/ lands inside the wheel
 DEFAULT_APP = "/Applications/ChimeraX-1.12.app"
 TOOLSHED = "https://cxtoolshed.rbvi.ucsf.edu"
-BUNDLE_NAME = "ChimeraX-HitPickingTool"
+BUNDLE_NAME = "ChimeraX-Syto"
 
 # A release version: 1.2, 1.2.3, 1.2.3rc1, 1.2.3.post1. Not .dev, not a
 # local version (+something) - the Toolshed takes neither, and a dev
@@ -317,7 +317,7 @@ def check_wheel(wheel, version):
     ok("handbook data, torsion profiles and both panels are inside")
 
     for line, why in (
-            ("Name: ChimeraX-HitPickingTool", "the Toolshed keys on the name"),
+            ("Name: ChimeraX-Syto", "the Toolshed keys on the name"),
             ("Version: %s" % version, "the version must match"),
             ("Classifier: Framework :: ChimeraX",
              "without it the Toolshed does not see a bundle"),

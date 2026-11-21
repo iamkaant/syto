@@ -44,7 +44,7 @@ check(not loaded, "hitpicking.al is not imported by setup (%s)" % loaded)
 
 print("\n[2] collect analyses and featurises")
 run(session, "hitpick learn collect limit 40")
-import chimerax.hitpickingtool.learn as L
+import chimerax.syto.learn as L
 d = L.describe(session)
 print("    %s" % d)
 check(d["poses"] >= 20, "poses featurised: %d" % d["poses"])
@@ -79,7 +79,7 @@ if rows:
           "and it does not suggest poses already graded")
 
 print("\n[5] ViewDock's rating scale maps straight onto the grades")
-from chimerax.hitpickingtool import viewdock_link as vl
+from chimerax.syto import viewdock_link as vl
 check(vl.RATING_LABELS == ("(unrated)", "bad", "maybe", "good"),
       "ViewDock: %s" % (vl.RATING_LABELS,))
 check(ls.learner.options == ("bad", "maybe", "good"),

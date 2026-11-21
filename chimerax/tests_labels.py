@@ -80,7 +80,7 @@ ligs = [m for m in session.models
 run(session, "hitpick setup")
 run(session, "hitpick analyze #%s" % ligs[0].id_string)
 
-import chimerax.hitpickingtool.state as hpstate
+import chimerax.syto.state as hpstate
 st = hpstate.get_state(session)
 
 print("\n[1] interaction labels show lengths by default")

@@ -47,9 +47,9 @@ run(session, "open %s format mol2 showTool false"
     % (A + "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2"))
 run(session, "hitpick setup")
 
-from chimerax.hitpickingtool import render
-from chimerax.hitpickingtool.state import get_state
-from chimerax.hitpickingtool.tool import HandbookTool
+from chimerax.syto import render
+from chimerax.syto.state import get_state
+from chimerax.syto.tool import HandbookTool
 
 st = get_state(session)
 lig = [m for m in session.models

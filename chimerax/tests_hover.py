@@ -38,8 +38,8 @@ lig = [m for m in models if "3521" in m.name] or [m for m in models if m is not 
 lig = lig[0]
 run(session, "hitpick setup"); run(session, "hitpick analyze #%s" % lig.id_string)
 
-from chimerax.hitpickingtool import hover
-import chimerax.hitpickingtool.state as S
+from chimerax.syto import hover
+import chimerax.syto.state as S
 st = S.get_state(session)
 
 def plain(html):

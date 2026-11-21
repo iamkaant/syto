@@ -322,7 +322,7 @@ def _register_attrs(session):
     from chimerax.atomic import Atom, Pseudobond
     for cls in (Atom, Pseudobond):
         try:
-            cls.register_attr(session, LABEL_ATTR, "HitPickingTool",
+            cls.register_attr(session, LABEL_ATTR, "Syto",
                               attr_type=str)
         except Exception:
             pass          # already registered by an earlier session

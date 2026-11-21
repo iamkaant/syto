@@ -10,7 +10,7 @@ so every key we write must satisfy display_key(key) == some column title.
 import sys
 
 from chimerax.viewdock.tool import ViewDockTool
-from chimerax.hitpickingtool import viewdock_link as vl
+from chimerax.syto import viewdock_link as vl
 
 failures = []
 

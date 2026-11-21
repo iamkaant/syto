@@ -39,8 +39,8 @@ run(session, "open %s" % (A + "autoparty/inputs/rec.crg.pdb"))
 run(session, "open %s format mol2" % (A + "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2"))
 run(session, "hitpick setup")
 
-import chimerax.hitpickingtool.viewdock_link as VL
-from chimerax.hitpickingtool import learn
+import chimerax.syto.viewdock_link as VL
+from chimerax.syto import learn
 
 print("[1] every prediction column obeys ViewDock's key/title contract")
 for title in VL.PREDICTION_COLUMNS:

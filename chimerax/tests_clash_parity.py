@@ -45,7 +45,7 @@ from chimerax.clashes.settings import defaults as cx_defaults
 
 # Import the bundle FIRST: it puts its vendored copy of the core on sys.path,
 # so `hitpicking` is only importable afterwards.
-from chimerax.hitpickingtool.adapter import from_structures
+from chimerax.syto.adapter import from_structures
 from hitpicking.strain import (find_clashes, DEFAULT_CLASH_OVERLAP,
                                DEFAULT_HBOND_ALLOWANCE,
                                DEFAULT_BOND_SEPARATION)

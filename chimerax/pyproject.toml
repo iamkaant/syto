@@ -3,7 +3,7 @@ requires = ["ChimeraX-BundleBuilder>=1.3.0"]
 build-backend = "chimerax.bundle_builder.cx_pep517"
 
 [project]
-name = "ChimeraX-HitPickingTool"
+name = "ChimeraX-Syto"
 version = "0.1.0"
 license = { text = "MIT" }
 authors = [{ name = "Andrii Kyrylchuk" }]

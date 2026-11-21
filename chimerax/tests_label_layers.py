@@ -44,8 +44,8 @@ run(session, "open %s format mol2 showTool false"
 run(session, "hitpick setup")
 run(session, "hitpick analyze")
 
-from chimerax.hitpickingtool import render
-from chimerax.hitpickingtool.state import get_state
+from chimerax.syto import render
+from chimerax.syto.state import get_state
 
 st = get_state(session)
 atoms = st.all_atoms

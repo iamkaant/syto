@@ -73,8 +73,16 @@ if [ -d "$SITE/chimerax" ]; then
   ls "$SITE/chimerax" | sed 's/^/      /'
 fi
 
+# --silent swallows the usage text, so this reads the real log. It used to
+# grep for the package name, which stopped appearing when the bundle was
+# renamed - a check that silently passes whatever happens is not a check.
 echo "==> verifying the command registers"
-"$CX" --nogui --silent --exit --cmd "usage hitpick analyze ; exit" 2>&1 \
-  | grep -iE "hitpickingtool|No module named 'hitpicking'" | head -3 || true
+OUT="$("$CX" --nogui --exit --cmd "usage hitpick analyze ; exit" 2>&1)"
+if echo "$OUT" | grep -q "'hitpick analyze'"; then
+  echo "    hitpick analyze is registered"
+else
+  echo "    FAILED: hitpick analyze did not register"
+  echo "$OUT" | grep -iE "error|No module named|Traceback" | head -5
+fi
 
 echo "done. In ChimeraX:  hitpick setup"

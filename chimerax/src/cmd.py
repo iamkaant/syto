@@ -934,7 +934,7 @@ def _refresh_learn_panel(session):
     import sys
     # Only if the panel is actually open: importing it here would drag the
     # whole AL stack in for someone who never asked for it.
-    mod = sys.modules.get("chimerax.hitpickingtool.learn_tool")
+    mod = sys.modules.get("chimerax.syto.learn_tool")
     if mod is None:
         return
     try:

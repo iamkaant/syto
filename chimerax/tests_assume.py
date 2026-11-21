@@ -41,11 +41,11 @@ run(session, "open %s format mol2 showTool false"
 run(session, "hitpick setup")
 run(session, "hitpick learn collect limit 24 wait true")
 
-import chimerax.hitpickingtool.learn as L
-from chimerax.hitpickingtool import viewdock_link as VL
-from chimerax.hitpickingtool.cmd import hitpick_learn_assume
-from chimerax.hitpickingtool.learn_tool import LearnTool
-from chimerax.hitpickingtool.state import get_state
+import chimerax.syto.learn as L
+from chimerax.syto import viewdock_link as VL
+from chimerax.syto.cmd import hitpick_learn_assume
+from chimerax.syto.learn_tool import LearnTool
+from chimerax.syto.state import get_state
 
 ls = L.state(session)
 poses = [ls.keys[k] for k in sorted(ls.keys)]

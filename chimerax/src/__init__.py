@@ -1,4 +1,4 @@
-"""HitPickingTool: a hit-picking helper for ChimeraX.
+"""Syto: a hit-picking helper for ChimeraX.
 
 Rides alongside ViewDock. The chemistry, the interaction scoring and the
 handbook all come from the `hitpicking` core package, which is shared

@@ -40,15 +40,15 @@ run(session, "open %s" % (A + "autoparty/inputs/rec.crg.pdb"))
 run(session, "open %s format mol2 showTool false"
     % (A + "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2"))
 run(session, "hitpick setup")
-check("chimerax.hitpickingtool.learn_tool" not in sys.modules,
+check("chimerax.syto.learn_tool" not in sys.modules,
       "learn_tool is unimported after setup")
 check(not [m for m in sys.modules if m.startswith("hitpicking.al")],
       "the AL engine is unimported after setup")
 
 print("\n[2] snapshot before anything is collected")
-from chimerax.hitpickingtool.learn_tool import LearnTool
-import chimerax.hitpickingtool.learn as L
-from chimerax.hitpickingtool.state import get_state
+from chimerax.syto.learn_tool import LearnTool
+import chimerax.syto.learn as L
+from chimerax.syto.state import get_state
 
 stub = types.SimpleNamespace(session=session, _strategy="uncertainty",
                              _auto_advance=True, _hp=get_state(session))
@@ -111,7 +111,7 @@ print("\n[6] grade in ViewDock, then analyse in the Learn panel")
 # sometimes before the poses have been analysed. Those grades used to be
 # dropped in silence - iter_rated() returned nothing unless the ViewDock TOOL
 # object was found, even though the ratings live on the structures.
-import chimerax.hitpickingtool.viewdock_link as VL
+import chimerax.syto.viewdock_link as VL
 
 L.clear(session)
 poses = [m for m in session.models

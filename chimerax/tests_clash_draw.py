@@ -47,7 +47,7 @@ def clash_groups():
             if isinstance(m, PseudobondGroup) and "clash" in m.name}
 
 
-import chimerax.hitpickingtool.state as hpstate
+import chimerax.syto.state as hpstate
 st = hpstate.get_state(session)
 
 print("\n[1] clashes are drawn")

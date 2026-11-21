@@ -25,7 +25,7 @@ def check(cond, msg):
         failures.append(msg)
 
 
-from chimerax.hitpickingtool import worklist as W
+from chimerax.syto import worklist as W
 
 RATING = "rating"
 

@@ -1,4 +1,4 @@
-# HitPickingTool
+# Syto
 
 A helper for [hit-picking parties](https://wiki.docking.org/index.php?title=Hit_picking_party):
 it detects and **scores** the non-covalent interactions in a docked pose, and
@@ -9,7 +9,7 @@ Two front ends, one engine:
 
 | | status |
 |---|---|
-| **ChimeraX bundle**, alongside ViewDock | working (v0.1) |
+| **ChimeraX bundle** (`ChimeraX-Syto`), alongside ViewDock | working (v0.1) |
 | **Static web page** (Mol\* + Pyodide) | not started |
 
 The engine (`core/hitpicking`) is pure Python + numpy — no RDKit, no ChimeraX,

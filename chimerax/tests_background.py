@@ -41,7 +41,7 @@ run(session, "open %s format mol2 showTool false"
     % (A + "autoparty/inputs/more_opcore_enum_asp_h2o_hbond.mol2"))
 run(session, "hitpick setup")
 
-from chimerax.hitpickingtool import background, learn
+from chimerax.syto import background, learn
 
 print("[1] with no GUI the work runs inline, so scripts still behave")
 job = background.Job(session, "test")
@@ -108,7 +108,7 @@ done_before = {"n": 0}
 
 
 def stop_early(j):
-    import chimerax.hitpickingtool.learn as L
+    import chimerax.syto.learn as L
     real = L._features_for
 
     def counting(hp, lig, jj):
