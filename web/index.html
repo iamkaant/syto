@@ -144,6 +144,11 @@
                value="1" style="flex:1">
         <span style="white-space:nowrap">lines <b id="linewval">1.0</b>&times;</span>
       </label>
+      <label class="chk" style="gap:9px">
+        <input type="range" id="opt-text" min="0.15" max="1.2" step="0.05"
+               value="0.33" style="flex:1">
+        <span style="white-space:nowrap">labels <b id="textval">0.33</b></span>
+      </label>
     </div>
 
     <h2>Grade</h2>
@@ -333,6 +338,7 @@ $("go").onclick = async () => {
       viewer.onAtomClick = onAtomClick;
       viewer.siteSize = +$("opt-stick").value;
       viewer.lineSize = +$("opt-linew").value;
+      viewer.textSize = +$("opt-text").value;
     }
     say("drawing&hellip;");
     const nrec = await viewer.loadReceptor(files.rec.text, "pdb");
@@ -411,20 +417,26 @@ $("opt-ribbon").onchange = () => {
   if (viewer) viewer.setRibbon($("opt-ribbon").checked);
   saveView();
 };
-$("opt-stick").oninput = () => {
-  $("stickval").textContent = (+$("opt-stick").value).toFixed(2);
-};
-$("opt-stick").onchange = async () => {
-  if (viewer) viewer.siteSize = +$("opt-stick").value;
-  saveView(); await redraw();
-};
-$("opt-linew").oninput = () => {
-  $("linewval").textContent = (+$("opt-linew").value).toFixed(1);
-};
-$("opt-linew").onchange = async () => {
-  if (viewer) viewer.lineSize = +$("opt-linew").value;
-  saveView(); await redraw();
-};
+// Each slider: a live readout while it moves, and the viewer updated
+// when it settles. The readout is refreshed on BOTH events, because only
+// dragging fires `input` - arrow keys, a reset, and anything that sets
+// the value from code fire `change` alone, and the number beside the
+// slider would sit there contradicting it.
+function wireSlider(id, readoutId, digits, apply) {
+  const el = $(id), out = $(readoutId);
+  const show = () => { out.textContent = (+el.value).toFixed(digits); };
+  el.addEventListener("input", show);
+  el.addEventListener("change", async () => {
+    show();
+    if (viewer) apply(+el.value);
+    saveView();
+    await redraw();
+  });
+}
+
+wireSlider("opt-stick", "stickval", 2, (v) => { viewer.siteSize = v; });
+wireSlider("opt-linew", "linewval", 1, (v) => { viewer.lineSize = v; });
+wireSlider("opt-text", "textval", 2, (v) => { viewer.textSize = v; });
 
 // Dragging a gutter.
 //
@@ -488,6 +500,7 @@ function saveView() {
     localStorage.setItem("hitpicking.view", JSON.stringify({
       site: $("opt-site").checked, ribbon: $("opt-ribbon").checked,
       stick: +$("opt-stick").value, linew: +$("opt-linew").value,
+      text: +$("opt-text").value,
       labels: $("opt-labels").checked, clashes: $("opt-clashes").checked,
       left: columnWidth("--left"), right: columnWidth("--right")
     }));
@@ -504,8 +517,10 @@ function restoreView() {
   if (d.clashes !== undefined) $("opt-clashes").checked = !!d.clashes;
   if (d.stick) $("opt-stick").value = d.stick;
   if (d.linew) $("opt-linew").value = d.linew;
+  if (d.text) $("opt-text").value = d.text;
   $("stickval").textContent = (+$("opt-stick").value).toFixed(2);
   $("linewval").textContent = (+$("opt-linew").value).toFixed(1);
+  $("textval").textContent = (+$("opt-text").value).toFixed(2);
   if (d.left) setColumn("--left", d.left);
   if (d.right) setColumn("--right", d.right);
 }

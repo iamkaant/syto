@@ -157,6 +157,17 @@ async function until(fn, ms, what) {
     } catch (e) { out.dragErr = String(e); }
     out.ribbonDefault = d.getElementById("opt-ribbon").checked;
     out.stickSize = V.siteSize;
+    // The label size slider must reach the drawn labels, not just the
+    // number beside it. Set it, redraw, and read it back off the viewer.
+    var ts = d.getElementById("opt-text");
+    ts.value = "0.6";
+    ts.dispatchEvent(new w.Event("change"));
+    await sleep(1800);
+    out.textSize = V.textSize;
+    out.textLabel = d.getElementById("textval").textContent;
+    out.textStored = (JSON.parse(w.localStorage.getItem("hitpicking.view")
+                                 || "{}")).text;
+    out.drawnAfterText = V.nDrawn;
 
     // --- the click path, end to end --------------------------------
     if (scene.lines.length) {
@@ -334,6 +345,14 @@ def main():
           % got.get("leftAfterDrag"), f)
     check(got.get("leftStored") and abs(got["leftStored"] - 380) < 3,
           "and the width was remembered (%s)" % got.get("leftStored"), f)
+    check(got.get("textSize") == 0.6 and got.get("textLabel") == "0.60",
+          "the label size slider reaches the viewer (%s) and the readout "
+          "(%s)" % (got.get("textSize"), got.get("textLabel")), f)
+    check(got.get("textStored") == 0.6,
+          "and is remembered (%s)" % got.get("textStored"), f)
+    check(got.get("drawnAfterText") == got.get("drawn"),
+          "with the lines redrawn rather than lost (%s of %s)"
+          % (got.get("drawnAfterText"), got.get("drawn")), f)
     check(got.get("ribbonDefault") is False,
           "the protein ribbon starts hidden, so the pocket is not buried "
           "in it", f)

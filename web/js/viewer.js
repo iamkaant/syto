@@ -35,10 +35,16 @@
   // tubing and buried the pose inside it.
   var SITE_SIZE = 0.1;
 
+  // Mol* sizes label text in world units, so a label legible on a small
+  // ligand is unreadable across a whole pocket and vice versa. There is
+  // no single right value; it is a control.
+  var TEXT_SIZE = 0.33;
+
   function Viewer(elementId) {
     this.id = elementId;
     this.siteSize = SITE_SIZE;
     this.lineSize = 1.0;        // multiplier on the interaction lines
+    this.textSize = TEXT_SIZE;  // the label beside each line
     this.plugin = null;
     this.receptor = null;     // the state cell
     this.trajectory = null;
@@ -355,7 +361,7 @@
         var cell = await mm.addDistance(lociFor(ha), lociFor(hb), {
           visualParams: {
             linesColor: r.color, linesSize: r.size, dashLength: r.dash,
-            textColor: r.color, textSize: 0.33,
+            textColor: r.color, textSize: self.textSize,
             customText: opts.labels === false ? " " : r.text
           }
         });
