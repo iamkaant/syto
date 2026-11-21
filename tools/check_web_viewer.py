@@ -73,6 +73,7 @@ async function until(fn, ms, what) {
       var reg = await w.navigator.serviceWorker.getRegistration();
       out.offline = !!reg;
     } catch (e) { out.offline = false; }
+    out.build = w.__build || null;
 
     var rec = await (await fetch("__rec")).text();
     var lig = await (await fetch("__lig")).text();
@@ -115,6 +116,23 @@ async function until(fn, ms, what) {
     out.siteAtoms = (scene.site || []).length;
     out.siteDrawn = !!V.site;
     out.siteFocused = !!V.siteLoci;
+    // Did it actually RENDER? A ref in the state tree proves nothing:
+    // a representation whose params Mol* rejects sits there with no
+    // geometry and the pocket is simply invisible.
+    try {
+      var cells = [];
+      V.plugin.state.data.cells.forEach(function (c) {
+        var o = c.obj;
+        if (!o) return;
+        cells.push({label: o.label || "",
+                    type: (o.type && o.type.name) || "",
+                    err: c.status === "error" ? String(c.errorText) : null,
+                    reprs: o.data && o.data.repr
+                      ? o.data.repr.renderObjects.length : null});
+      });
+      out.cells = cells;
+      out.stateErrors = cells.filter(function (c) { return c.err; });
+    } catch (e) { out.cellErr = String(e); }
     out.gradeHint = d.getElementById("gradestate").textContent
       .replace(/\s+/g, " ").trim();
 
@@ -248,9 +266,11 @@ def main():
     check_file_protocol(chrome, f)
     check(not got.get("errors"), "no JavaScript error (%s)"
           % ("; ".join(got["errors"]) or "none"), f)
-    check(got.get("offline") is True,
-          "the page registered for offline use, so a second visit needs "
-          "no network", f)
+    check(got.get("offline") is False,
+          "no service worker on localhost - caching there bought nothing "
+          "and served stale pages against newer code", f)
+    check(got.get("build"),
+          "the page states which build it is running: %s" % got.get("build"), f)
     check(got["recAtoms"] > 1000,
           "the receptor is in the viewer: %d atoms" % got["recAtoms"], f)
     check(got["ligAtoms"] > 5,
@@ -276,6 +296,13 @@ def main():
           "the core picked %d pocket atom(s) to draw" % got["siteAtoms"], f)
     check(got["siteDrawn"],
           "and the viewer made them into a component", f)
+    print("   state cells:")
+    for c in (got.get("cells") or []):
+        print("     %-34s %-28s reprs=%s%s"
+              % (c["label"][:34], c["type"][:28], c["reprs"],
+                 "  ERROR: " + c["err"] if c["err"] else ""))
+    check(not got.get("stateErrors"),
+          "no state node failed: %s" % got.get("stateErrors"), f)
     check(got["siteFocused"],
           "with a loci to frame, so the view opens on the pocket rather "
           "than on 2800 atoms of cartoon", f)

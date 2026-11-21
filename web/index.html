@@ -732,28 +732,70 @@ function fileProtocolNotice() {
   $("rec").disabled = $("lig").disabled = true;
 }
 
-// Cached whole on the first visit, so the hosted copy then opens with no
-// network at all. This is what makes it usable "locally" without anyone
-// running a server: the page is local after you have seen it once.
+// Offline caching, for the HOSTED copy only.
+//
+// It used to register on localhost too, which cost two rounds of a very
+// confusing bug: the cached page kept being served against newer code, so
+// the script threw on markup that build no longer had. On localhost there
+// is a server running by definition - caching buys nothing there and the
+// staleness is a real cost. On https it is the whole point.
 function registerOffline() {
   if (!("serviceWorker" in navigator)) return;
-  if (location.protocol !== "https:" && location.hostname !== "localhost"
-      && location.hostname !== "127.0.0.1") return;
+  if (location.protocol !== "https:") return;
   navigator.serviceWorker.register("sw.js").then(function (reg) {
     window.__offline = reg;
   }).catch(function () { /* offline use is a bonus, not a requirement */ });
+  // A new worker taking over means the files under it have changed.
+  // Reload once, so the page you are looking at matches the code that
+  // is now being served rather than half of each.
+  var reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", function () {
+    if (reloaded) return;
+    reloaded = true;
+    location.reload();
+  });
+}
+
+// An escape hatch: open ?fresh=1 and everything cached for this origin is
+// dropped and the page reloads clean. Here because telling someone to go
+// unregister a service worker in about:debugging is not a fix.
+async function freshStart() {
+  try {
+    if ("serviceWorker" in navigator) {
+      var regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(function (r) { return r.unregister(); }));
+    }
+    if (window.caches) {
+      var names = await caches.keys();
+      await Promise.all(names.map(function (n) { return caches.delete(n); }));
+    }
+  } catch (e) { /* nothing cached is also a clean state */ }
+  location.replace(location.pathname);
 }
 
 (async function () {
+  if (new URLSearchParams(location.search).get("fresh")) {
+    await freshStart();
+    return;
+  }
   renderToggles();
   if (location.protocol === "file:") { fileProtocolNotice(); return; }
   registerOffline();
+  // Which build is on screen, stated rather than guessed at. Two bugs
+  // were "the page is broken" when they were "the page is from a
+  // different build than the code".
+  try {
+    const b = await (await fetch("build.js", {cache: "no-store"})).text();
+    const m = b.match(/"([0-9a-f]+)"/);
+    window.__build = m ? m[1] : "?";
+  } catch (e) { window.__build = "?"; }
   try {
     bridge = new HPBridge.WorkerBridge("js/worker.js");
     const v = await bridge.call("version");
     window.__handbook = v.handbook;
     say("engine ready &middot; " + esc(v.handbook || "no handbook")
         + " &middot; Mol* " + (window.molstar ? molstar.version : "missing")
+        + " &middot; build " + esc(window.__build || "?")
         + " &middot; <span class='muted'>everything runs in this tab</span>");
   } catch (e) {
     say("the engine failed to start: " + esc(e.message)
