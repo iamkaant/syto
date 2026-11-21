@@ -96,6 +96,7 @@ const METHODS = {
                                    a.count || 25));
   },
   async saveParty() { return toJs(engine.save_party()); },
+  async exportRows() { return toJs(engine.export_rows()); },
   async loadParty(a) { return toJs(engine.load_party(a.text)); },
   async explainAt(a) {
     return toJs(engine.explain_at(a.x, a.y, a.z, a.tolerance || 0.05));

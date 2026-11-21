@@ -27,9 +27,12 @@
     --card: #22262c; --accent: #6ba4f8; --warn: #e0b060; --warn-bg: #2e2718;
     --good: #5fd08a;
   }
-  /* Controls that only mean something in ChimeraX. The web page has its
-     own file pickers and its own Analyse button; showing a second pair
-     here would be two ways to do one thing, one of which does nothing. */
+  /* Controls that only mean something in ChimeraX, or that the web page
+     owns itself. Showing them in both places gave two ways to do one
+     thing, and the panel's copies did nothing at all in the browser: its
+     line-width slider moved and then snapped back, because nothing on
+     the other side of the bridge was listening. A control that does
+     nothing is worse than no control. */
   :root[data-host="web"] .host-chimerax { display: none; }
   * { box-sizing: border-box; }
   /* Two columns once there is room for them. Docked in ChimeraX the panel is
@@ -181,13 +184,13 @@
 <h2>Current pose</h2>
 <div id="pose"></div>
 
-<details class="fold" id="fold-nci" ontoggle="hpRemember(this)">
+<details class="fold host-chimerax" id="fold-nci" ontoggle="hpRemember(this)">
   <summary><span>Interactions shown</span>
     <i class="sum" id="sum-nci"></i></summary>
 <div class="card" id="toggles"></div>
 </details>
 
-<details class="fold" id="fold-display" ontoggle="hpRemember(this)">
+<details class="fold host-chimerax" id="fold-display" ontoggle="hpRemember(this)">
   <summary><span>Display</span>
     <i class="sum" id="sum-display"></i></summary>
 <div class="card">

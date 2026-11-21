@@ -135,6 +135,9 @@ async function until(fn, ms, what) {
     } catch (e) { out.cellErr = String(e); }
     out.gradeHint = d.getElementById("gradestate").textContent
       .replace(/\s+/g, " ").trim();
+    out.gradeEnabled = !d.getElementById("g-good").disabled;
+    out.ribbonDefault = d.getElementById("opt-ribbon").checked;
+    out.stickSize = V.siteSize;
 
     // --- the click path, end to end --------------------------------
     if (scene.lines.length) {
@@ -303,12 +306,23 @@ def main():
                  "  ERROR: " + c["err"] if c["err"] else ""))
     check(not got.get("stateErrors"),
           "no state node failed: %s" % got.get("stateErrors"), f)
+    check(got.get("ribbonDefault") is False,
+          "the protein ribbon starts hidden, so the pocket is not buried "
+          "in it", f)
+    check(got.get("stickSize") and got["stickSize"] <= 0.12,
+          "and the pocket sticks are thin (sizeFactor %s)"
+          % got.get("stickSize"), f)
     check(got["siteFocused"],
           "with a loci to frame, so the view opens on the pocket rather "
           "than on 2800 atoms of cartoon", f)
-    check("Analyse all poses" in (got.get("gradeHint") or ""),
-          "grading says what it needs rather than just being disabled: %r"
-          % (got.get("gradeHint") or "")[:80], f)
+    # Grading used to wait for featurisation. It does not any more: an
+    # opinion about a pose needs a pose, and nothing else.
+    check("b" in (got.get("gradeHint") or "")
+          and "Analyse all poses" not in (got.get("gradeHint") or ""),
+          "grading is available as soon as a pose is on screen: %r"
+          % (got.get("gradeHint") or "")[:70], f)
+    check(got.get("gradeEnabled") is True,
+          "and the buttons are live", f)
     check(got["rows"] == got["sceneLines"] or got["rows"] > 0,
           "the list beside the view has %d row(s)" % got["rows"], f)
     check(got["toggles"] >= 8,

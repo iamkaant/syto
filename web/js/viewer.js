@@ -31,8 +31,14 @@
   var CLASH = 0xe64646;
   var SEVERE = 0xff2020;
 
+  // Thin enough to see the ligand through. 0.22 drew the pocket as
+  // tubing and buried the pose inside it.
+  var SITE_SIZE = 0.1;
+
   function Viewer(elementId) {
     this.id = elementId;
+    this.siteSize = SITE_SIZE;
+    this.lineSize = 1.0;        // multiplier on the interaction lines
     this.plugin = null;
     this.receptor = null;     // the state cell
     this.trajectory = null;
@@ -186,6 +192,33 @@
                    [{unit: hit.unit, indices: [hit.offset]}]);
   }
 
+  // The cartoon is context. It is also most of what you see when the
+  // camera is anywhere near the protein, and it hides the pocket sticks
+  // inside it, so it starts hidden and is a toggle rather than a given.
+  Viewer.prototype.setRibbon = function (on) {
+    this.ribbon = !!on;
+    var found = false;
+    try {
+      this.plugin.state.data.cells.forEach(function (cell) {
+        var o = cell.obj;
+        if (!o || !o.label) return;
+        if (o.label !== "Cartoon") return;
+        found = true;
+      });
+      // Visibility is a state flag, not a parameter: toggling it does not
+      // rebuild the representation.
+      var refs = [];
+      this.plugin.state.data.cells.forEach(function (cell, ref) {
+        if (cell.obj && cell.obj.label === "Cartoon") refs.push(ref);
+      });
+      var p = this.plugin;
+      refs.forEach(function (ref) {
+        p.state.data.updateCellState(ref, {isHidden: !on});
+      });
+    } catch (e) { /* nothing to hide yet */ }
+    return found;
+  };
+
   // ------------------------------------------------------- binding site
   //
   // The residues lining the pocket, as sticks. Which atoms those are is
@@ -235,7 +268,8 @@
              {bundle: bundle, label: "binding site"})
       .apply(ST.Representation.StructureRepresentation3D, {
         type: {name: "ball-and-stick",
-               params: {sizeFactor: 0.22, aromaticBonds: false}},
+               params: {sizeFactor: this.siteSize, aromaticBonds: false,
+                        sizeAspectRatio: 0.5}},
         colorTheme: {name: "element-symbol",
                      params: {carbonColor: {name: "element-symbol",
                                             params: {}}}},
@@ -292,6 +326,7 @@
     if (!this._index) this._buildIndex();
 
     var mm = this.plugin.managers.structure.measurement;
+    var self = this;
     var drawn = 0, missed = 0;
     var rows = [];
 
@@ -299,7 +334,7 @@
       rows.push({a: l.a, b: l.b,
                  color: COLORS[l.kind] === undefined ? 0x8b93a3 : COLORS[l.kind],
                  dash: l.quality >= 0.55 ? 0.1 : 0.45,
-                 size: 0.08 + 0.1 * l.quality,
+                 size: (0.08 + 0.1 * l.quality) * self.lineSize,
                  text: l.kind.replace(/_/g, " ") + "  "
                        + l.distance.toFixed(2) + " Å  q "
                        + l.quality.toFixed(2)});
@@ -307,7 +342,7 @@
     if (opts.clashes !== false) {
       (scene.clashes || []).forEach(function (c) {
         rows.push({a: c.a, b: c.b, color: c.severe ? SEVERE : CLASH,
-                   dash: 0.2, size: 0.12,
+                   dash: 0.2, size: 0.12 * self.lineSize,
                    text: "clash " + c.overlap.toFixed(2) + " Å"});
       });
     }

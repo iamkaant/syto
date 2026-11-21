@@ -122,6 +122,46 @@ check(abs(snap()["options"]["line_width"] - 0.12) < 1e-6,
       "and the slider would read it back")
 run(session, "hitpick width 0.075")
 
+print("\n[3b] the panel's own URLs reach those commands")
+# The sliders and checkboxes do not call the command directly: they
+# navigate to hitpick:/<path>, which handle_scheme dispatches. A path
+# that is not wired there is silently ignored - the control does
+# nothing and resets on the next refresh, which is exactly what a
+# missing registration looks like from the outside.
+from Qt.QtCore import QUrl
+stub.html_view = None
+hs = types.MethodType(HandbookTool.handle_scheme, stub)
+
+
+def visit(path, **q):
+    qs = "&".join("%s=%s" % (k, v) for k, v in q.items())
+    hs(QUrl("hitpick:/%s%s" % (path, ("?" + qs) if qs else "")))
+
+
+visit("width", value="0.14")
+check(abs(get_state(session).options.line_width - 0.14) < 1e-6,
+      "hitpick:/width sets the width (%.3f)"
+      % get_state(session).options.line_width)
+check(abs(snap()["options"]["line_width"] - 0.14) < 1e-6,
+      "and the slider reads it back, so it does not snap home")
+visit("width", value="0.075")
+
+visit("autoexplain", on="0")
+check(get_state(session).options.handbook_on_click is False,
+      "hitpick:/autoexplain reaches the option")
+visit("autoexplain", on="1")
+
+visit("reveal", on="1")
+check(get_state(session).options.reveal_partners is True,
+      "hitpick:/reveal reaches the option")
+visit("reveal", on="0")
+
+rows_now = snap()["torsions"]
+if rows_now:
+    visit("torsion", bond=rows_now[0]["bond"])
+    check(get_state(session).last_torsion is not None,
+          "hitpick:/torsion selects a torsion from the list")
+
 print("\n[4] the torsion list is the flagged set, worst first")
 rows = snap()["torsions"]
 check(isinstance(rows, list) and rows, "%d flagged torsion(s) listed"

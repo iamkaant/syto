@@ -85,11 +85,25 @@ async function until(fn, ms, what) {
     out.poses = w.HP.state().poses.length;
     log("loaded " + out.poses + " poses");
 
-    // --- grading before featurising must be refused, not silently lost
+    // --- a party with no model at all --------------------------------
+    // Grading must not require featurising: most of a hit-picking party
+    // is walking a list and writing down what you think.
+    d.getElementById("opt-advance").checked = false;
+    d.getElementById("pose").value = "0";
+    d.getElementById("pose").dispatchEvent(new w.Event("change"));
+    await sleep(600);
     await w.HP.grade("good");
     await sleep(400);
     out.gradedBeforeFeaturise = w.HP.state().al.graded || 0;
-    out.earlyWarning = d.getElementById("status").textContent;
+    out.gradeHintEarly = d.getElementById("gradestate").textContent
+      .replace(/\s+/g, " ").trim();
+    // and it must be exportable and saveable with no model in sight
+    var earlyCsv = await w.HP.bridge.call("exportRows", {});
+    out.earlyRows = earlyCsv.rows.length;
+    out.earlyGradedRow = earlyCsv.rows[0].your_grade;
+    var earlyParty = await w.HP.bridge.call("saveParty", {});
+    out.earlySavedGrades = Object.keys(earlyParty.human_grades || {}).length;
+    out.earlySavedModel = !!earlyParty.committee;
 
     // --- analyse them all ---------------------------------------------
     var t0 = Date.now();
@@ -101,7 +115,6 @@ async function until(fn, ms, what) {
     // --- grade a spread -----------------------------------------------
     var plan = ["bad", "good", "maybe", "good", "bad", "good",
                 "maybe", "bad", "good", "maybe"];
-    d.getElementById("opt-advance").checked = false;
     for (var i = 0; i < plan.length; i++) {
       d.getElementById("pose").value = String(i);
       d.getElementById("pose").dispatchEvent(new w.Event("change"));
@@ -112,6 +125,7 @@ async function until(fn, ms, what) {
       await sleep(250);
     }
     out.graded = w.HP.state().al.graded;
+    out.gradedFeaturised = w.HP.state().al.graded_featurised;
     out.gradeCounts = w.HP.state().al.grades;
     out.canTrain = w.HP.state().al.can_train;
     log("graded " + out.graded);
@@ -143,17 +157,36 @@ async function until(fn, ms, what) {
     out.suggestBoxShown = d.getElementById("suggestbox").style.display !== "none";
     out.poseOptionHasMark = d.getElementById("pose").options[0].textContent;
 
+    var csv = await w.HP.bridge.call("exportRows", {});
+    out.csvCols = csv.columns;
+    out.csvScored = csv.rows.filter(function (r) {
+      return r.predicted !== ""; }).length;
+    out.csvGraded = csv.rows.filter(function (r) {
+      return r.your_grade !== ""; }).length;
+    out.csvAnalysed = csv.rows.filter(function (r) {
+      return r.summary !== ""; }).length;
+
     // --- save and load --------------------------------------------------
     var party = await w.HP.bridge.call("saveParty", {});
-    out.savedGrades = Object.keys(party.grades || {}).length;
+    out.savedGrades = Object.keys(party.human_grades || {}).length;
     out.savedHasModel = !!party.committee;
     var back = await w.HP.bridge.call("loadParty",
                                       {text: JSON.stringify(party)});
     out.restored = back.restored;
     out.unmatched = back.unmatched;
 
+    // Loading a party brings back grades and the model but NOT the
+    // feature vectors - they are reproducible in seconds and would make
+    // the file enormous. So predictions are unavailable until the poses
+    // are analysed again, and the export has to say so by leaving the
+    // column empty rather than inventing a score.
+    var afterLoad = await w.HP.bridge.call("exportRows", {});
+    out.scoredAfterLoad = afterLoad.rows.filter(function (r) {
+      return r.predicted !== ""; }).length;
+
     // a party from a different file must not pretend to fit
     var alien = JSON.parse(JSON.stringify(party));
+    alien.human_grades = {"999|NOT_IN_THIS_FILE": "good"};
     alien.grades = {"999|NOT_IN_THIS_FILE": 2};
     var bad = await w.HP.bridge.call("loadParty",
                                      {text: JSON.stringify(alien)});
@@ -206,21 +239,32 @@ def main():
     check(not got.get("errors"),
           "no JavaScript error (%s)" % ("; ".join(got["errors"]) or "none"), f)
 
-    check(got["gradedBeforeFeaturise"] == 0,
-          "a grade before the poses are analysed is refused, not lost "
-          "silently", f)
-    check("analyse the poses first" in (got.get("earlyWarning") or ""),
-          "and it says why: %r" % (got.get("earlyWarning") or "")[:70], f)
+    check(got["gradedBeforeFeaturise"] == 1,
+          "a pose can be graded with no model and nothing analysed "
+          "(%d recorded)" % got["gradedBeforeFeaturise"], f)
+    check("you graded this" in (got.get("gradeHintEarly") or ""),
+          "and the page says so: %r" % (got.get("gradeHintEarly") or "")[:60],
+          f)
+    check(got["earlyRows"] == got["poses"]
+          and got["earlyGradedRow"] == "good",
+          "the results export works with no model: %d row(s), first is %r"
+          % (got["earlyRows"], got["earlyGradedRow"]), f)
+    check(got["earlySavedGrades"] == 1 and not got["earlySavedModel"],
+          "and a party with opinions and no model still saves", f)
 
     check(got["featurised"] == got["poses"],
           "every pose featurised (%d of %d) in %.1f s"
           % (got["featurised"], got["poses"], got["featuriseMs"] / 1000.0), f)
 
     check(got["graded"] == 10,
-          "ten grades reached the learner (%d)" % got["graded"], f)
+          "ten grades recorded (%d)" % got["graded"], f)
     counts = got.get("gradeCounts") or {}
     check(sorted(counts.values()) == [3, 3, 4],
           "spread across all three (%s)" % counts, f)
+    check(got.get("gradedFeaturised") == 10,
+          "and all of them reached the learner once analysed (%s) - "
+          "including the one given before anything was"
+          % got.get("gradedFeaturised"), f)
     check(got["canTrain"] is True, "which is enough to train", f)
     check(got["afterHotkey"] == 11 and got["hotkeyGrade"] == "good",
           "the b/m/g hotkey grades too (%s on pose 12)"
@@ -239,6 +283,16 @@ def main():
           "and the pose list marks what you graded: %r"
           % got.get("poseOptionHasMark"), f)
 
+    check(got["scoredAfterLoad"] == 0,
+          "after loading a party the score column is empty until the poses "
+          "are analysed again, rather than carrying an invented number "
+          "(%d scored)" % got["scoredAfterLoad"], f)
+    check(got["csvGraded"] == 11 and got["csvScored"] == got["poses"]
+          and got["csvAnalysed"] == got["poses"],
+          "the results CSV carries %d grade(s), %d prediction(s) and %d "
+          "analysed pose(s) over %s columns"
+          % (got["csvGraded"], got["csvScored"], got["csvAnalysed"],
+             len(got["csvCols"])), f)
     check(got["savedGrades"] == 11 and got["savedHasModel"],
           "a saved party carries %d grade(s) and the model"
           % got["savedGrades"], f)

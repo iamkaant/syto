@@ -122,6 +122,18 @@
         Clashes</label>
       <label class="chk"><input type="checkbox" id="opt-site" checked>
         Pocket residues as sticks</label>
+      <label class="chk"><input type="checkbox" id="opt-ribbon">
+        Protein ribbon</label>
+      <label class="chk" style="gap:9px">
+        <input type="range" id="opt-stick" min="0.04" max="0.3" step="0.01"
+               value="0.1" style="flex:1">
+        <span style="white-space:nowrap">sticks <b id="stickval">0.10</b></span>
+      </label>
+      <label class="chk" style="gap:9px">
+        <input type="range" id="opt-linew" min="0.4" max="3" step="0.1"
+               value="1" style="flex:1">
+        <span style="white-space:nowrap">lines <b id="linewval">1.0</b>&times;</span>
+      </label>
     </div>
 
     <h2>Grade</h2>
@@ -147,6 +159,7 @@
       <div id="modelstate" class="tiny muted" style="margin-top:6px"></div>
       <div class="row" style="margin-top:7px">
         <button id="save" class="tiny">Save party</button>
+        <button id="csv" class="tiny">Results CSV</button>
         <button id="load" class="tiny">Load&hellip;</button>
         <input type="file" id="loadfile" accept=".json" style="display:none">
       </div>
@@ -304,6 +317,8 @@ $("go").onclick = async () => {
       viewer = new HPViewer.Viewer("view");
       await viewer.start();
       viewer.onAtomClick = onAtomClick;
+      viewer.siteSize = +$("opt-stick").value;
+      viewer.lineSize = +$("opt-linew").value;
     }
     say("drawing&hellip;");
     const nrec = await viewer.loadReceptor(files.rec.text, "pdb");
@@ -325,6 +340,7 @@ $("go").onclick = async () => {
     $("pose").onchange = () => analyse(+$("pose").value);
     $("posebox").style.display = "";
     renderToggles();
+    viewer.setRibbon($("opt-ribbon").checked);
     await analyse(0);
     viewer.focusSite();
   } catch (e) {
@@ -342,6 +358,7 @@ $("g-good").onclick = () => gradePose("good");
 $("featurise").onclick = featuriseAll;
 $("strategy").onchange = refreshSuggestions;
 $("save").onclick = savePartyFile;
+$("csv").onclick = saveResultsCsv;
 $("load").onclick = () => $("loadfile").click();
 $("loadfile").onchange = async () => {
   if ($("loadfile").files[0]) await loadPartyFile($("loadfile").files[0]);
@@ -373,9 +390,53 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "ArrowRight") { e.preventDefault(); $("next").click(); }
   else if (e.key === "ArrowLeft") { e.preventDefault(); $("prev").click(); }
 });
-$("opt-labels").onchange = redraw;
-$("opt-clashes").onchange = redraw;
+$("opt-labels").onchange = () => { saveView(); redraw(); };
+$("opt-clashes").onchange = () => { saveView(); redraw(); };
 $("opt-site").onchange = redraw;
+$("opt-ribbon").onchange = () => {
+  if (viewer) viewer.setRibbon($("opt-ribbon").checked);
+  saveView();
+};
+$("opt-stick").oninput = () => {
+  $("stickval").textContent = (+$("opt-stick").value).toFixed(2);
+};
+$("opt-stick").onchange = async () => {
+  if (viewer) viewer.siteSize = +$("opt-stick").value;
+  saveView(); await redraw();
+};
+$("opt-linew").oninput = () => {
+  $("linewval").textContent = (+$("opt-linew").value).toFixed(1);
+};
+$("opt-linew").onchange = async () => {
+  if (viewer) viewer.lineSize = +$("opt-linew").value;
+  saveView(); await redraw();
+};
+
+// These are preferences, not state: they should survive a reload, which
+// is what "the setting is not saved" meant.
+function saveView() {
+  try {
+    localStorage.setItem("hitpicking.view", JSON.stringify({
+      site: $("opt-site").checked, ribbon: $("opt-ribbon").checked,
+      stick: +$("opt-stick").value, linew: +$("opt-linew").value,
+      labels: $("opt-labels").checked, clashes: $("opt-clashes").checked
+    }));
+  } catch (e) { /* private window */ }
+}
+function restoreView() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem("hitpicking.view") || "null"); }
+  catch (e) { d = null; }
+  if (!d) d = {};
+  if (d.site !== undefined) $("opt-site").checked = !!d.site;
+  if (d.ribbon !== undefined) $("opt-ribbon").checked = !!d.ribbon;
+  if (d.labels !== undefined) $("opt-labels").checked = !!d.labels;
+  if (d.clashes !== undefined) $("opt-clashes").checked = !!d.clashes;
+  if (d.stick) $("opt-stick").value = d.stick;
+  if (d.linew) $("opt-linew").value = d.linew;
+  $("stickval").textContent = (+$("opt-stick").value).toFixed(2);
+  $("linewval").textContent = (+$("opt-linew").value).toFixed(1);
+}
 
 // ------------------------------------------------------------ analysing
 async function analyse(i) {
@@ -441,21 +502,20 @@ function setGradeButtons(current) {
   GRADES.forEach((g) => {
     const b = $("g-" + g);
     b.classList.toggle("on", current === g);
-    b.disabled = !featurisedNow();
+    b.disabled = !canGradeNow();
   });
 }
-function featurisedNow() {
-  return alState.poses > 0 && current < alState.poses;
+// Grading needs a pose loaded, and nothing else. A grade is a person's
+// opinion; the model is optional and comes later, if at all.
+function canGradeNow() {
+  return poses.length > 0;
 }
 
 // A disabled button with no explanation is the worst of both worlds: it
 // looks broken and it teaches nothing. Grading needs the pose featurised,
 // so when it is not, say so and point at the button that fixes it.
 function gradeState(i) {
-  if (!featurisedNow()) {
-    return "<b>Analyse all poses</b> first (under Model) &mdash; a grade "
-         + "only means something once the model has the features.";
-  }
+  if (!canGradeNow()) return "load a receptor and some poses first";
   if (gradeOf(i)) return "you graded this <b>" + esc(gradeOf(i)) + "</b>";
   if (predicted[i]) {
     return "the model predicts <b>" + esc(predicted[i].grade) + "</b> ("
@@ -504,7 +564,8 @@ async function refreshAl() {
   const g = alState.grades || {};
   const n = alState.graded || 0;
   $("modelstate").innerHTML =
-    (alState.poses || 0) + " pose(s) analysed &middot; " + n + " graded"
+    n + " graded"
+    + (alState.poses ? " &middot; " + alState.poses + " analysed" : "")
     + (n ? "<br><span class='counts'>"
         + "<span style='color:#e88'>bad " + (g.bad || 0) + "</span>"
         + "<span style='color:#e3c07a'>maybe " + (g.maybe || 0) + "</span>"
@@ -522,11 +583,7 @@ let myGrades = {};          // index -> grade, mirrored for the UI
 function gradeOf(i) { return myGrades[i] || null; }
 
 async function gradePose(value) {
-  if (!featurisedNow()) {
-    say("analyse the poses first &mdash; the model needs the features "
-        + "before a grade means anything", true);
-    return;
-  }
+  if (!canGradeNow()) return;
   try {
     alState = await bridge.call("grade", {index: current, value: value});
   } catch (e) {
@@ -588,15 +645,42 @@ function restoreLocal() {
   } catch (e) { return null; }
 }
 
+function download(name, text, mime) {
+  const blob = new Blob([text], {type: mime || "text/plain"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+function csvCell(v) {
+  const s = String(v == null ? "" : v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+// The thing that leaves the building. The saved party is for carrying on
+// later; this is the list you take to the meeting.
+async function saveResultsCsv() {
+  try {
+    const r = await bridge.call("exportRows", {});
+    const cols = r.columns;
+    const lines = [cols.join(",")];
+    r.rows.forEach((row) => {
+      lines.push(cols.map((c) => csvCell(row[c])).join(","));
+    });
+    const base = (files.lig ? files.lig.name : "poses").replace(/\.[^.]+$/, "");
+    download(base + "-hitpicking.csv", lines.join("\n"), "text/csv");
+    say("wrote " + r.rows.length + " row(s)");
+  } catch (e) {
+    say("could not export: " + esc(e.message), true);
+  }
+}
+
 async function savePartyFile() {
   try {
     const st = await bridge.call("saveParty", {});
-    const blob = new Blob([JSON.stringify(st)], {type: "application/json"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "party.json";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    download("party.json", JSON.stringify(st), "application/json");
   } catch (e) {
     say("nothing to save yet: " + esc(e.message), true);
   }
@@ -779,6 +863,7 @@ async function freshStart() {
     return;
   }
   renderToggles();
+  restoreView();
   if (location.protocol === "file:") { fileProtocolNotice(); return; }
   registerOffline();
   // Which build is on screen, stated rather than guessed at. Two bugs

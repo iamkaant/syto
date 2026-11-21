@@ -233,6 +233,17 @@ def featurise(start=0, count=1, strain=True):
         lr.add_features(key, pose_features(res, terms=lr.score_terms),
                         res.scores)
         _STATE.setdefault("keys", {})[i] = key
+        # A grade given before this pose was featurised is still a grade;
+        # hand it over now rather than losing it.
+        pending = (_STATE.get("grades") or {}).get(key)
+        if pending:
+            lr.grade(key, pending)
+        _STATE.setdefault("summary", {})[i] = {
+            "name": name, "summary": res.summary(),
+            "counts": dict(res.counts),
+            "worst_overlap": (round(float(res.strain.worst_overlap), 2)
+                              if res.strain is not None else None),
+        }
         done += 1
     total = time.perf_counter() - t0
 
@@ -270,12 +281,28 @@ def _index_of(key):
 
 
 def grade(index, value):
-    """Record one human judgement. `value` is bad / maybe / good, or None."""
-    lr = _learner()
-    key = (_STATE.get("keys") or {}).get(int(index))
-    if key is None:
-        raise RuntimeError("pose %s has not been featurised yet" % index)
-    lr.grade(key, value if value else None)
+    """Record one human judgement. `value` is bad / maybe / good, or None.
+
+    A grade is a person's opinion about a pose. It does not need a model,
+    a feature vector, or anything else to exist - and requiring one meant
+    you could not simply walk a list and write down what you thought,
+    which is what a hit-picking party mostly is. So the grade is recorded
+    here regardless, and handed to the learner if and when that pose is
+    featurised.
+    """
+    i = int(index)
+    poses = _STATE["poses"]
+    if not (0 <= i < len(poses)):
+        raise IndexError("pose %d of %d" % (i, len(poses)))
+    key = _key(i)
+    grades = _STATE.setdefault("grades", {})
+    if value:
+        grades[key] = str(value)
+    else:
+        grades.pop(key, None)
+    lr = _STATE.get("learner")
+    if lr is not None and key in lr.features:
+        lr.grade(key, value if value else None)
     return al_status()
 
 
@@ -346,11 +373,25 @@ def save_party():
     the browser can be finished in ChimeraX.
     """
     lr = _STATE.get("learner")
+    human = dict(_STATE.get("grades") or {})
     if lr is None:
-        raise RuntimeError("nothing to save yet")
+        # A party with opinions and no model is a perfectly good party.
+        # Refusing to save it was the model's needs standing in for the
+        # user's, which is the thing this whole change is about.
+        if not human:
+            raise RuntimeError("nothing to save yet")
+        return _json({"feature_version": None, "grades": {},
+                      "human_grades": human,
+                      "poses": {str(i): _key(i)
+                                for i in range(len(_STATE.get("poses") or []))},
+                      "receptor": _STATE.get("receptor"),
+                      "committee": None})
     st = lr.state()
     st["poses"] = {str(i): k for i, k in (_STATE.get("keys") or {}).items()}
     st["receptor"] = _STATE.get("receptor")
+    # Every opinion, including the ones on poses nobody has featurised.
+    # Those are the whole point of grading without the model.
+    st["human_grades"] = human
     return _json(st)
 
 
@@ -364,15 +405,30 @@ def load_party(text):
     """
     from hitpicking.al import Learner
     data = json.loads(text) if isinstance(text, str) else dict(text)
-    lr = Learner.from_state(data)
-    _STATE["learner"] = lr
+    human = dict(data.get("human_grades") or {})
+    if data.get("feature_version") is None and not data.get("committee"):
+        # grades only, saved before anything was analysed
+        lr = _STATE.get("learner")
+    else:
+        lr = Learner.from_state(data)
+        _STATE["learner"] = lr
+    if lr is not None and not human:
+        # a party saved before grades were kept separately
+        human = {k: lr.grades.options[v]
+                 for k, v in (data.get("grades") or {}).items()
+                 if 0 <= int(v) < len(lr.grades.options)}
+    _STATE["grades"] = human
+    if lr is not None:
+        for key, value in human.items():
+            if key in lr.features:
+                lr.grade(key, value)
 
     have = {}
     poses = _STATE["poses"]
     for i in range(len(poses)):
         have[_key(i)] = i
     matched, orphan = 0, []
-    for key in list(lr.grades.keys()):
+    for key in list(human):
         if key in have:
             matched += 1
         else:
@@ -385,14 +441,84 @@ def load_party(text):
 
 
 def al_status():
+    """Where the party is. Human grades and model state are separate.
+
+    `graded` is how many opinions have been recorded - the thing a party
+    actually produces. `graded_featurised` is how many of those the model
+    can learn from, which is a different and much less interesting number
+    until somebody wants to train.
+    """
+    human = _STATE.get("grades") or {}
+    counts = {"bad": 0, "maybe": 0, "good": 0}
+    for v in human.values():
+        if v in counts:
+            counts[v] += 1
     lr = _STATE.get("learner")
-    if lr is None:
-        return _json({"poses": 0, "graded": 0, "trained": False})
-    ok, why = lr.can_train()
-    return _json({"poses": len(lr.features), "graded": lr.n_graded,
-                  "grades": lr.grades.counts(), "trained": lr.committee
-                  is not None, "can_train": ok, "why_not": why,
-                  "score_terms": list(lr.score_terms)})
+    out = {"poses": 0 if lr is None else len(lr.features),
+           "of": len(_STATE.get("poses") or []),
+           "graded": len(human), "grades": counts,
+           "graded_featurised": 0 if lr is None else lr.n_graded,
+           "trained": bool(lr is not None and lr.committee is not None),
+           "can_train": False, "why_not": "", "score_terms": []}
+    if lr is not None:
+        ok, why = lr.can_train()
+        out["can_train"] = ok
+        out["why_not"] = why
+        out["score_terms"] = list(lr.score_terms)
+    elif human:
+        out["why_not"] = ("press Analyse all poses before training - the "
+                          "model needs the features, though your grades "
+                          "are being kept either way")
+    return _json(out)
+
+
+def export_rows():
+    """The party's result: one row a pose, as a table.
+
+    This is what leaves the building. The saved party is for carrying on
+    later; this is the list you take to the meeting - what you said,
+    what the model thinks if it was trained, and what the pose actually
+    does if it was analysed.
+    """
+    poses = _STATE.get("poses") or []
+    grades = _STATE.get("grades") or {}
+    summ = _STATE.get("summary") or {}
+    lr = _STATE.get("learner")
+    preds = {}
+    if lr is not None and lr.committee is not None:
+        try:
+            for k, p in lr.predict().items():
+                preds[k] = p
+        except Exception:
+            preds = {}
+
+    rows = []
+    for i in range(len(poses)):
+        key = _key(i)
+        p = preds.get(key) or {}
+        d = summ.get(i) or {}
+        c = d.get("counts") or {}
+        rows.append({
+            "pose": i + 1,
+            "name": _pose_name(poses[i], i),
+            "your_grade": grades.get(key, ""),
+            "predicted": p.get("grade", ""),
+            "score": "" if p.get("score") is None else round(p["score"], 3),
+            "uncertainty": ("" if p.get("uncertainty") is None
+                            else round(p["uncertainty"], 4)),
+            "hbonds": c.get("hbond", 0) + c.get("hbond_charged", 0),
+            "salt_bridges": c.get("salt_bridge", 0),
+            "stacking": (c.get("pi_stack_parallel", 0)
+                         + c.get("pi_stack_tshaped", 0)),
+            "worst_overlap": d.get("worst_overlap", ""),
+            "summary": d.get("summary", ""),
+        })
+    return _json({"rows": rows,
+                  "columns": ["pose", "name", "your_grade", "predicted",
+                              "score", "uncertainty", "hbonds",
+                              "salt_bridges", "stacking", "worst_overlap",
+                              "summary"],
+                  "receptor": _STATE.get("receptor")})
 
 
 # ------------------------------------------------------------------ scene
