@@ -34,17 +34,29 @@ web/vendor/hitpicking.zip
 .chrome-*/
 web/build.js
 
-# Research data, not source. These were committed early and should not
-# have been: saved ChimeraX sessions and a saved party are unpublished
-# work - which compounds were looked at and what was thought of them.
-# They stay on disk; git just stops carrying them.
+# Research data, not source - anywhere in the tree, not just the top.
+#
+# Receptors, poses, saved sessions and saved parties are unpublished
+# work: which compounds were looked at and what was thought of them.
+# Structure files were committed early once already and had to be cut
+# out of the history, which rewrote every commit. This is the guard that
+# stops it happening again, so it is deliberately wide.
+#
+# Nothing of this kind is tracked: the test fixtures live outside the
+# checkout and are found through $HITPICK_SAMPLES (tools/samples.py). If
+# a small fixture ever does belong in git, add it with `git add -f`.
+*.mol2
+*.pdb
+*.ent
+*.sdf
+*.sd
+*.mol
+*.cif
+*.mmcif
+*.mae
+*.maegz
+*.db2
+*.db2.gz
 *.cxs
+*.cxc
 party*.json
-
-# Receptors and pose files dropped in the top of the checkout to try the
-# page. These are research data - which compounds were looked at - and
-# they are what the history rewrite had to strip out once already.
-/*.mol2
-/*.sdf
-/*.pdb
-/*.ent
