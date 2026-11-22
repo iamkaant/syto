@@ -133,6 +133,10 @@ class HandbookTool(HtmlToolInstance):
                         scales.append(sc)
                 snap["scales"] = scales
                 snap["scale"] = scales[0] if scales else None
+        # The pseudobond colours, so the panel's list can carry the same
+        # swatch the 3D view draws it with. One definition, two renderings.
+        snap["colors"] = {k: "#%02x%02x%02x" % tuple(v[:3])
+                          for k, v in render.TYPE_COLORS.items()}
         return snap
 
     # ------------------------------------------------------- UI -> state

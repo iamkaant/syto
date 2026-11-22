@@ -157,6 +157,10 @@
   .scale .lbl.on { fill: var(--fg); font-weight: 600; }
   .scale .ax { font-size: 8px; fill: var(--muted); }
   .scale-note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  /* The type's colour, next to the quality bar: which line in the 3D
+     view this row is. */
+  .qwrap { display: flex; align-items: center; gap: 5px; }
+  .kindsw { width: 8px; height: 14px; border-radius: 2px; flex: none; }
   .band { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
           margin-right: 4px; vertical-align: middle; }
   .band.good { background: #1e8c46; }
@@ -411,6 +415,11 @@ window.hpSetState = function (s) {
     }
   }
 
+  // One swatch per row, in the colour that host drew the line in. The
+  // colours are not kept here: a third copy would be a legend that can
+  // quietly stop matching the picture.
+  window.hpColors = s.colors || window.hpColors || {};
+
   hpFoldSummary(s);
 
   window.hpShowScale = s.options ? (s.options.show_scale !== false) : true;
@@ -532,7 +541,10 @@ function renderPose(p) {
       }
       h += '<tr class="ix" onclick="hp(\'highlight\',{atoms:\''
         + (i.lig_atoms || []).concat(i.rec_atoms || []).join(",") + '\'})">'
-        + '<td style="width:40px">' + qbar(i.quality) + '</td>'
+        + '<td style="width:52px"><div class="qwrap">' + qbar(i.quality)
+        + '<i class="kindsw" style="background:'
+        + ((window.hpColors || {})[i.kind] || "var(--muted)")
+        + '"></i></div></td>'
         + '<td><b>' + esc(i.kind.replace(/_/g, " ")) + '</b><br>'
         + '<span class="val tiny">' + terms.join(" &nbsp; ") + "</span>"
         + '<br><span class="tiny muted">' + esc(i.label) + '</span>'

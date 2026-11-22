@@ -31,6 +31,7 @@
   var CLASH = 0xe64646;
   var SEVERE = 0xff2020;
   var TORSION = 0xffb020;  // the picked torsion, a colour nothing else uses
+  var SITE_LABEL = 0xd8dee9;  // residue names: readable, not competing
 
   // Thin enough to see the ligand through. 0.22 drew the pocket as
   // tubing and buried the pose inside it.
@@ -44,6 +45,7 @@
   function Viewer(elementId) {
     this.id = elementId;
     this.siteSize = SITE_SIZE;
+    this.siteLabels = false;   // residue names on the pocket, off by default
     this.lineSize = 1.0;        // multiplier on the interaction lines
     this.textSize = TEXT_SIZE;  // the label beside each line
     this.plugin = null;
@@ -243,6 +245,30 @@
                    [{unit: hit.unit, indices: [hit.offset]}]);
   }
 
+  // A loci over several atoms. Mol* measures between the centres of the
+  // two loci it is given, so a whole ring in one loci is a line drawn to
+  // that ring's centroid - which is where the core measured from. Drawn
+  // from one ring atom instead, a good stack looks like a bad one.
+  Viewer.prototype.lociOver = function (coords) {
+    var SE = global.molstar.lib.structure.StructureElement;
+    var byUnit = new Map();
+    var structure = null;
+    for (var i = 0; i < coords.length; i++) {
+      var hit = this.atomAt(coords[i]);
+      if (!hit) continue;
+      structure = hit.structure;
+      if (!byUnit.has(hit.unit)) byUnit.set(hit.unit, []);
+      byUnit.get(hit.unit).push(hit.offset);
+    }
+    if (!structure) return null;
+    var elements = [];
+    byUnit.forEach(function (offsets, unit) {
+      offsets.sort(function (a, b) { return a - b; });
+      elements.push({unit: unit, indices: offsets});
+    });
+    return SE.Loci(structure, elements);
+  };
+
   // The cartoon is context. It is also most of what you see when the
   // camera is anywhere near the protein, and it hides the pocket sticks
   // inside it, so it starts hidden and is a toggle rather than a given.
@@ -314,18 +340,36 @@
 
     var ST = global.molstar.lib.plugin.StateTransforms;
     var bundle = SE.Bundle.fromLoci(loci);
-    var update = this.plugin.build().to(this.receptor)
+    // The selection is the handle: the sticks hang off it, and so do the
+    // residue labels when they are on, so one delete clears both.
+    var sel = this.plugin.build().to(this.receptor)
       .apply(ST.Model.StructureSelectionFromBundle,
-             {bundle: bundle, label: "binding site"})
-      .apply(ST.Representation.StructureRepresentation3D, {
-        type: {name: "ball-and-stick",
-               params: {sizeFactor: this.siteSize, aromaticBonds: false,
-                        sizeAspectRatio: 0.5}},
-        colorTheme: {name: "element-symbol",
-                     params: {carbonColor: {name: "element-symbol",
-                                            params: {}}}},
-        sizeTheme: {name: "physical", params: {}}
-      });
+             {bundle: bundle, label: "binding site"});
+    sel.apply(ST.Representation.StructureRepresentation3D, {
+      type: {name: "ball-and-stick",
+             params: {sizeFactor: this.siteSize, aromaticBonds: false,
+                      sizeAspectRatio: 0.5}},
+      colorTheme: {name: "element-symbol",
+                   params: {carbonColor: {name: "element-symbol",
+                                          params: {}}}},
+      sizeTheme: {name: "physical", params: {}}
+    });
+    // One label per residue, not per atom: a pocket labelled atom by atom
+    // is unreadable, and "ASP149" is the thing you are trying to read.
+    if (this.siteLabels) {
+      sel.apply(ST.Representation.StructureRepresentation3D, {
+        type: {name: "label",
+               params: {level: "residue",
+                        background: true, backgroundOpacity: 0.55,
+                        borderWidth: 0.1,
+                        attachment: "middle-center",
+                        sizeFactor: 1,
+                        textSize: this.textSize * 2.2}},
+        colorTheme: {name: "uniform", params: {value: SITE_LABEL}},
+        sizeTheme: {name: "uniform", params: {}}
+      }, {tags: ["hp-sitelabels"]});
+    }
+    var update = sel;
     await update.commit();
     this.site = update.selector ? update.selector.ref : null;
     if (!this.site) {
@@ -445,6 +489,9 @@
 
     (scene.lines || []).forEach(function (l) {
       rows.push({a: l.a, b: l.b,
+                 // the ring sides, where the core measured a centroid
+                 aSpan: l.a_span && l.a_span.length > 1 ? l.a_span : null,
+                 bSpan: l.b_span && l.b_span.length > 1 ? l.b_span : null,
                  color: COLORS[l.kind] === undefined ? 0x8b93a3 : COLORS[l.kind],
                  dash: l.quality >= 0.55 ? 0.1 : 0.45,
                  size: (0.08 + 0.1 * l.quality) * self.lineSize,
@@ -462,12 +509,17 @@
       });
     }
 
+    this.lastSpans = [];
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       var ha = this.atomAt(r.a), hb = this.atomAt(r.b);
       if (!ha || !hb) { missed++; continue; }
+      var la = (r.aSpan && this.lociOver(r.aSpan)) || lociFor(ha);
+      var lb = (r.bSpan && this.lociOver(r.bSpan)) || lociFor(hb);
+      this.lastSpans.push([r.aSpan ? r.aSpan.length : 1,
+                           r.bSpan ? r.bSpan.length : 1]);
       try {
-        var cell = await mm.addDistance(lociFor(ha), lociFor(hb), {
+        var cell = await mm.addDistance(la, lb, {
           visualParams: {
             linesColor: r.color, linesSize: r.size, dashLength: r.dash,
             textColor: r.color, textSize: self.textSize,

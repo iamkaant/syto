@@ -523,6 +523,12 @@ def export_rows():
 
 # ------------------------------------------------------------------ scene
 
+# Interactions whose geometry is about a ring as a whole: the distance
+# reported for these was measured to a centroid, not to an atom.
+CENTROID_KINDS = frozenset(("pi_stack_parallel", "pi_stack_tshaped",
+                            "cation_pi"))
+
+
 def scene(index=None):
     """What to draw, as coordinates, for the last analysed pose.
 
@@ -546,11 +552,36 @@ def scene(index=None):
         return [round(float(v[0]), 3), round(float(v[1]), 3),
                 round(float(v[2]), 3)]
 
+    # Which side of which interaction is a ring, so the page can draw
+    # the line where the measurement was actually made. A stack measured
+    # between two ring centroids but drawn from one ring atom to another
+    # is a picture of something that was never computed - and it looks
+    # like a bad stack when the numbers say it is a good one.
+    ring_sets = set()
+    try:
+        for r in ms.rings():
+            ring_sets.add(frozenset(int(a) for a in r))
+    except Exception:
+        pass
+
+    def endpoint(atoms):
+        """(coordinates to span, whether they are a ring)."""
+        ats = [int(a) for a in atoms]
+        if len(ats) >= 5 and frozenset(ats) in ring_sets:
+            return [xyz(a) for a in ats], True
+        # The other side of a cation-pi is the charged group. The
+        # measurement was made from its heteroatom, so that is where the
+        # line belongs - not the carbon that happens to be first.
+        for a in ats:
+            if str(ms.element[a]) not in ("C", "H"):
+                return [xyz(a)], False
+        return [xyz(ats[0])], False
+
     lines = []
     for it in res.interactions:
         if not it.lig_atoms or not it.rec_atoms:
             continue
-        lines.append({
+        row = {
             "kind": it.kind,
             "quality": round(float(it.quality), 3),
             "distance": round(float(it.distance), 3),
@@ -558,7 +589,14 @@ def scene(index=None):
             "a": xyz(it.lig_atoms[0]),
             "b": xyz(it.rec_atoms[0]),
             "flags": list(it.flags or ()),
-        })
+        }
+        if it.kind in CENTROID_KINDS:
+            a_pts, a_ring = endpoint(it.lig_atoms)
+            b_pts, b_ring = endpoint(it.rec_atoms)
+            row["a_span"] = a_pts
+            row["b_span"] = b_pts
+            row["spans"] = [bool(a_ring), bool(b_ring)]
+        lines.append(row)
 
     clashes = []
     sr = res.strain

@@ -162,6 +162,8 @@
         Clashes</label>
       <label class="chk"><input type="checkbox" id="opt-site" checked>
         Pocket residues as sticks</label>
+      <label class="chk"><input type="checkbox" id="opt-reslabels">
+        Name the pocket residues</label>
       <label class="chk"><input type="checkbox" id="opt-ribbon">
         Protein ribbon</label>
       <label class="chk" style="gap:9px">
@@ -170,7 +172,10 @@
         <span style="white-space:nowrap">sticks <b id="stickval">0.10</b></span>
       </label>
       <label class="chk" style="gap:9px">
-        <input type="range" id="opt-linew" min="0.4" max="3" step="0.1"
+        <!-- 1x is the ceiling: past it the lines are thicker than the
+             bonds they are drawn between and the pose disappears behind
+             its own annotation. -->
+        <input type="range" id="opt-linew" min="0.3" max="1" step="0.05"
                value="1" style="flex:1">
         <span style="white-space:nowrap">lines <b id="linewval">1.0</b>&times;</span>
       </label>
@@ -222,8 +227,6 @@
       </div>
     </div>
 
-    <h2>Interactions</h2>
-    <div id="list"><p class="tiny muted">Nothing analysed yet.</p></div>
   </aside>
 
   <div class="gutter" id="gut-l" title="drag to resize"></div>
@@ -313,6 +316,11 @@ function baseSnapshot(hit, scales) {
       hover_detail: false, line_width: 0.075,
       handbook_on_click: true, reveal_partners: false
     },
+    // The panel draws a swatch per row. The colours come from the
+    // viewer rather than being written out again here, so the list and
+    // the picture cannot disagree.
+    colors: Object.fromEntries(TYPES.map((t) =>
+      [t[0], hex(HPViewer.COLORS[t[0]] || 0x8b93a3)])),
     pose: lastResult ? {
       name: lastResult.name, counts: lastResult.counts,
       warnings: lastResult.warnings, interactions: lastResult.interactions,
@@ -391,6 +399,7 @@ $("go").onclick = async () => {
         say("that click landed on a " + esc(String(kind).replace("-loci", ""))
             + ", not an atom or a bond");
       viewer.siteSize = +$("opt-stick").value;
+      viewer.siteLabels = $("opt-reslabels").checked;
       viewer.lineSize = +$("opt-linew").value;
       viewer.textSize = +$("opt-text").value;
     }
@@ -468,7 +477,12 @@ $("opt-labels").onchange = () => { saveView(); redraw(); };
 $("opt-legend").onchange = () => { saveView(); renderLegend(lastScene); };
 $("reset").onclick = resetView;
 $("opt-clashes").onchange = () => { saveView(); redraw(); };
-$("opt-site").onchange = redraw;
+$("opt-site").onchange = () => { saveView(); redraw(); };
+$("opt-reslabels").onchange = () => {
+  if (viewer) viewer.siteLabels = $("opt-reslabels").checked;
+  saveView();
+  redraw();
+};
 $("opt-ribbon").onchange = () => {
   if (viewer) viewer.setRibbon($("opt-ribbon").checked);
   saveView();
@@ -559,6 +573,7 @@ function saveView() {
       text: +$("opt-text").value,
       labels: $("opt-labels").checked, clashes: $("opt-clashes").checked,
       legend: $("opt-legend").checked,
+      reslabels: $("opt-reslabels").checked,
       left: columnWidth("--left"), right: columnWidth("--right")
     }));
   } catch (e) { /* private window */ }
@@ -573,8 +588,11 @@ function restoreView() {
   if (d.labels !== undefined) $("opt-labels").checked = !!d.labels;
   if (d.clashes !== undefined) $("opt-clashes").checked = !!d.clashes;
   if (d.legend !== undefined) $("opt-legend").checked = !!d.legend;
+  if (d.reslabels !== undefined) $("opt-reslabels").checked = !!d.reslabels;
   if (d.stick) $("opt-stick").value = d.stick;
-  if (d.linew) $("opt-linew").value = d.linew;
+  // A width saved when the slider went to 3x is outside the range now;
+  // the input would clamp it silently and the readout would lie.
+  if (d.linew) $("opt-linew").value = Math.min(+d.linew, 1);
   if (d.text) $("opt-text").value = d.text;
   $("stickval").textContent = (+$("opt-stick").value).toFixed(2);
   $("linewval").textContent = (+$("opt-linew").value).toFixed(1);
@@ -607,7 +625,6 @@ async function analyse(i) {
   await viewer.showPose(i);
   if (my !== analyseSeq) return;
   renderPose(res);
-  renderList(res);
   await redraw();
   if (my !== analyseSeq) return;
   sendPanel(baseSnapshot());
@@ -1060,23 +1077,6 @@ function renderPose(r) {
     h += '<div class="card warn tiny">' + esc(w) + "</div>";
   });
   $("pose-out").innerHTML = h;
-}
-
-function renderList(r) {
-  const rows = r.interactions || [];
-  if (!rows.length) {
-    $("list").innerHTML = '<p class="tiny muted">No interactions of the '
-      + "selected types.</p>";
-    return;
-  }
-  $("list").innerHTML = '<div class="card">' + rows.map((i) =>
-    '<div class="irow"><div class="row" style="justify-content:space-between">'
-    + "<b class='tiny'>" + esc(i.kind.replace(/_/g, " ")) + "</b>"
-    + "<span class='tiny muted'>" + i.distance.toFixed(2) + " Å</span>"
-    + "</div><div class='q' style='width:" + Math.round(i.quality * 100)
-    + "%;background:" + hex(HPViewer.COLORS[i.kind] || 0x8b93a3) + "'></div>"
-    + "<div class='tiny muted'>" + esc(i.label) + "</div></div>").join("")
-    + "</div>";
 }
 
 // A handle on the page's own objects. `const` at the top level of a

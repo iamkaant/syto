@@ -97,7 +97,13 @@ async function until(fn, ms, what) {
     out.firstMs = Date.now() - t0;
     out.loadmsg = d.getElementById("loadmsg").textContent;
     out.posen = d.getElementById("posen").textContent;
-    out.rows = d.querySelectorAll("#list .irow").length;
+    var pdoc = d.getElementById("hb").contentDocument;
+    out.rows = pdoc.querySelectorAll("#pose tr.ix").length;
+    out.swatches = pdoc.querySelectorAll("#pose tr.ix .kindsw").length;
+    out.swatchColor = (pdoc.querySelector("#pose tr.ix .kindsw") || {})
+      .getAttribute ? pdoc.querySelector("#pose tr.ix .kindsw")
+        .getAttribute("style") : "";
+    out.oldList = !!d.getElementById("list");
     out.buildBadgeAfter = (d.getElementById("build") || {}).textContent || "";
     out.toggles = d.querySelectorAll("#toggles input[data-kind]").length;
     log("analysed: " + d.getElementById("status").textContent);
@@ -158,6 +164,25 @@ async function until(fn, ms, what) {
       out.gutters = d.querySelectorAll(".gutter").length;
     } catch (e) { out.dragErr = String(e); }
     out.ribbonDefault = d.getElementById("opt-ribbon").checked;
+    out.linewMax = +d.getElementById("opt-linew").max;
+    // A ring interaction must span its whole ring, not one atom of it.
+    out.ringSpan = 0;
+    (V.lastSpans || []).forEach(function (sp) {
+      out.ringSpan = Math.max(out.ringSpan, sp[0], sp[1]);
+    });
+    // Residue names on the pocket, on demand.
+    d.getElementById("opt-reslabels").checked = true;
+    d.getElementById("opt-reslabels").dispatchEvent(new w.Event("change"));
+    await sleep(2500);
+    out.resLabelsDrawn = 0;
+    V.plugin.state.data.cells.forEach(function (c) {
+      var tags = (c.transform && c.transform.tags) || [];
+      if (typeof tags === "string") tags = [tags];
+      if (tags.indexOf("hp-sitelabels") < 0) return;
+      if (c.obj && c.obj.data && c.obj.data.repr) {
+        out.resLabelsDrawn = c.obj.data.repr.renderObjects.length;
+      }
+    });
     // The colour key, in the view. It must name what was drawn and
     // nothing else, and the names must be gone from the line labels.
     // What was actually written on the lines, read back off the state
@@ -531,8 +556,24 @@ def main():
           % (got.get("gradeHint") or "")[:70], f)
     check(got.get("gradeEnabled") is True,
           "and the buttons are live", f)
-    check(got["rows"] == got["sceneLines"] or got["rows"] > 0,
-          "the list beside the view has %d row(s)" % got["rows"], f)
+    check(got.get("oldList") is False,
+          "the duplicate list in the left column is gone", f)
+    check(got["rows"] > 0 and got["rows"] == got["sceneLines"],
+          "the panel lists every drawn interaction (%d row(s) for %d line(s))"
+          % (got["rows"], got["sceneLines"]), f)
+    check(got.get("swatches") == got["rows"]
+          and "#" in (got.get("swatchColor") or ""),
+          "each row carries the colour it was drawn in (%s swatch(es), e.g. "
+          "%r)" % (got.get("swatches"), got.get("swatchColor")), f)
+    check(got.get("linewMax") == 1,
+          "the line-width slider stops at 1x (max=%s)" % got.get("linewMax"), f)
+    check(got.get("resLabelsDrawn", 0) > 0,
+          "naming the pocket residues draws %s label(s)"
+          % got.get("resLabelsDrawn"), f)
+    check(got.get("ringSpan", 0) >= 5,
+          "a ring interaction is drawn from the whole ring, so the line "
+          "meets the centroid the core measured (%s atoms spanned)"
+          % got.get("ringSpan"), f)
     check(got["toggles"] >= 8,
           "%d interaction types can be switched off" % got["toggles"], f)
 
