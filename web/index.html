@@ -164,6 +164,8 @@
         Pocket residues as sticks</label>
       <label class="chk"><input type="checkbox" id="opt-reslabels">
         Name the pocket residues</label>
+      <label class="chk"><input type="checkbox" id="opt-sitekeep">
+        Keep every pocket residue shown</label>
       <label class="chk"><input type="checkbox" id="opt-ribbon">
         Protein ribbon</label>
       <label class="chk" style="gap:9px">
@@ -310,7 +312,7 @@ function baseSnapshot(hit, scales) {
     handbook: window.__handbook || null,
     viewdock: false,
     options: {
-      enabled_nci: enabled || TYPES.map((t) => t[0]).slice(0, 8),
+      enabled_nci: enabled || [],
       show_lengths: true, show_angles: false, show_limits: false,
       show_clashes: $("opt-clashes").checked, show_scale: true,
       hover_detail: false, line_width: 0.075,
@@ -355,6 +357,8 @@ async function onPanelAction(action, params) {
     await analyse(current);
   } else if (action === "torsion") {
     await pickTorsion(params.bond);
+  } else if (action === "highlight") {
+    await focusInteraction(params.atoms);
   }
 }
 
@@ -384,7 +388,15 @@ $("go").onclick = async () => {
     say("perceiving the receptor&hellip;");
     const r = await bridge.call("setup", files.rec);
     window.__handbook = r.handbook;
+    // Start from what the core actually computes, not from "everything".
+    // Ticking all nine boxes while the core ran seven meant the first
+    // toggle - any toggle - sent those ticks back and switched on weak
+    // H-bonds and hydrophobics for the first time. The tool looked like
+    // it turned everything on when you turned one thing off.
+    if (r.default_nci && r.default_nci.length) enabled = r.default_nci;
     say("reading poses&hellip;");
+    siteUnion = new Map();
+    lastSiteSig = null;
     const p = await bridge.call("loadPoses", {...files.lig, limit: 2000});
     poses = p.names;
 
@@ -478,6 +490,7 @@ $("opt-legend").onchange = () => { saveView(); renderLegend(lastScene); };
 $("reset").onclick = resetView;
 $("opt-clashes").onchange = () => { saveView(); redraw(); };
 $("opt-site").onchange = () => { saveView(); redraw(); };
+$("opt-sitekeep").onchange = () => { saveView(); redraw(); };
 $("opt-reslabels").onchange = () => {
   if (viewer) viewer.siteLabels = $("opt-reslabels").checked;
   saveView();
@@ -574,6 +587,7 @@ function saveView() {
       labels: $("opt-labels").checked, clashes: $("opt-clashes").checked,
       legend: $("opt-legend").checked,
       reslabels: $("opt-reslabels").checked,
+      sitekeep: $("opt-sitekeep").checked,
       left: columnWidth("--left"), right: columnWidth("--right")
     }));
   } catch (e) { /* private window */ }
@@ -589,6 +603,7 @@ function restoreView() {
   if (d.clashes !== undefined) $("opt-clashes").checked = !!d.clashes;
   if (d.legend !== undefined) $("opt-legend").checked = !!d.legend;
   if (d.reslabels !== undefined) $("opt-reslabels").checked = !!d.reslabels;
+  if (d.sitekeep !== undefined) $("opt-sitekeep").checked = !!d.sitekeep;
   if (d.stick) $("opt-stick").value = d.stick;
   // A width saved when the slider went to 3x is outside the range now;
   // the input would clamp it silently and the readout would lie.
@@ -637,6 +652,23 @@ async function analyse(i) {
   say(esc(res.name) + " &middot; " + esc(res.summary));
 }
 
+// The pocket, across poses.
+//
+// Which residues line the pocket is decided per pose, so stepping
+// through a series re-picks them and the sticks come and go underneath
+// you. Keeping them accumulates the union of every pose looked at, which
+// is the pocket rather than this ligand's neighbourhood. It resets with
+// a new file.
+let siteUnion = new Map();
+let lastSiteSig = null;
+
+function siteCoords(scene) {
+  const here = scene.site || [];
+  if (!$("opt-sitekeep").checked) return here;
+  here.forEach((c) => siteUnion.set(c.join(","), c));
+  return [...siteUnion.values()];
+}
+
 async function redraw() {
   if (!viewer || !lastResult) return;
   // The engine holds one analysed pose. If a newer analysis landed while
@@ -645,8 +677,23 @@ async function redraw() {
   const my = analyseSeq;
   const scene = await bridge.call("scene", {});
   if (my !== analyseSeq) return;
-  if ($("opt-site").checked) await viewer.showSite(scene.site);
-  else await viewer.clearSite();
+  if ($("opt-site").checked) {
+    const coords = siteCoords(scene);
+    // Rebuilding an identical pocket is what "re-showing them every
+    // time" looks like: the sticks blink out and back on every redraw,
+    // including redraws that had nothing to do with them. The signature
+    // carries what the drawing depends on, sizes and labels included.
+    const sig = [coords.length, viewer.siteLabels, viewer.siteSize,
+                 viewer.textSize].join("|") + ";"
+              + coords.map((c) => c.join(",")).join(";");
+    if (sig !== lastSiteSig || !viewer.site) {
+      await viewer.showSite(coords);
+      lastSiteSig = sig;
+    }
+  } else {
+    await viewer.clearSite();
+    lastSiteSig = null;
+  }
   const n = await viewer.drawScene(scene, {
     labels: $("opt-labels").checked,
     clashes: $("opt-clashes").checked
@@ -730,6 +777,26 @@ async function resetView() {
   await clearTorsionPick(true);
   if (viewer) viewer.focusSite();
   say("view reset to the binding site");
+}
+
+// A row in the pose list points at a line in the view. Clicking it
+// takes you there - both ends of the interaction framed, so the line
+// between them is what you are looking at, and highlighted so you can
+// tell which of several it was. The row carries atom indices, which the
+// page has no use for: it asks the engine where they are, because its
+// viewer numbers atoms its own way.
+async function focusInteraction(atoms) {
+  if (!viewer || !lastResult) return;
+  const idx = String(atoms || "").split(",")
+    .map((x) => parseInt(x, 10)).filter((x) => !isNaN(x));
+  if (!idx.length) return;
+  try {
+    const xyz = await bridge.call("atomsXyz", {atoms: idx});
+    const n = viewer.focusAtoms(xyz);
+    if (!n) say("those atoms are not in the viewer", true);
+  } catch (e) {
+    say("could not focus that interaction: " + esc(e.message), true);
+  }
 }
 
 // Clicking the stick between two atoms asks about the torsion on that
@@ -1025,10 +1092,12 @@ function renderLegend(scene) {
 }
 
 function renderToggles() {
+  // Ticked means "the core is computing this". Anything else is a
+  // control that lies about what it controls.
   const on = new Set(enabled || (lastResult ? Object.keys(lastResult.counts) : []));
   $("toggles").innerHTML = TYPES.map((t) =>
     '<label class="chk"><input type="checkbox" data-kind="' + t[0] + '"'
-    + (enabled === null || on.has(t[0]) ? " checked" : "") + ">"
+    + (on.has(t[0]) ? " checked" : "") + ">"
     + '<span class="swatch" style="background:'
     + hex(HPViewer.COLORS[t[0]] || 0x8b93a3) + '"></span>'
     + t[1] + "</label>").join("");

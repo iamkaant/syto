@@ -96,6 +96,12 @@ def setup(receptor_name, receptor_text):
         "has_hydrogens": bool(ctx.has_hydrogens),
         "warnings": list(ctx.warnings),
         "handbook": hb.describe() if hb else None,
+        # Which interaction types the core draws unless told otherwise.
+        # The page used to assume "all of them" and tick every box,
+        # which was a lie about what was being computed - and the first
+        # toggle sent those ticks back as the truth, switching on types
+        # that had never been on.
+        "default_nci": sorted(Options().enabled_nci),
     })
 
 
@@ -721,6 +727,28 @@ def _atom_at(ms, x, y, z, tolerance=0.05):
     if float(np.sqrt((d[i] * d[i]).sum())) > float(tolerance):
         return None
     return i
+
+
+def atoms_xyz(indices):
+    """Where these atoms are, for a page that works in coordinates.
+
+    The panel's rows carry atom indices, because that is what the
+    ChimeraX host selects with. The web page has no use for an index -
+    its viewer numbers atoms its own way - so it asks where they are.
+    """
+    res = _STATE.get("last")
+    if res is None or res.combined is None:
+        return _json([])
+    ms = res.combined
+    out = []
+    for i in indices or ():
+        try:
+            k = int(i)
+        except (TypeError, ValueError):
+            continue
+        if 0 <= k < ms.n_atoms:
+            out.append(_xyz(ms, k))
+    return _json(out)
 
 
 def torsion_at(ax, ay, az, bx, by, bz):

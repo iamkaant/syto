@@ -31,7 +31,17 @@
   var CLASH = 0xe64646;
   var SEVERE = 0xff2020;
   var TORSION = 0xffb020;  // the picked torsion, a colour nothing else uses
-  var SITE_LABEL = 0xd8dee9;  // residue names: readable, not competing
+  // The canvas is white. A light colour that reads well as a 3 pixel
+  // line is almost invisible as text on it, so text gets a darker shade
+  // of its line's colour and the residue names get near-black.
+  var SITE_LABEL = 0x2a2f3a;
+
+  function darken(color, f) {
+    var r = Math.round(((color >> 16) & 255) * f);
+    var g = Math.round(((color >> 8) & 255) * f);
+    var b = Math.round((color & 255) * f);
+    return (r << 16) | (g << 8) | b;
+  }
 
   // Thin enough to see the ligand through. 0.22 drew the pocket as
   // tubing and buried the pose inside it.
@@ -357,26 +367,53 @@
     // One label per residue, not per atom: a pocket labelled atom by atom
     // is unreadable, and "ASP149" is the thing you are trying to read.
     if (this.siteLabels) {
+      // residueScale, not textSize: Mol*'s label representation sizes
+      // residue-level text with its own scale parameter and ignores a
+      // textSize it was never given. The slider's value goes in as-is,
+      // which is the same number the interaction labels are drawn at -
+      // Mol*'s own default of 1 is three times that and shouts over the
+      // pose it is labelling.
       sel.apply(ST.Representation.StructureRepresentation3D, {
         type: {name: "label",
                params: {level: "residue",
-                        background: true, backgroundOpacity: 0.55,
-                        borderWidth: 0.1,
-                        attachment: "middle-center",
-                        sizeFactor: 1,
-                        textSize: this.textSize * 2.2}},
+                        residueScale: this.textSize,
+                        // same reasoning as the interaction labels: the
+                        // grey plate and the outline are what make a
+                        // small residue name hard to read
+                        background: false, backgroundOpacity: 0,
+                        borderWidth: 0,
+                        attachment: "middle-center"}},
         colorTheme: {name: "uniform", params: {value: SITE_LABEL}},
         sizeTheme: {name: "uniform", params: {}}
       }, {tags: ["hp-sitelabels"]});
     }
     var update = sel;
     await update.commit();
+    // Counted so a test can tell a rebuild from a redraw: the pocket
+    // blinking on every unrelated redraw is a thing people notice.
+    this.siteBuilds = (this.siteBuilds || 0) + 1;
+    this.siteCount = found;
     this.site = update.selector ? update.selector.ref : null;
     if (!this.site) {
       // find it back by label so a later clear still works
       this.site = null;
     }
     return found;
+  };
+
+  // Frame one interaction: both ends of it, so the line between them is
+  // what you are looking at. A row in a list that cannot take you to the
+  // thing it describes is a row in a list.
+  Viewer.prototype.focusAtoms = function (coords) {
+    var loci = this.lociOver(coords || []);
+    if (!loci) return 0;
+    try {
+      this.plugin.managers.camera.focusLoci(loci, {durationMs: 250});
+      // and say which one, for as long as the mouse stays away
+      this.plugin.managers.interactivity.lociHighlights.highlightOnly(
+        {loci: loci});
+    } catch (e) { /* no camera yet */ }
+    return (coords || []).length;
   };
 
   // Frame the pocket, not the whole protein. Opening on a 2800-atom
@@ -498,7 +535,14 @@
                  // No kind name: it was the longest part of every label
                  // and the line's own colour already says it. The legend
                  // in the corner of the view carries the names instead.
-                 text: l.distance.toFixed(2) + " Å  q "
+                 //
+                 // Single spaces. The double ones were set when the kind
+                 // name made these labels long, where they read as
+                 // grouping; on "2.94 A q 0.80" they are a third of the
+                 // string and read as loose letter spacing - which Mol*
+                 // gives no way to tighten, because its 3D text has no
+                 // such control.
+                 text: l.distance.toFixed(2) + " Å q "
                        + l.quality.toFixed(2)});
     });
     if (opts.clashes !== false) {
@@ -520,9 +564,15 @@
                            r.bSpan ? r.bSpan.length : 1]);
       try {
         var cell = await mm.addDistance(la, lb, {
+          labelParams: {
+            // The outline stays: it is what keeps a number legible when
+            // the line behind it runs through dense sticks. Only the
+            // plate behind the text is off.
+            background: false, backgroundOpacity: 0
+          },
           visualParams: {
             linesColor: r.color, linesSize: r.size, dashLength: r.dash,
-            textColor: r.color, textSize: self.textSize,
+            textColor: darken(r.color, 0.62), textSize: self.textSize,
             customText: opts.labels === false ? " " : r.text
           }
         });

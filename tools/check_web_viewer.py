@@ -164,6 +164,31 @@ async function until(fn, ms, what) {
       out.gutters = d.querySelectorAll(".gutter").length;
     } catch (e) { out.dragErr = String(e); }
     out.ribbonDefault = d.getElementById("opt-ribbon").checked;
+
+    // What the boxes claim, and what the core was told.
+    function ticked() {
+      return [].slice.call(d.querySelectorAll("#toggles input[data-kind]"))
+        .filter(function (b) { return b.checked; })
+        .map(function (b) { return b.getAttribute("data-kind"); });
+    }
+    out.tickedKinds = ticked();
+    out.coreKinds = (await w.HP.bridge.call("setup",
+      {name: "rec.crg.pdb", text: rec})).default_nci;
+    var box = d.querySelector("#toggles input[data-kind='hbond_charged']");
+    out.toggledOff = "hbond_charged";
+    box.checked = false;
+    box.dispatchEvent(new w.Event("change"));
+    await until(function () { return !/analysing/.test(
+      d.getElementById("status").textContent); }, 180000, "the re-analysis");
+    await sleep(1500);
+    out.afterToggle = ticked();
+    out.kindsAfterToggle = (await w.HP.bridge.call("scene", {}))
+      .lines.map(function (l) { return l.kind; });
+    box.checked = true;
+    box.dispatchEvent(new w.Event("change"));
+    await until(function () { return !/analysing/.test(
+      d.getElementById("status").textContent); }, 180000, "the re-analysis");
+    await sleep(1500);
     out.linewMax = +d.getElementById("opt-linew").max;
     // A ring interaction must span its whole ring, not one atom of it.
     out.ringSpan = 0;
@@ -182,7 +207,53 @@ async function until(fn, ms, what) {
       if (c.obj && c.obj.data && c.obj.data.repr) {
         out.resLabelsDrawn = c.obj.data.repr.renderObjects.length;
       }
+      // The one label-size control must reach these too. Mol* sizes
+      // residue labels with residueScale, so that is what to read.
+      var pr = c.transform && c.transform.params;
+      if (pr && pr.type && pr.type.params) {
+        out.resLabelScale = pr.type.params.residueScale;
+      }
     });
+    out.textAtLabels = V.textSize;
+
+    // A row in the pose list must take you to the line it describes.
+    function campos() {
+      var c = V.plugin.canvas3d.camera.state.position;
+      return [c[0], c[1], c[2]];     // Vec3 is a typed array, not {x,y,z}
+    }
+    var before = campos();
+    var row = pdoc.querySelector("#pose tr.ix");
+    out.rowClickable = !!row;
+    if (row) {
+      row.click();
+      await sleep(2500);
+      var after = campos();
+      out.cameraMoved = Math.abs(after[0] - before[0])
+        + Math.abs(after[1] - before[1]) + Math.abs(after[2] - before[2]);
+    }
+
+    // The pocket must not be rebuilt by a redraw that has nothing to do
+    // with it - that blink is "it re-shows them every time".
+    var buildsBefore = V.siteBuilds;
+    d.getElementById("opt-labels").checked = false;
+    d.getElementById("opt-labels").dispatchEvent(new w.Event("change"));
+    await sleep(1500);
+    d.getElementById("opt-labels").checked = true;
+    d.getElementById("opt-labels").dispatchEvent(new w.Event("change"));
+    await sleep(1500);
+    out.siteRebuilds = V.siteBuilds - buildsBefore;
+
+    // Keeping the pocket: the union across poses, not this ligand's
+    // neighbourhood.
+    d.getElementById("opt-sitekeep").checked = true;
+    d.getElementById("opt-sitekeep").dispatchEvent(new w.Event("change"));
+    await sleep(1500);
+    out.siteKeptBefore = V.siteCount;
+    d.getElementById("next").click();
+    await sleep(6000);
+    out.siteKeptAfter = V.siteCount;
+    d.getElementById("prev").click();
+    await sleep(6000);
     // The colour key, in the view. It must name what was drawn and
     // nothing else, and the names must be gone from the line labels.
     // What was actually written on the lines, read back off the state
@@ -198,6 +269,14 @@ async function until(fn, ms, what) {
       } catch (e) { /* params that do not stringify are not labels */ }
     });
     out.lineLabels = texts.slice(0, 4);
+    // Nothing drawn behind or around the text: Mol* puts both there by
+    // default and they are what make a small label unreadable.
+    out.labelChrome = [];
+    V.plugin.state.data.cells.forEach(function (c) {
+      var pr = c.transform && c.transform.params;
+      if (!pr || pr.customText === undefined) return;
+      out.labelChrome.push([pr.borderWidth, pr.background]);
+    });
     out.viewerLabels = (V.lastLabels || []).slice(0, 4);
     var lg = d.getElementById("legend");
     out.legendShown = lg && !lg.hidden;
@@ -570,6 +649,21 @@ def main():
     check(got.get("resLabelsDrawn", 0) > 0,
           "naming the pocket residues draws %s label(s)"
           % got.get("resLabelsDrawn"), f)
+    check(got.get("resLabelScale")
+          and abs(got["resLabelScale"] - got.get("textAtLabels", 0)) < 1e-6,
+          "and the one label-size control sizes them to match the "
+          "interaction labels (scale %s for slider %s)"
+          % (got.get("resLabelScale"), got.get("textAtLabels")), f)
+    check(got.get("rowClickable") and (got.get("cameraMoved") or 0) > 0.01,
+          "clicking an interaction in the pose list flies the camera to "
+          "it (moved %.2f A)" % (got.get("cameraMoved") or 0), f)
+    check(got.get("siteRebuilds") == 0,
+          "a redraw that does not touch the pocket leaves it alone "
+          "(%s rebuild(s))" % got.get("siteRebuilds"), f)
+    check(got.get("siteKeptAfter", 0) >= got.get("siteKeptBefore", 0) > 0,
+          "keeping the pocket never drops a residue across poses "
+          "(%s atoms, then %s)"
+          % (got.get("siteKeptBefore"), got.get("siteKeptAfter")), f)
     check(got.get("ringSpan", 0) >= 5,
           "a ring interaction is drawn from the whole ring, so the line "
           "meets the centroid the core measured (%s atoms spanned)"
@@ -628,6 +722,30 @@ def main():
     check(labels and not named,
           "no interaction name is written on the lines any more: %s"
           % labels[:3], f)
+    check(all("  " not in t for t in labels),
+          "and no run of spaces inside a label, which reads as loose "
+          "letter spacing: %s" % labels[:3], f)
+    chrome = got.get("labelChrome") or []
+    check(chrome and all(c[1] is False and (c[0] or 0) > 0 for c in chrome),
+          "an outline on the label text and no plate behind it "
+          "(borderWidth, background: %s)"
+          % (chrome[:2] or "no labels found"), f)
+
+    # The toggles must say what the core is actually computing. They
+    # used to show all nine ticked while it ran seven, so the first
+    # toggle switched two types on by reporting the UI's own lie back.
+    check(got.get("tickedKinds") and got.get("coreKinds")
+          and sorted(got["tickedKinds"]) == sorted(got["coreKinds"]),
+          "the type checkboxes start as what the core computes "
+          "(%s ticked, core runs %s)"
+          % (len(got.get("tickedKinds") or []),
+             len(got.get("coreKinds") or [])), f)
+    check(got.get("afterToggle") is not None
+          and sorted(got["afterToggle"])
+              == sorted([k for k in (got.get("coreKinds") or [])
+                         if k != got.get("toggledOff")]),
+          "and turning one off turns off exactly that one (%s)"
+          % (got.get("afterToggle") or []), f)
     check(got.get("legendShown") is True and got.get("legendRows", 0) > 0,
           "the view carries a colour key with %s row(s): %r"
           % (got.get("legendRows"), (got.get("legendText") or "")[:70]), f)

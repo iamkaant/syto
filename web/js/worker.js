@@ -105,6 +105,9 @@ const METHODS = {
   async torsionProfile(a) {
     return toJs(engine.torsion_profile(a.bond || null));
   },
+  async atomsXyz(a) {
+    return toJs(engine.atoms_xyz(pyodide.toPy(a.atoms || [])));
+  },
   async torsionAt(a) {
     return toJs(engine.torsion_at(a.a[0], a.a[1], a.a[2],
                                   a.b[0], a.b[1], a.b[2]));
