@@ -100,6 +100,9 @@ class HandbookTool(HtmlToolInstance):
         if st.last_hit is not None:
             snap["hit"] = st.last_hit.to_dict()
             snap["torsion"] = self._torsion_profile(st)
+            # Whether the profile is the one the user asked for or just
+            # the worst one: the panel opens the section for a pick.
+            snap["torsion_picked"] = st.last_torsion is not None
             if hb is not None and st.options.show_scale:
                 # Both scales, because they answer different questions and
                 # the answers do not follow from each other: pKBHX says how

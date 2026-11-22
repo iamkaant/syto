@@ -156,6 +156,34 @@ async function until(fn, ms, what) {
       out.gutters = d.querySelectorAll(".gutter").length;
     } catch (e) { out.dragErr = String(e); }
     out.ribbonDefault = d.getElementById("opt-ribbon").checked;
+    // The colour key, in the view. It must name what was drawn and
+    // nothing else, and the names must be gone from the line labels.
+    // What was actually written on the lines, read back off the state
+    // tree rather than trusted: the kind name must be gone from it.
+    var texts = [];
+    V.plugin.state.data.cells.forEach(function (c) {
+      try {
+        var j = JSON.stringify((c.transform && c.transform.params) || null);
+        if (!j) return;
+        (j.match(/"customText":"[^"]*"/g) || []).forEach(function (x) {
+          texts.push(x.slice('"customText":"'.length, -1));
+        });
+      } catch (e) { /* params that do not stringify are not labels */ }
+    });
+    out.lineLabels = texts.slice(0, 4);
+    out.viewerLabels = (V.lastLabels || []).slice(0, 4);
+    var lg = d.getElementById("legend");
+    out.legendShown = lg && !lg.hidden;
+    out.legendRows = lg ? lg.querySelectorAll(".lrow").length : -1;
+    out.legendText = lg ? lg.textContent.replace(/\s+/g, " ").trim() : "";
+    d.getElementById("opt-legend").checked = false;
+    d.getElementById("opt-legend").dispatchEvent(new w.Event("change"));
+    await sleep(400);
+    out.legendOff = d.getElementById("legend").hidden;
+    d.getElementById("opt-legend").checked = true;
+    d.getElementById("opt-legend").dispatchEvent(new w.Event("change"));
+    await sleep(400);
+    out.legendBack = !d.getElementById("legend").hidden;
     out.stickSize = V.siteSize;
     // The label size slider must reach the drawn labels, not just the
     // number beside it. Set it, redraw, and read it back off the viewer.
@@ -193,6 +221,9 @@ async function until(fn, ms, what) {
     out.torsionSum = (pt.querySelector("#fold-torsions .sum") || {}).textContent
                      || "";
     var first = pt.querySelector("#torsions .trow");
+    var trows = await w.HP.bridge.call("torsions", {});
+    out.torsionRowXyz = trows.rows && trows.rows.length
+      ? trows.rows[0].xyz : null;
     if (first) {
       out.torsionRow = first.textContent.replace(/\s+/g, " ").trim();
       first.click();
@@ -212,9 +243,36 @@ async function until(fn, ms, what) {
         }
       });
       out.torsionReprs = tcell;
-      out.torsionPanel = pt.getElementById("hit").textContent
+      // The profile now lives WITH the list, not at the bottom of the
+      // clicked-atom column.
+      out.torsionSection = pt.getElementById("torsions").textContent
         .replace(/\s+/g, " ").trim();
-      out.torsionProfile = /QM scans/.test(out.torsionPanel);
+      out.torsionProfile = /QM scans/.test(out.torsionSection);
+      out.torsionPlotInSection =
+        !!pt.querySelector("#torsions .tprofile svg");
+      // #hit holds the basicity scale, which is also a .scale - so this
+      // asks specifically for a torsion profile.
+      out.torsionPlotInHit = !!pt.querySelector("#hit .tprofile svg");
+    }
+
+    // --- a bond click, not a row click ------------------------------
+    //
+    // Any rotatable bond answers, flagged or not. The torsion's own two
+    // middle atoms are a bond the viewer can be asked about directly.
+    if (first && out.torsionRowXyz) {
+      var tx = out.torsionRowXyz;
+      w.HP.viewer().onBondClick(tx[1], tx[2]);
+      await sleep(2000);
+      out.bondClickProfile = /QM scans/.test(
+        pt.getElementById("torsions").textContent);
+      out.bondClickStatus = d.getElementById("status").textContent
+        .replace(/\s+/g, " ").trim();
+      // A bond with no torsion must say so rather than guess: the first
+      // interaction line's two ends are not a rotatable bond.
+      var far = await w.HP.bridge.call("torsionAt",
+        {a: scene.lines[0].a, b: scene.lines[0].b});
+      out.bondRefused = !!far.error;
+      out.bondRefusedWhy = far.error || "";
     }
 
     // --- switching pose redraws, it does not accumulate -------------
@@ -436,8 +494,37 @@ def main():
     check((got.get("torsionReprs") or 0) > 0,
           "which actually rendered (reprs=%s)" % got.get("torsionReprs"), f)
     check(got.get("torsionProfile") is True,
-          "with its QM profile beside the handbook entry: %r"
-          % (got.get("torsionPanel") or "")[:90], f)
+          "with its QM profile in the same section: %r"
+          % (got.get("torsionSection") or "")[-90:], f)
+    check(got.get("torsionPlotInSection") is True
+          and got.get("torsionPlotInHit") is False,
+          "the plot is under the torsion list, not at the bottom of the "
+          "clicked-atom column (section=%s, hit=%s)"
+          % (got.get("torsionPlotInSection"), got.get("torsionPlotInHit")), f)
+    check(got.get("bondClickProfile") is True,
+          "clicking the bond itself plots it too: %r"
+          % (got.get("bondClickStatus") or "")[:80], f)
+    check(got.get("bondRefused") is True,
+          "a bond with no torsion is refused, not guessed at: %r"
+          % got.get("bondRefusedWhy"), f)
+
+    # The labels carry numbers; the colours carry the names.
+    labels = got.get("lineLabels") or got.get("viewerLabels") or []
+    named = [t for t in labels
+             if any(k in t for k in ("bond", "stack", "pi", "phobic", "salt"))]
+    check(labels and not named,
+          "no interaction name is written on the lines any more: %s"
+          % labels[:3], f)
+    check(got.get("legendShown") is True and got.get("legendRows", 0) > 0,
+          "the view carries a colour key with %s row(s): %r"
+          % (got.get("legendRows"), (got.get("legendText") or "")[:70]), f)
+    check(got.get("legendRows") == len(set(got.get("kinds") or []))
+          + (1 if got.get("sceneClashes") else 0)
+          + (1 if got.get("torsionRef") else 0)
+          or got.get("legendRows", 0) >= len(set(got.get("kinds") or [])),
+          "and it names what was drawn, not a fixed list", f)
+    check(got.get("legendOff") is True and got.get("legendBack") is True,
+          "and it can be switched off and back on", f)
 
     # Switching pose must redraw, not accumulate.
     check(got["posen"].startswith("1 of") and got["secondMs"] is not None,

@@ -415,10 +415,11 @@ window.hpSetState = function (s) {
 
   window.hpShowScale = s.options ? (s.options.show_scale !== false) : true;
   renderPose(s.pose);
-  renderTorsions(s.torsions, s.torsion_warn_kcal);
+  renderTorsions(s.torsions, s.torsion_warn_kcal, s.torsion,
+                 s.torsion_picked);
   // kept so the scale tabs can re-render without a round trip
   window.hpLast = {hit: s.hit, scales: s.scales, torsion: s.torsion};
-  renderHit(s.hit, s.scales || (s.scale ? [s.scale] : []), s.torsion);
+  renderHit(s.hit, s.scales || (s.scale ? [s.scale] : []));
 };
 
 // Every flagged torsion, worst first. This existed only as `hitpick
@@ -426,15 +427,22 @@ window.hpSetState = function (s) {
 // which can be read down. The two severity tiers are the point of the
 // list: a torsion measured past the warning threshold is costing the pose
 // real energy, while most flags are a geometric rule being careful.
-function renderTorsions(rows, warnKcal) {
+function renderTorsions(rows, warnKcal, torsion, picked) {
   var el = document.getElementById("torsions");
   if (!el) return;
-  if (!rows || !rows.length) { el.innerHTML = ""; return; }
+  // The profile belongs with the list it came from. It used to be drawn
+  // at the bottom of the clicked-atom column, which put the plot a long
+  // way from the row that asked for it - and meant clicking a bond in 3D
+  // drew a plot nowhere near anything you had just done.
+  var plot = (window.hpShowScale === false) ? "" : renderTorsion(torsion);
+  if ((!rows || !rows.length) && !plot) { el.innerHTML = ""; return; }
+  rows = rows || [];
 
   var bad = rows.filter(function (r) { return r.severity === "warning"; });
-  var sum = bad.length
-    ? bad.length + " over " + (warnKcal || 3) + " kcal/mol"
-    : rows.length + ", none serious";
+  var sum = !rows.length
+    ? "one bond"
+    : (bad.length ? bad.length + " over " + (warnKcal || 3) + " kcal/mol"
+                  : rows.length + ", none serious");
 
   var body = rows.map(function (r) {
     var cls = "trow" + (r.severity === "warning" ? " warn" : "")
@@ -456,14 +464,19 @@ function renderTorsions(rows, warnKcal) {
   // something is actually serious and stays shut when nothing is.
   var remembered = (hpFoldState() || {})["fold-torsions"];
   var open = (remembered === undefined) ? bad.length > 0 : !!remembered;
+  // Whatever was remembered, an explicit pick opens the section: the
+  // plot the user just asked for has to be visible.
+  if (picked) open = true;
 
   el.innerHTML = '<details class="fold" id="fold-torsions"'
     + (open ? " open" : "") + ' ontoggle="hpRemember(this)">'
     + '<summary><span>Torsions worth a look</span>'
     + '<i class="sum">' + esc(sum) + "</i></summary>"
     + '<div class="card" style="padding:4px 6px">' + body
+    + (plot ? '<h3 style="margin:8px 0 2px;font-size:11.5px">'
+              + "Torsion profile</h3>" + plot : "")
     + '<div class="tiny muted" style="margin-top:6px">'
-    + "Click a row to select the bond and plot its profile. "
+    + "Click a row, or a bond in the 3D view, to plot its profile. "
     + "Orange is measured above " + (warnKcal || 3) + " kcal/mol above "
     + "that bond class&rsquo;s own minimum; the rest are a geometric rule "
     + "being careful, or a smaller measured cost.</div></div></details>";
@@ -660,8 +673,7 @@ function renderScales(scales) {
 
 function hpPickScale(q) {
   hpScaleTab = q;
-  if (window.hpLast) renderHit(window.hpLast.hit, window.hpLast.scales,
-                               window.hpLast.torsion);
+  if (window.hpLast) renderHit(window.hpLast.hit, window.hpLast.scales);
 }
 
 function renderTorsion(tp) {
@@ -674,7 +686,7 @@ function renderTorsion(tp) {
   function X(a) { return L + (a - loX) / ((hiX - loX) || 1) * (W - L - R); }
   function Y(e) { return T + (1 - e / hiY) * (H - T - B); }
 
-  var p = ['<div class="scale"><svg viewBox="0 0 ' + W + " " + H
+  var p = ['<div class="scale tprofile"><svg viewBox="0 0 ' + W + " " + H
            + '" preserveAspectRatio="xMidYMin meet">'];
 
   // interquartile band: the spread matters as much as the median
@@ -729,7 +741,7 @@ function renderTorsion(tp) {
   return p.join("");
 }
 
-function renderHit(hit, scales, torsion) {
+function renderHit(hit, scales) {
   var el = document.getElementById("hit");
   if (!hit) {
     el.innerHTML = '<p class="empty">Click an atom in the 3D view.</p>';
@@ -786,11 +798,6 @@ function renderHit(hit, scales, torsion) {
   if (sv) {
     h += '<h2 style="border:none;padding-top:4px">Where this sits</h2>' + sv;
   }
-  var tv = (window.hpShowScale === false) ? "" : renderTorsion(torsion);
-  if (tv) {
-    h += '<h2 style="border:none;padding-top:4px">Torsion profile</h2>' + tv;
-  }
-
   (hit.entries || []).slice(0, 6).forEach(function (e) {
     h += '<div class="entry"><h3>' + esc(e.title || e.id) + '</h3>';
     if (e.summary) {

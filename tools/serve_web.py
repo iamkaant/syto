@@ -43,8 +43,24 @@ def main(argv=None):
               "\n  python tools/build_web_core.py")
         return 1
 
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler,
-                                directory=WEB)
+    # Served with no-store, deliberately.
+    #
+    # This folder is rebuilt while the page is open - that is the whole
+    # point of serving it locally - and the default handler sends
+    # Last-Modified, so a browser happily keeps showing the previous
+    # index.html against newer JavaScript. That failure looks exactly
+    # like "the feature was never added", and it has cost real time
+    # twice. The build stamp in the status line is the other half of
+    # this: it says which build you are actually looking at.
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def end_headers(self):
+            self.send_header("Cache-Control", "no-store, must-revalidate")
+            super().end_headers()
+
+        def log_message(self, fmt, *a):      # one line per request is noise
+            pass
+
+    handler = functools.partial(Handler, directory=WEB)
     # 127.0.0.1, not 0.0.0.0: this is for the person at this keyboard, and
     # binding every interface would put a file browser of this directory on
     # whatever network the machine happens to be on.

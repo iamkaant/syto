@@ -675,6 +675,55 @@ def torsions():
     return _json({"rows": rows, "warn_kcal": QM_WARN_KCAL})
 
 
+def _atom_at(ms, x, y, z, tolerance=0.05):
+    """The atom at this position, or None. Position, never index."""
+    import numpy as np
+    d = ms.xyz - np.array([float(x), float(y), float(z)], dtype=float)
+    i = int(np.argmin((d * d).sum(axis=1)))
+    if float(np.sqrt((d[i] * d[i]).sum())) > float(tolerance):
+        return None
+    return i
+
+
+def torsion_at(ax, ay, az, bx, by, bz):
+    """The torsion on the bond between these two atoms, if there is one.
+
+    For clicking a bond in the viewer rather than a row in the list. Any
+    rotatable bond the core measured answers here, not only the flagged
+    ones: "this one is fine" is a useful answer about a bond you are
+    looking at, and it is the same measurement either way.
+    """
+    res = _STATE.get("last")
+    if res is None or res.strain is None or res.combined is None:
+        return _json({"error": "analyse a pose first"})
+    ms = res.combined
+    i = _atom_at(ms, ax, ay, az)
+    j = _atom_at(ms, bx, by, bz)
+    if i is None or j is None:
+        return _json({"error": "that bond is not in the analysis"})
+    want = tuple(sorted((i, j)))
+    for t in res.strain.torsions:
+        if tuple(sorted(t.bond)) != want:
+            continue
+        return _json({
+            "bond": "%d,%d" % t.bond,
+            "label": " - ".join(ms.atom_label(a) for a in t.bond),
+            "kind": t.subtype or t.bond_type,
+            "angle": round(t.angle, 1),
+            "assessment": t.assessment,
+            "severity": t.severity,
+            "flagged": bool(t.flagged),
+            "energy": (None if t.energy is None else round(t.energy, 2)),
+            "note": t.note,
+            "atoms": [int(a) for a in t.atoms],
+            "xyz": [_xyz(ms, a) for a in t.atoms],
+            "profile": json.loads(torsion_profile("%d,%d" % t.bond)),
+        })
+    # Not every bond has one: ring bonds, double bonds and terminal bonds
+    # are not rotatable, so there is nothing to measure.
+    return _json({"error": "no rotatable torsion on that bond"})
+
+
 def torsion_profile(bond=None):
     """The QM profile for one bond, or for the worst flagged torsion.
 

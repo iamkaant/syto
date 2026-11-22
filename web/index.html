@@ -29,7 +29,7 @@
   @media (max-width:1100px) {
     body { overflow:auto; }
     #shell { grid-template-columns:1fr; grid-template-rows:auto; height:auto; }
-    #view { height:62vh; }
+    #stage { height:62vh; }
     #panel { height:70vh; }
     .gutter { display:none; }
   }
@@ -42,7 +42,13 @@
             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #status.warn { color:var(--warn); }
   aside { overflow-y:auto; border-right:1px solid var(--line); padding:10px; }
-  #view { position:relative; background:#0d1014; min-height:300px; }
+  /* Mol* takes the element it is given and replaces its contents, so
+     nothing of ours may live inside #view. The drop notice and the
+     colour key sit in #stage, over it. They used to be children of
+     #view, which is why a second Analyse threw on a $("drop") that was
+     no longer in the document. */
+  #stage { position:relative; min-height:300px; }
+  #view { position:absolute; inset:0; background:#0d1014; }
   #panel { border-left:1px solid var(--line); border-right:none; padding:0; }
   #panel iframe { width:100%; height:100%; border:0; display:block; }
   h2 { font-size:11px; letter-spacing:.05em; text-transform:uppercase;
@@ -86,6 +92,17 @@
   .srow.on { outline:1px solid var(--accent); }
   .srow .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .counts span { margin-right:9px; }
+  /* The legend belongs where you are looking. The swatches beside the
+     type toggles are in a panel you have to look away to read, which is
+     exactly what a legend is for avoiding. */
+  #legend { position:absolute; left:10px; bottom:10px; z-index:3;
+            display:flex; flex-direction:column; gap:3px; font-size:11px;
+            padding:6px 9px; border-radius:7px; pointer-events:none;
+            background:rgba(10,13,18,.74); border:1px solid var(--line);
+            backdrop-filter:blur(3px); max-width:46%; }
+  #legend .lrow { display:flex; align-items:center; gap:6px;
+                  white-space:nowrap; }
+  #legend[hidden] { display:none; }
   #drop { position:absolute; inset:0; display:flex; align-items:center;
           justify-content:center; text-align:center; color:var(--muted);
           font-size:13px; padding:30px; pointer-events:none; }
@@ -127,6 +144,8 @@
     <div class="card">
       <label class="chk"><input type="checkbox" id="opt-labels" checked>
         Labels on the lines</label>
+      <label class="chk"><input type="checkbox" id="opt-legend" checked>
+        Colour key in the view</label>
       <label class="chk"><input type="checkbox" id="opt-clashes" checked>
         <span class="swatch" style="background:#e64646"></span>
         Clashes</label>
@@ -198,8 +217,12 @@
 
   <div class="gutter" id="gut-l" title="drag to resize"></div>
 
-  <div id="view"><div id="drop">Load a receptor and a pose file.<br>
-    Everything is computed in this tab; no file leaves your machine.</div></div>
+  <div id="stage">
+    <div id="view"></div>
+    <div id="drop">Load a receptor and a pose file.<br>
+      Everything is computed in this tab; no file leaves your machine.</div>
+    <div id="legend" hidden></div>
+  </div>
 
   <div class="gutter" id="gut-r" title="drag to resize"></div>
 
@@ -225,6 +248,9 @@ let viewer = null, poses = [], current = 0, lastResult = null;
 // only keeping them so a re-send of the snapshot does not lose them.
 let torsionRows = [], torsionWarn = null, torsionPick = null,
     torsionProfile = null;
+// The last scene drawn, so the legend can be rebuilt without asking
+// the engine for it again.
+let lastScene = null;
 let enabled = null;   // null = whatever the core defaults to
 
 const TYPES = [
@@ -286,7 +312,10 @@ function baseSnapshot(hit, scales) {
     scales: scales || [],
     torsions: torsionRows.map((r) => ({...r, selected: r.bond === torsionPick})),
     torsion_warn_kcal: torsionWarn,
-    torsion: torsionProfile
+    torsion: torsionProfile,
+    // An explicit pick opens the torsion section even when it was left
+    // closed: a profile nobody can see is not an answer.
+    torsion_picked: torsionPick !== null
   };
 }
 
@@ -345,6 +374,7 @@ $("go").onclick = async () => {
       viewer = new HPViewer.Viewer("view");
       await viewer.start();
       viewer.onAtomClick = onAtomClick;
+      viewer.onBondClick = onBondClick;
       viewer.siteSize = +$("opt-stick").value;
       viewer.lineSize = +$("opt-linew").value;
       viewer.textSize = +$("opt-text").value;
@@ -420,6 +450,7 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "ArrowLeft") { e.preventDefault(); $("prev").click(); }
 });
 $("opt-labels").onchange = () => { saveView(); redraw(); };
+$("opt-legend").onchange = () => { saveView(); renderLegend(lastScene); };
 $("opt-clashes").onchange = () => { saveView(); redraw(); };
 $("opt-site").onchange = redraw;
 $("opt-ribbon").onchange = () => {
@@ -511,6 +542,7 @@ function saveView() {
       stick: +$("opt-stick").value, linew: +$("opt-linew").value,
       text: +$("opt-text").value,
       labels: $("opt-labels").checked, clashes: $("opt-clashes").checked,
+      legend: $("opt-legend").checked,
       left: columnWidth("--left"), right: columnWidth("--right")
     }));
   } catch (e) { /* private window */ }
@@ -524,6 +556,7 @@ function restoreView() {
   if (d.ribbon !== undefined) $("opt-ribbon").checked = !!d.ribbon;
   if (d.labels !== undefined) $("opt-labels").checked = !!d.labels;
   if (d.clashes !== undefined) $("opt-clashes").checked = !!d.clashes;
+  if (d.legend !== undefined) $("opt-legend").checked = !!d.legend;
   if (d.stick) $("opt-stick").value = d.stick;
   if (d.linew) $("opt-linew").value = d.linew;
   if (d.text) $("opt-text").value = d.text;
@@ -567,6 +600,8 @@ async function redraw() {
     labels: $("opt-labels").checked,
     clashes: $("opt-clashes").checked
   });
+  lastScene = scene;
+  renderLegend(scene);
   if (viewer.lastMissed) {
     say("drew " + n + " line(s); " + viewer.lastMissed
         + " could not be placed in the viewer", true);
@@ -581,6 +616,7 @@ async function loadTorsions() {
   torsionRows = []; torsionWarn = null;
   torsionPick = null; torsionProfile = null;
   if (viewer) await viewer.clearTorsion();
+  renderLegend(lastScene);
   try {
     const t = await bridge.call("torsions", {});
     torsionRows = t.rows || [];
@@ -614,11 +650,41 @@ async function pickTorsion(bond) {
     if (!h.error) hit = h;
   } catch (e) { /* the panel still gets the list and the profile */ }
   if (viewer) await viewer.showTorsion(row.xyz || [row.a, row.b], true);
+  renderLegend(lastScene);
   sendPanel(baseSnapshot(hit, hit ? (hit.scales || []) : []));
   say(esc(row.kind) + " &middot; " + esc(row.label) + " &middot; "
       + row.angle.toFixed(0) + "&deg;"
       + (row.energy === null || row.energy === undefined
          ? "" : ", costing " + row.energy.toFixed(1) + " kcal/mol"));
+}
+
+// Clicking the stick between two atoms asks about the torsion on that
+// bond, which is a different question from clicking either end. Every
+// rotatable bond the core measured answers, not only the flagged ones:
+// "this one is fine" is worth knowing about a bond you are looking at,
+// and it is the same measurement either way. Ring, double and terminal
+// bonds have no torsion to measure and say so.
+async function onBondClick(a, b) {
+  if (!lastResult) return;
+  try {
+    const t = await bridge.call("torsionAt", {a: a, b: b});
+    if (t.error) { say(esc(t.error)); return; }
+    torsionPick = t.bond;
+    torsionProfile = t.profile || null;
+    if (viewer) await viewer.showTorsion(t.xyz || [a, b], false);
+    renderLegend(lastScene);
+    sendPanel(baseSnapshot());
+    let msg = esc(t.kind) + " &middot; " + esc(t.label) + " &middot; "
+            + t.angle.toFixed(0) + "&deg;";
+    if (t.energy !== null && t.energy !== undefined) {
+      msg += ", costing " + t.energy.toFixed(1) + " kcal/mol";
+    } else if (!torsionProfile) {
+      msg += " &middot; no QM reference for this bond class";
+    }
+    say(msg, !!t.flagged);
+  } catch (e) {
+    say("could not measure that bond: " + esc(e.message), true);
+  }
 }
 
 async function onAtomClick(xyz, name) {
@@ -847,6 +913,43 @@ async function loadPartyFile(file) {
 }
 
 // ------------------------------------------------------------ rendering
+
+// The colour key, in the view rather than beside it.
+//
+// The line labels used to start with the interaction's name, which made
+// them long enough to overlap each other on a crowded pocket while
+// saying what the colour already said. The name moved here: it is read
+// once, where you are looking, instead of being repeated on every line.
+// Only what was actually drawn is listed - a key to things that are not
+// on screen is clutter.
+function renderLegend(scene) {
+  const el = $("legend");
+  if (!el) return;
+  if (!$("opt-legend").checked || !scene) { el.hidden = true; return; }
+  const named = new Map(TYPES);
+  const kinds = new Set((scene.lines || []).map((l) => l.kind));
+  const rows = [];
+  TYPES.forEach((t) => {
+    if (kinds.has(t[0])) {
+      rows.push([t[1], hex(HPViewer.COLORS[t[0]] || 0x8b93a3)]);
+    }
+  });
+  kinds.forEach((k) => {
+    if (!named.has(k)) rows.push([k.replace(/_/g, " "), hex(0x8b93a3)]);
+  });
+  if ($("opt-clashes").checked && (scene.clashes || []).length) {
+    rows.push(["clash", hex(HPViewer.CLASH)]);
+    if (scene.clashes.some((c) => c.severe)) {
+      rows.push(["severe clash", hex(HPViewer.SEVERE)]);
+    }
+  }
+  if (torsionPick) rows.push(["picked torsion", hex(HPViewer.TORSION)]);
+  el.innerHTML = rows.map((r) =>
+    '<div class="lrow"><span class="swatch" style="background:' + r[1]
+    + '"></span>' + esc(r[0]) + "</div>").join("");
+  el.hidden = rows.length === 0;
+}
+
 function renderToggles() {
   const on = new Set(enabled || (lastResult ? Object.keys(lastResult.counts) : []));
   $("toggles").innerHTML = TYPES.map((t) =>

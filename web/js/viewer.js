@@ -54,6 +54,7 @@
     this.torsion = null;      // the highlighted torsion, if any
     this._index = null;       // rounded coordinate -> {unit, element}
     this.onAtomClick = null;
+    this.onBondClick = null;   // a bond is a torsion question, not an atom one
   }
 
   Viewer.prototype.start = async function () {
@@ -409,8 +410,10 @@
                  color: COLORS[l.kind] === undefined ? 0x8b93a3 : COLORS[l.kind],
                  dash: l.quality >= 0.55 ? 0.1 : 0.45,
                  size: (0.08 + 0.1 * l.quality) * self.lineSize,
-                 text: l.kind.replace(/_/g, " ") + "  "
-                       + l.distance.toFixed(2) + " Å  q "
+                 // No kind name: it was the longest part of every label
+                 // and the line's own colour already says it. The legend
+                 // in the corner of the view carries the names instead.
+                 text: l.distance.toFixed(2) + " Å  q "
                        + l.quality.toFixed(2)});
     });
     if (opts.clashes !== false) {
@@ -441,6 +444,7 @@
     }
     this.lastMissed = missed;
     this.nDrawn = drawn;
+    this.lastLabels = rows.map(function (r) { return r.text; });
     return drawn;
   };
 
@@ -451,9 +455,27 @@
     var SP = global.molstar.lib.structure.StructureProperties;
     var SE = global.molstar.lib.structure.StructureElement;
     this.plugin.behaviors.interaction.click.subscribe(function (e) {
-      if (!self.onAtomClick) return;
       var loci = e.current && e.current.loci;
-      if (!loci || loci.kind !== "element-loci") return;
+      if (!loci) return;
+      // A bond is its own kind of loci, not two atoms. Clicking the stick
+      // between two atoms is how you ask about a torsion - asking about
+      // one of its ends instead is a different question.
+      if (loci.kind === "bond-loci") {
+        if (!self.onBondClick) return;
+        try {
+          var bd = loci.bonds && loci.bonds[0];
+          if (!bd) return;
+          var la = SE.Location.create(loci.structure, bd.aUnit,
+                                      bd.aUnit.elements[bd.aIndex]);
+          var lb = SE.Location.create(loci.structure, bd.bUnit,
+                                      bd.bUnit.elements[bd.bIndex]);
+          self.onBondClick([SP.atom.x(la), SP.atom.y(la), SP.atom.z(la)],
+                           [SP.atom.x(lb), SP.atom.y(lb), SP.atom.z(lb)]);
+        } catch (err) { /* a click on nothing is not an error */ }
+        return;
+      }
+      if (!self.onAtomClick) return;
+      if (loci.kind !== "element-loci") return;
       try {
         var l = SE.Loci.getFirstLocation(loci);
         if (!l) return;
@@ -469,5 +491,9 @@
       global.molstar.lib.structure.Structure.Loci(this.pose.data));
   };
 
-  global.HPViewer = {Viewer: Viewer, COLORS: COLORS};
+  // The colours are exported so the legend names exactly what was
+  // drawn. A second copy of them in the page would be a legend that
+  // can quietly stop matching the picture.
+  global.HPViewer = {Viewer: Viewer, COLORS: COLORS,
+                     CLASH: CLASH, SEVERE: SEVERE, TORSION: TORSION};
 })(window);

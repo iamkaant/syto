@@ -40,3 +40,11 @@ web/build.js
 # They stay on disk; git just stops carrying them.
 *.cxs
 party*.json
+
+# Receptors and pose files dropped in the top of the checkout to try the
+# page. These are research data - which compounds were looked at - and
+# they are what the history rewrite had to strip out once already.
+/*.mol2
+/*.sdf
+/*.pdb
+/*.ent
