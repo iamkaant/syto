@@ -74,6 +74,7 @@ async function until(fn, ms, what) {
       out.offline = !!reg;
     } catch (e) { out.offline = false; }
     out.build = w.__build || null;
+    out.buildBadge = (d.getElementById("build") || {}).textContent || "";
 
     var rec = await (await fetch("__rec")).text();
     var lig = await (await fetch("__lig")).text();
@@ -97,6 +98,7 @@ async function until(fn, ms, what) {
     out.loadmsg = d.getElementById("loadmsg").textContent;
     out.posen = d.getElementById("posen").textContent;
     out.rows = d.querySelectorAll("#list .irow").length;
+    out.buildBadgeAfter = (d.getElementById("build") || {}).textContent || "";
     out.toggles = d.querySelectorAll("#toggles input[data-kind]").length;
     log("analysed: " + d.getElementById("status").textContent);
 
@@ -402,6 +404,10 @@ def main():
           "and served stale pages against newer code", f)
     check(got.get("build"),
           "the page states which build it is running: %s" % got.get("build"), f)
+    check((got.get("buildBadgeAfter") or "").startswith("build ")
+          and (got.get("build") or "?")[:8] in got.get("buildBadgeAfter", ""),
+          "and still says so after a pose is analysed, when the status "
+          "line has been overwritten: %r" % got.get("buildBadgeAfter"), f)
     check(got["recAtoms"] > 1000,
           "the receptor is in the viewer: %d atoms" % got["recAtoms"], f)
     check(got["ligAtoms"] > 5,

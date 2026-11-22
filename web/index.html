@@ -41,6 +41,13 @@
   #status { font-size:11.5px; color:var(--muted); flex:1;
             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #status.warn { color:var(--warn); }
+  /* Permanent, because the status line is transient: it is overwritten
+     by the first pose you analyse, and it is clipped with an ellipsis
+     long before its end. The build was only ever written there, so
+     "which build am I looking at" was unanswerable exactly when it
+     mattered - with a stale page on screen. */
+  #build { font-size:11px; color:var(--muted); white-space:nowrap;
+           flex:none; font-variant-numeric:tabular-nums; cursor:default; }
   aside { overflow-y:auto; border-right:1px solid var(--line); padding:10px; }
   /* Mol* takes the element it is given and replaces its contents, so
      nothing of ours may live inside #view. The drop notice and the
@@ -113,6 +120,7 @@
   <header>
     <b>Hit Picking</b>
     <span id="status">starting&hellip;</span>
+    <span id="build" title="which build is on screen">&nbsp;</span>
   </header>
 
   <aside>
@@ -1122,13 +1130,17 @@ async function freshStart() {
     const m = b.match(/"([0-9a-f]+)"/);
     window.__build = m ? m[1] : "?";
   } catch (e) { window.__build = "?"; }
+  $("build").textContent = "build " + String(window.__build).slice(0, 8);
   try {
     bridge = new HPBridge.WorkerBridge("js/worker.js");
     const v = await bridge.call("version");
     window.__handbook = v.handbook;
+    $("build").title = "build " + (window.__build || "?")
+      + "\n" + (v.handbook || "no handbook")
+      + "\nMol* " + (window.molstar ? molstar.version : "missing")
+      + "\neverything runs in this tab; nothing is uploaded";
     say("engine ready &middot; " + esc(v.handbook || "no handbook")
         + " &middot; Mol* " + (window.molstar ? molstar.version : "missing")
-        + " &middot; build " + esc(window.__build || "?")
         + " &middot; <span class='muted'>everything runs in this tab</span>");
   } catch (e) {
     say("the engine failed to start: " + esc(e.message)
