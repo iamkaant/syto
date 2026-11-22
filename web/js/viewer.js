@@ -55,6 +55,9 @@
     this._index = null;       // rounded coordinate -> {unit, element}
     this.onAtomClick = null;
     this.onBondClick = null;   // a bond is a torsion question, not an atom one
+    this.onEmptyClick = null;  // clicking nothing is how you clear a pick
+    this.onOtherClick = null;  // anything else, so it can be reported
+    this.lastLociKind = null;
   }
 
   Viewer.prototype.start = async function () {
@@ -457,6 +460,13 @@
     this.plugin.behaviors.interaction.click.subscribe(function (e) {
       var loci = e.current && e.current.loci;
       if (!loci) return;
+      // Kept so a click that goes nowhere can say what it was, instead
+      // of looking like a dead control.
+      self.lastLociKind = loci.kind;
+      if (loci.kind === "empty-loci") {
+        if (self.onEmptyClick) self.onEmptyClick();
+        return;
+      }
       // A bond is its own kind of loci, not two atoms. Clicking the stick
       // between two atoms is how you ask about a torsion - asking about
       // one of its ends instead is a different question.
@@ -474,14 +484,20 @@
         } catch (err) { /* a click on nothing is not an error */ }
         return;
       }
-      if (!self.onAtomClick) return;
-      if (loci.kind !== "element-loci") return;
-      try {
-        var l = SE.Loci.getFirstLocation(loci);
-        if (!l) return;
-        self.onAtomClick([SP.atom.x(l), SP.atom.y(l), SP.atom.z(l)],
-                         SP.atom.label_atom_id(l));
-      } catch (err) { /* a click on nothing is not an error */ }
+      if (loci.kind === "element-loci") {
+        if (!self.onAtomClick) return;
+        try {
+          var l = SE.Loci.getFirstLocation(loci);
+          if (!l) return;
+          self.onAtomClick([SP.atom.x(l), SP.atom.y(l), SP.atom.z(l)],
+                           SP.atom.label_atom_id(l));
+        } catch (err) { /* a click on nothing is not an error */ }
+        return;
+      }
+      // Anything else - a whole structure, a shape, a measurement line.
+      // Saying so beats silence: silence is indistinguishable from the
+      // feature being broken, which is how this was reported.
+      if (self.onOtherClick) self.onOtherClick(loci.kind);
     });
   };
 

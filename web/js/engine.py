@@ -720,8 +720,11 @@ def torsion_at(ax, ay, az, bx, by, bz):
             "profile": json.loads(torsion_profile("%d,%d" % t.bond)),
         })
     # Not every bond has one: ring bonds, double bonds and terminal bonds
-    # are not rotatable, so there is nothing to measure.
-    return _json({"error": "no rotatable torsion on that bond"})
+    # are not rotatable, so there is nothing to measure. Name the bond -
+    # a click that registered must not read as a click that did nothing.
+    return _json({"error": "%s - %s is not a rotatable bond (ring, double "
+                           "or terminal), so it has no torsion"
+                           % (ms.atom_label(i), ms.atom_label(j))})
 
 
 def torsion_profile(bond=None):

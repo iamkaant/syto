@@ -277,6 +277,29 @@ async function until(fn, ms, what) {
       out.bondRefusedWhy = far.error || "";
     }
 
+    // --- a pick can be put back ------------------------------------
+    //
+    // Highlighting a torsion moves the camera and leaves a component on
+    // screen. Before this the only way out was to step to another pose
+    // and come back, which is not a way out.
+    if (first) {
+      first.click();                       // the same row again
+      await sleep(1500);
+      out.clearedByRow = !V.torsion
+        && pt.querySelectorAll("#torsions .trow.on").length === 0;
+      first.click();                       // pick it again
+      await sleep(1500);
+      out.repickedAfterClear = !!V.torsion;
+      d.getElementById("reset").click();   // and the button clears it
+      await sleep(1500);
+      out.clearedByButton = !V.torsion;
+      out.resetStatus = d.getElementById("status").textContent
+        .replace(/\s+/g, " ").trim();
+      V.onEmptyClick();                    // as does clicking nothing
+      await sleep(800);
+      out.emptyClickOk = !V.torsion;
+    }
+
     // --- switching pose redraws, it does not accumulate -------------
     var t1 = Date.now();
     d.getElementById("next").click();
@@ -510,6 +533,15 @@ def main():
     check(got.get("bondClickProfile") is True,
           "clicking the bond itself plots it too: %r"
           % (got.get("bondClickStatus") or "")[:80], f)
+    check(got.get("clearedByRow") is True,
+          "clicking the picked row again puts it back", f)
+    check(got.get("repickedAfterClear") is True,
+          "and it can be picked again afterwards", f)
+    check(got.get("clearedByButton") is True,
+          "Reset view drops the pick and re-frames the pocket: %r"
+          % (got.get("resetStatus") or "")[:60], f)
+    check(got.get("emptyClickOk") is True,
+          "and so does clicking empty space", f)
     check(got.get("bondRefused") is True,
           "a bond with no torsion is refused, not guessed at: %r"
           % got.get("bondRefusedWhy"), f)

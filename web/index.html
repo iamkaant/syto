@@ -154,6 +154,9 @@
         Labels on the lines</label>
       <label class="chk"><input type="checkbox" id="opt-legend" checked>
         Colour key in the view</label>
+      <div class="row" style="margin-top:6px">
+        <button id="reset" title="back to the pocket, and drop any picked torsion">Reset view</button>
+      </div>
       <label class="chk"><input type="checkbox" id="opt-clashes" checked>
         <span class="swatch" style="background:#e64646"></span>
         Clashes</label>
@@ -383,6 +386,10 @@ $("go").onclick = async () => {
       await viewer.start();
       viewer.onAtomClick = onAtomClick;
       viewer.onBondClick = onBondClick;
+      viewer.onEmptyClick = () => clearTorsionPick(true);
+      viewer.onOtherClick = (kind) =>
+        say("that click landed on a " + esc(String(kind).replace("-loci", ""))
+            + ", not an atom or a bond");
       viewer.siteSize = +$("opt-stick").value;
       viewer.lineSize = +$("opt-linew").value;
       viewer.textSize = +$("opt-text").value;
@@ -459,6 +466,7 @@ document.addEventListener("keydown", (e) => {
 });
 $("opt-labels").onchange = () => { saveView(); redraw(); };
 $("opt-legend").onchange = () => { saveView(); renderLegend(lastScene); };
+$("reset").onclick = resetView;
 $("opt-clashes").onchange = () => { saveView(); redraw(); };
 $("opt-site").onchange = redraw;
 $("opt-ribbon").onchange = () => {
@@ -639,31 +647,54 @@ async function loadTorsions() {
   }
 }
 
-// A row click: select the bond in 3D, plot its profile, and open the
-// handbook on one of its atoms. The handbook entry is what makes the
-// profile visible at all - the panel draws it under the entry - and it
-// is also the right answer to "what is this bond I am being warned
-// about".
+// A row click: select the bond in 3D and plot its profile, in the
+// section the row is in. It used to also open the handbook on one of
+// the bond's atoms - needed back when the profile was drawn under the
+// handbook entry, and nothing but noise now that it is not: the entry
+// brought its own basicity plot with it, which is the plot that kept
+// appearing at the bottom of the panel. A row is a torsion question;
+// the handbook answers atom clicks.
 async function pickTorsion(bond) {
   const row = torsionRows.find((r) => r.bond === bond);
   if (!row || !lastResult) return;
+  // The same row again is "put it back", not "pick it harder".
+  if (torsionPick === bond) { await clearTorsionPick(); return; }
   torsionPick = bond;
   try {
     torsionProfile = await bridge.call("torsionProfile", {bond: bond});
   } catch (e) { torsionProfile = null; }
-  let hit = null;
-  try {
-    const h = await bridge.call("explainAt",
-      {x: row.a[0], y: row.a[1], z: row.a[2]});
-    if (!h.error) hit = h;
-  } catch (e) { /* the panel still gets the list and the profile */ }
   if (viewer) await viewer.showTorsion(row.xyz || [row.a, row.b], true);
   renderLegend(lastScene);
-  sendPanel(baseSnapshot(hit, hit ? (hit.scales || []) : []));
+  sendPanel(baseSnapshot());
   say(esc(row.kind) + " &middot; " + esc(row.label) + " &middot; "
       + row.angle.toFixed(0) + "&deg;"
       + (row.energy === null || row.energy === undefined
          ? "" : ", costing " + row.energy.toFixed(1) + " kcal/mol"));
+}
+
+// A pick has to be undoable. Highlighting a torsion moves the camera to
+// it and leaves a component on screen; before this the only way back was
+// to step to the next pose and return, which is not a way back.
+async function clearTorsionPick(quiet) {
+  const had = torsionPick !== null || (viewer && viewer.torsion);
+  torsionPick = null;
+  if (viewer) await viewer.clearTorsion();
+  try {
+    torsionProfile = torsionRows.length
+      ? await bridge.call("torsionProfile", {}) : null;
+  } catch (e) { torsionProfile = null; }
+  renderLegend(lastScene);
+  sendPanel(baseSnapshot());
+  if (had && !quiet) say("selection cleared");
+  return had;
+}
+
+// Back to the pocket, at any time. The camera is the one piece of state
+// a user cannot put back by hand once something has flown it somewhere.
+async function resetView() {
+  await clearTorsionPick(true);
+  if (viewer) viewer.focusSite();
+  say("view reset to the binding site");
 }
 
 // Clicking the stick between two atoms asks about the torsion on that
