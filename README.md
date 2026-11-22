@@ -1,16 +1,15 @@
 # Syto
 
-A helper for [hit-picking parties](https://wiki.docking.org/index.php?title=Hit_picking_party):
+Syto (Ukrainian "сито": fine sieve) is a helper for hit-picking:
 it detects and **scores** the non-covalent interactions in a docked pose, and
 puts the quantitative interaction literature one click away from the atom
 you are looking at.
 
 Two front ends, one engine:
 
-| | status |
-|---|---|
-| **ChimeraX bundle** (`ChimeraX-Syto`), alongside ViewDock | working (v0.1) |
-| **Static web page** (Mol\* + Pyodide) | not started |
+
+ -  **ChimeraX bundle** (`ChimeraX-Syto`), alongside ViewDock 
+ -  **Static web page** (Mol\* + Pyodide) 
 
 The engine (`core/hitpicking`) is pure Python + numpy — no RDKit, no ChimeraX,
 no torch — so the identical code runs inside ChimeraX's Python 3.11 and, later,
@@ -20,7 +19,7 @@ atom for atom.
 
 ---
 
-## What it does today
+## What it does 
 
 **Detects and scores**, against published geometric criteria: hydrogen bonds
 (including charge-assisted and water-mediated), salt bridges, parallel and
@@ -30,14 +29,10 @@ T-shaped π-stacking, cation–π, halogen bonds, hydrophobic contacts.
 the ligand (drawn in red, severe ones separately), puckered aromatic rings,
 and the docking program's own strain terms.
 
-**Measures every rotatable torsion** and judges the ones that can be judged:
+**Measures every rotatable torsion**:
 an sp3–sp3 bond on an eclipsed rotamer, an aromatic amine or anilide twisted
 out of the ring plane with no ortho substituent to force it, a twisted amide,
-an ortho-substituted biaryl held unnaturally flat. Where a twist IS forced by
-an ortho substituent it says so rather than crying strain. Torsions it cannot
-judge are reported as `unjudged`, never as fine — see the note on the torsion
-library below. Inside ChimeraX this uses ChimeraX's own per-atom radii, so the numbers
-agree with its Clashes tool rather than quietly differing.
+an ortho-substituted biaryl held unnaturally flat. 
 
 Each interaction reports the measured distance and angles, a 0–1 geometric
 quality, and plain-language flags such as *"D-H···A 128°, well off linear"* or
@@ -48,23 +43,11 @@ whole moiety highlighted, and the handbook entries for it — including real
 pKBHX basicity data from Laurence 2009, every value traceable to a DOI *and* a
 locator naming the table it was read from.
 
-**Says what is not an interaction.** Amide and sulfonamide nitrogens, pyrrole
-NH and organic fluorine are modelled as explicit negative entries, because half
-of what gets argued about at a party is someone over-counting one of these.
-
-### Deliberate limits
-
-- **Scores are heuristic rankings, not free energies.** They are never summed
-  into a single number. Energy ranges are coarse, flagged, and shown as ranges.
-- **Atom labels show a family median and range** (`pKBHX ~1.9 (0.7–2.7)`), not
-  a value for your exact compound: perception knows "a tertiary amine", not
-  which substitution pattern.
-- **Protonation is treated as evidence, not assumption.** A delocalised cation
-  is only called charged when every nitrogen in the group actually bears a
-  proton. With no hydrogens in the file, groups are assumed protonated and
-  say so.
-- **Disagreeing sources stay visible.** 25 values conflict between or within
-  sources; they are surfaced, not silently resolved.
+**Predicts grade of unseen ligands via active learning.** Rank a few poses and 
+train an ensemble model to predict grades of unseen ligands. Look through the 
+more ligands and repeat training. Use the trained model to do automatic 
+hit picking of thousands of ligands, and only spend time on grading the best
+ones. This feature is a port of [AutoParty](https://github.com/keiserlab/autoparty).
 
 ---
 
@@ -83,28 +66,8 @@ Requires PyYAML to build the handbook. If ChimeraX's Python lacks it:
 ```bash
 HITPICK_PYTHON=/path/to/python/with/pyyaml tools/install_bundle.sh
 ```
+The tool is planned to be published on the ChimeraX Toolshed
 
-### Releasing to the ChimeraX Toolshed
-
-```bash
-python tools/release_bundle.py --version 0.2.0     # build and verify
-python tools/release_bundle.py --check             # checks only, no build
-```
-
-`devel build` makes a wheel; it does not tell you whether the wheel is the one
-you meant to publish. A Toolshed version is public and can never be reused, so
-this does the whole path and stops at the first thing that is wrong: a `.dev`
-version left over from an interrupted `install_bundle.sh`, a version already
-published, an uncommitted tree, handbook data that was not rebuilt, a vendored
-core that has drifted from `core/`. Then it opens the finished wheel and checks
-it file by file against `chimerax/src`, and imports the vendored core out of it
-in a fresh process — a missing module gets past every check that only reads
-names.
-
-The wheel lands in `dist/`. Submitting it stays manual: sign in at
-[cxtoolshed.rbvi.ucsf.edu](https://cxtoolshed.rbvi.ucsf.edu) (Google sign-in
-only), use **Submit a Bundle**, and upload it. The first submission waits for
-ChimeraX staff to approve it; later ones from the same account appear at once.
 
 ## Use
 
@@ -196,28 +159,6 @@ A numpy port of the [AutoParty](https://github.com/keiserlab/autoparty) model
 with PyTorch removed, so it runs inside ChimeraX and, later, in the browser.
 A committee of small networks is trained on the ordinal grades, and the poses
 it disagrees with itself about are the ones worth grading next.
-
-**What to expect.** On a 250-pose set with a synthetic rubric, uncertainty
-sampling was ahead of random selection at three of four checkpoints (75% vs
-72% at 64 graded) - a real but modest margin, within noise at three seeds.
-Treat the ranking as a reading order, not an oracle. It refuses to train on
-fewer than eight grades, or when every grade is the same.
-
-## Development
-
-```bash
-pip install -e core[dev]
-pytest core/tests -q                  # 49 tests
-python tools/build_data.py            # compile data-src -> handbook.json
-python tools/build_data.py --check    # validate without writing
-```
-
-The build **fails** on any numeric value lacking a DOI and a locator. That is
-the project's core promise, and a test enforces it across the whole dataset.
-
-Perception is cross-checked against RDKit on 1091 real docked ligands
-(54,264 atoms): aromaticity 0.031%, hybridisation 0.006%, ring count 0.017%
-disagreement. RDKit is a dev-only dependency; nothing in the package imports it.
 
 ### Layout
 
