@@ -46,6 +46,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      # setup-python gives a bare interpreter. The handbook build reads
+      # YAML and imports the core, which is numpy from its first line -
+      # without these the very first step died and every run failed
+      # before it ever reached Pages.
+      - name: Install what the build needs
+        run: python -m pip install --disable-pip-version-check pyyaml numpy
+
       - name: Build the handbook
         run: python tools/build_data.py
 
@@ -67,7 +74,13 @@ jobs:
           done
           echo "web/ is $(du -sh web | cut -f1)"
 
+      # enablement turns Pages on for the repository the first time this
+      # runs, instead of failing with "Get Pages site failed" until
+      # somebody flips the switch by hand. On a private repository Pages
+      # still needs a paid plan and this will fail without one.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
