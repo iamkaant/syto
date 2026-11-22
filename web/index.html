@@ -584,19 +584,32 @@ function restoreView() {
 }
 
 // ------------------------------------------------------------ analysing
+//
+// Every analysis is numbered, and a continuation that finds a newer
+// number stops. Holding down "next" starts an analysis per click, each
+// several awaits long; without this they interleave and the last one to
+// finish - not the last one asked for - is what you end up looking at,
+// with the others' work drawn over it.
+let analyseSeq = 0;
+
 async function analyse(i) {
+  const my = ++analyseSeq;
   current = i;
   $("pose").value = String(i);
   $("posen").textContent = (i + 1) + " of " + poses.length;
   say("analysing&hellip;");
   const res = await bridge.call("analyse",
     {index: i, enabled: enabled, strain: true});
+  if (my !== analyseSeq) return;
   lastResult = res;
   await loadTorsions();
+  if (my !== analyseSeq) return;
   await viewer.showPose(i);
+  if (my !== analyseSeq) return;
   renderPose(res);
   renderList(res);
   await redraw();
+  if (my !== analyseSeq) return;
   sendPanel(baseSnapshot());
   setGradeButtons(gradeOf(i));
   $("gradestate").innerHTML = gradeState(i);
@@ -609,7 +622,12 @@ async function analyse(i) {
 
 async function redraw() {
   if (!viewer || !lastResult) return;
+  // The engine holds one analysed pose. If a newer analysis landed while
+  // this scene was being fetched, the scene is of a different ligand
+  // than the one on screen - so drop it rather than draw it.
+  const my = analyseSeq;
   const scene = await bridge.call("scene", {});
+  if (my !== analyseSeq) return;
   if ($("opt-site").checked) await viewer.showSite(scene.site);
   else await viewer.clearSite();
   const n = await viewer.drawScene(scene, {

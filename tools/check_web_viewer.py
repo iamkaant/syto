@@ -318,6 +318,37 @@ async function until(fn, ms, what) {
     out.torsionRows2 = d.getElementById("hb").contentDocument
       .querySelectorAll("#torsions .trow").length;
     out.torsionRef2 = !!V.torsion;
+
+    // --- hammering "next" leaves ONE ligand on screen ---------------
+    //
+    // Each click starts an analysis several awaits long. Interleaved,
+    // they each delete a node another had already replaced and each
+    // leave their own structure behind - several ligands at once, which
+    // is what was reported.
+    function models() {
+      var n = 0;
+      V.plugin.state.data.cells.forEach(function (c) {
+        if (c.obj && c.obj.type && c.obj.type.name === "Model") n++;
+      });
+      return n;                       // one receptor + one pose = 2
+    }
+    out.modelsBefore = models();
+    for (var hammer = 0; hammer < 5; hammer++) {
+      d.getElementById("next").click();
+      await sleep(60);                // faster than any analysis can run
+    }
+    await until(function () { return !/analysing/.test(
+      d.getElementById("status").textContent); }, 180000, "the pile-up");
+    await sleep(3000);
+    out.modelsAfter = models();
+    out.hammerPosen = d.getElementById("posen").textContent;
+    out.hammerDrawn = V.nDrawn;
+    var hs = await w.HP.bridge.call("scene", {});
+    out.hammerSceneLines = hs.lines.length;
+    out.hammerName = hs.name;
+    out.hammerShown = d.getElementById("status").textContent
+      .replace(/\s+/g, " ").trim();
+
     out.ok = true;
   } catch (e) {
     out.error = String((e && e.stack) || e);
@@ -401,7 +432,10 @@ def main():
     httpd = serve(WEB, PORT, inbox)
     try:
         t0 = time.time()
-        got = run_browser(chrome, PORT, inbox, page=DRIVER)
+        # This page drives the whole tool, and the pile-up check adds
+        # five more analyses on top - each one real work in Pyodide. The
+        # default 420s is for the parity page, which does far less.
+        got = run_browser(chrome, PORT, inbox, page=DRIVER, timeout=900)
         secs = time.time() - t0
     finally:
         httpd.shutdown()
@@ -563,6 +597,18 @@ def main():
           "and it names what was drawn, not a fixed list", f)
     check(got.get("legendOff") is True and got.get("legendBack") is True,
           "and it can be switched off and back on", f)
+
+    # Two models, always: the receptor and the pose on screen. Orphans
+    # draw nothing, so only a count catches them.
+    check(got.get("modelsAfter") == 2 and got.get("modelsBefore") == 2,
+          "five fast clicks on next leave one ligand on screen, not a "
+          "pile (%s models before, %s after; 2 is receptor + pose)"
+          % (got.get("modelsBefore"), got.get("modelsAfter")), f)
+    check(got.get("hammerDrawn") == got.get("hammerSceneLines"),
+          "and what is drawn is the pose that ended up selected "
+          "(%s lines drawn, %s in the scene for %s)"
+          % (got.get("hammerDrawn"), got.get("hammerSceneLines"),
+             got.get("hammerName")), f)
 
     # Switching pose must redraw, not accumulate.
     check(got["posen"].startswith("1 of") and got["secondMs"] is not None,

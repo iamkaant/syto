@@ -50,6 +50,8 @@
     this.receptor = null;     // the state cell
     this.trajectory = null;
     this.pose = null;
+    this.poseModel = null;    // the parent of this.pose; deleting it
+                              // takes the structure with it
     this.measurements = [];
     this.torsion = null;      // the highlighted torsion, if any
     this._index = null;       // rounded coordinate -> {unit, element}
@@ -103,17 +105,50 @@
     return this.trajectory.data.frameCount;
   };
 
+  // Everything that builds state runs through here, one at a time.
+  //
+  // Building a pose is four awaits long. Two of them overlapping - which
+  // is what holding down "next" does - means both read this.pose before
+  // either writes it, so each deletes a node the other had already
+  // replaced and both leave their own structure behind: several ligands
+  // on screen at once. A queue is the fix; a flag would only drop the
+  // click that happens to arrive mid-build.
+  Viewer.prototype._serial = function (fn) {
+    var prev = this._chain || Promise.resolve();
+    var next = prev.then(fn, fn);
+    // the chain must survive a failure, or one error stops every later
+    // pose from ever being built
+    this._chain = next.catch(function () {});
+    return next;
+  };
+
   // One trajectory, one model per pose: switching is a model index, not a
   // re-parse of a file that may hold a few thousand records.
-  Viewer.prototype.showPose = async function (i) {
+  Viewer.prototype.showPose = function (i) {
+    var self = this;
+    return this._serial(function () { return self._showPose(i); });
+  };
+
+  Viewer.prototype._showPose = async function (i) {
     var p = this.plugin;
-    if (this.pose) {
-      await p.build().delete(this.pose).commit();
+    // Delete the MODEL, not the structure built from it.
+    //
+    // createModel adds a model cell and createStructure hangs a
+    // structure off it; deleting the structure leaves the model behind,
+    // so every pose switch left one more orphan in the state tree. They
+    // draw nothing, which is why this went unnoticed - but they are the
+    // parsed coordinates of every pose ever looked at. Deleting the
+    // parent takes its subtree with it.
+    if (this.poseModel) {
+      var old = this.poseModel;
+      this.poseModel = null;
       this.pose = null;
+      await p.build().delete(old).commit();
     }
     if (!this.trajectory) return 0;
     var model = await p.builders.structure.createModel(
       this.trajectory, {modelIndex: i});
+    this.poseModel = model;
     var struct = await p.builders.structure.createStructure(model);
     await p.builders.structure.representation.applyPreset(struct, "auto");
     this.pose = struct;
