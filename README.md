@@ -17,6 +17,7 @@ inside Pyodide in a browser. Both front ends therefore give the same answers by
 construction, and a test proves the ChimeraX path and the standalone path agree
 atom for atom.
 
+![logo](img/syto-logo.jpg)
 ---
 
 ## What it does 
