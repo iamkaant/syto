@@ -50,6 +50,12 @@ QM_SPEC = "default"
 LEVEL_OF_THEORY = "B3LYP-D3(BJ)/DZVP (Psi4), relaxed torsion drives"
 
 
+# Datasets replaced by a re-run of the same molecules: old -> new.
+SUPERSEDED = {
+    "OpenFF Substituted Phenyl Set 1": "OpenFF Substituted Phenyl Set 1 v2.0",
+}
+
+
 def fold_angle(angle, bond_type):
     """Map a scan angle onto the coordinate the tool measures."""
     a = abs(float(angle)) % 360.0
@@ -95,6 +101,7 @@ def build(min_scans=5, split_ortho=True):
     classes = {}
     datasets = set()
     skipped_mm = 0
+    skipped_old = 0
     for path in files:
         try:
             with open(path) as fh:
@@ -110,6 +117,12 @@ def build(min_scans=5, split_ortho=True):
         # exist to correct - it has no business in the reference.
         if rec.get("spec", QM_SPEC) != QM_SPEC:
             skipped_mm += 1
+            continue
+        # A dataset that was re-run under a new name is the same
+        # molecules twice. Pooling both gives those molecules double
+        # weight in their class and reports twice the scans there are.
+        if rec.get("dataset") in SUPERSEDED:
+            skipped_old += 1
             continue
         datasets.add(rec.get("dataset", "?"))
         bond_type = rec.get("bond_type") or "other"
@@ -164,6 +177,9 @@ def build(min_scans=5, split_ortho=True):
     attribution["level_of_theory"] = LEVEL_OF_THEORY
     attribution["specification"] = QM_SPEC
     attribution["non_qm_scans_excluded"] = skipped_mm
+    attribution["superseded_datasets_excluded"] = {
+        k: v for k, v in SUPERSEDED.items()}
+    attribution["superseded_scans_excluded"] = skipped_old
 
     payload = {
         "schema_version": 1,

@@ -236,11 +236,12 @@ Bissantz et al. (ref 7) is also a source of quantitative values.
 **Torsion energy profiles** are relaxed gas-phase torsion drives computed at
 **B3LYP-D3(BJ)/DZVP** in Psi4 by the Open Force Field Initiative and hosted on
 the [MolSSI QCArchive](https://api.qcarchive.molssi.org) (TorsionDrive
-datasets; 1805 scans used). The datasets, with their submission records:
+datasets; 1649 scans used). The datasets, with their submission records:
 
 - [OpenFF Group1 Torsions](https://github.com/openforcefield/qca-dataset-submission/tree/master/submissions/2019-05-01-OpenFF-Group1-Torsions)
-- [OpenFF Substituted Phenyl Set 1](https://github.com/openforcefield/qca-dataset-submission/tree/master/submissions/2019-07-25-phenyl-set)
-  and its v2.0 re-run
+- [OpenFF Substituted Phenyl Set 1 v2.0](https://github.com/openforcefield/qca-dataset-submission/tree/master/submissions/2019-07-25-phenyl-set)
+  (the v2.0 re-run only; the original Set 1 holds the same molecules and is
+  left out so they are not counted twice)
 - [OpenFF WBO Conjugated Series v1.0](https://github.com/openforcefield/qca-dataset-submission/tree/master/submissions/2021-01-25-OpenFF-Conjugated-Series)
 
 They are used under
