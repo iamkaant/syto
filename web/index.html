@@ -160,6 +160,9 @@
       <label class="chk"><input type="checkbox" id="opt-clashes" checked>
         <span class="swatch" style="background:#e64646"></span>
         Clashes</label>
+      <label class="chk"><input type="checkbox" id="opt-stranded" checked>
+        <span class="swatch" style="background:#ff3dbb"></span>
+        Buried polar atoms with no H-bond</label>
       <label class="chk"><input type="checkbox" id="opt-site" checked>
         Pocket residues as sticks</label>
       <label class="chk"><input type="checkbox" id="opt-reslabels">
@@ -321,12 +324,14 @@ function baseSnapshot(hit, scales) {
     // The panel draws a swatch per row. The colours come from the
     // viewer rather than being written out again here, so the list and
     // the picture cannot disagree.
-    colors: Object.fromEntries(TYPES.map((t) =>
+    colors: Object.assign(Object.fromEntries(TYPES.map((t) =>
       [t[0], hex(HPViewer.COLORS[t[0]] || 0x8b93a3)])),
+      {unsatisfied: hex(HPViewer.STRANDED)}),
     pose: lastResult ? {
       name: lastResult.name, counts: lastResult.counts,
       warnings: lastResult.warnings, interactions: lastResult.interactions,
       strain: lastResult.strain ? lastResult.strain.counts : null,
+      unsatisfied: lastResult.unsatisfied || [],
       worst_overlap: lastResult.strain ? lastResult.strain.worst_overlap : null
     } : null,
     hit: hit || null,
@@ -501,6 +506,7 @@ $("reset").onclick = resetView;
 $("opt-clashes").onchange = () => { saveView(); redraw(); };
 $("opt-site").onchange = () => { saveView(); redraw(); };
 $("opt-sitekeep").onchange = () => { saveView(); redraw(); };
+$("opt-stranded").onchange = () => { saveView(); redraw(); };
 $("opt-reslabels").onchange = () => {
   if (viewer) viewer.siteLabels = $("opt-reslabels").checked;
   saveView();
@@ -598,6 +604,7 @@ function saveView() {
       legend: $("opt-legend").checked,
       reslabels: $("opt-reslabels").checked,
       sitekeep: $("opt-sitekeep").checked,
+      stranded: $("opt-stranded").checked,
       left: columnWidth("--left"), right: columnWidth("--right")
     }));
   } catch (e) { /* private window */ }
@@ -614,6 +621,7 @@ function restoreView() {
   if (d.legend !== undefined) $("opt-legend").checked = !!d.legend;
   if (d.reslabels !== undefined) $("opt-reslabels").checked = !!d.reslabels;
   if (d.sitekeep !== undefined) $("opt-sitekeep").checked = !!d.sitekeep;
+  if (d.stranded !== undefined) $("opt-stranded").checked = !!d.stranded;
   if (d.stick) $("opt-stick").value = d.stick;
   // A width saved when the slider went to 3x is outside the range now;
   // the input would clamp it silently and the readout would lie.
@@ -708,6 +716,10 @@ async function redraw() {
     labels: $("opt-labels").checked,
     clashes: $("opt-clashes").checked
   });
+  // Marked after the pocket is drawn, so a flagged pocket atom's residue
+  // is already on screen under its mark.
+  if ($("opt-stranded").checked) await viewer.showStranded(scene.stranded);
+  else await viewer.clearStranded();
   lastScene = scene;
   renderLegend(scene);
   if (viewer.lastMissed) {
@@ -1093,6 +1105,9 @@ function renderLegend(scene) {
     if (scene.clashes.some((c) => c.severe)) {
       rows.push(["severe clash", hex(HPViewer.SEVERE)]);
     }
+  }
+  if ($("opt-stranded").checked && (scene.stranded || []).length) {
+    rows.push(["buried, no H-bond partner", hex(HPViewer.STRANDED)]);
   }
   if (torsionPick) rows.push(["picked torsion", hex(HPViewer.TORSION)]);
   el.innerHTML = rows.map((r) =>

@@ -185,6 +185,8 @@ def _pose_dict(res, index):
                           "atoms": [int(a) for a in f.atoms]}
                          for f in sr.findings],
         }
+    if res.unsatisfied is not None:
+        out["unsatisfied"] = [u.to_dict() for u in res.unsatisfied]
     return out
 
 
@@ -617,7 +619,13 @@ def scene(index=None):
                 "a": xyz(c.i), "b": xyz(c.j),
             })
 
+    # Buried polar atoms with no partner, as positions like everything
+    # else the page draws.
+    stranded = [{"xyz": xyz(u.atom), "role": u.role, "side": u.side,
+                 "label": u.label} for u in (res.unsatisfied or ())]
+
     return _json({"name": res.name, "lines": lines, "clashes": clashes,
+                  "stranded": stranded,
                   "n_receptor": int(res.n_receptor),
                   "site": site_atoms(res)})
 

@@ -31,6 +31,7 @@
   var CLASH = 0xe64646;
   var SEVERE = 0xff2020;
   var TORSION = 0xffb020;  // the picked torsion, a colour nothing else uses
+  var STRANDED = 0xff3dbb; // buried polar atom with no H-bond partner
   // The canvas is white. A light colour that reads well as a 3 pixel
   // line is almost invisible as text on it, so text gets a darker shade
   // of its line's colour and the residue names get near-black.
@@ -66,6 +67,7 @@
                               // takes the structure with it
     this.measurements = [];
     this.torsion = null;      // the highlighted torsion, if any
+    this.stranded = [];       // highlights on unpaired buried polar atoms
     this._index = null;       // rounded coordinate -> {unit, element}
     this.onAtomClick = null;
     this.onBondClick = null;   // a bond is a torsion question, not an atom one
@@ -471,6 +473,64 @@
     } catch (e) { /* no camera yet */ }
   };
 
+  // ----------------------------------------- unpaired buried polar atoms
+  //
+  // Which atoms these are is decided by the core; this only marks them.
+  // A fat sphere in a colour nothing else uses, on the atom itself: there
+  // is no second atom to draw a line to, which is the whole point.
+
+  Viewer.prototype.clearStranded = async function () {
+    var refs = this.stranded || [];
+    this.stranded = [];
+    for (var i = 0; i < refs.length; i++) {
+      try { await this.plugin.build().delete(refs[i]).commit(); }
+      catch (e) { /* went with the pose it hung off */ }
+    }
+  };
+
+  Viewer.prototype.showStranded = async function (items) {
+    await this.clearStranded();
+    if (!items || !items.length) return 0;
+    if (!this._index) this._buildIndex();
+    var SE = global.molstar.lib.structure.StructureElement;
+    var ST = global.molstar.lib.plugin.StateTransforms;
+    var self = this, found = 0;
+    // ligand atoms hang off the pose, pocket atoms off the receptor
+    var cells = [this.pose, this.receptor];
+    for (var c = 0; c < cells.length; c++) {
+      var cell = cells[c];
+      if (!cell || !cell.data) continue;
+      var byUnit = new Map();
+      items.forEach(function (it) {
+        var hit = self.atomAt(it.xyz);
+        if (!hit || hit.structure !== cell.data) return;
+        if (!byUnit.has(hit.unit)) byUnit.set(hit.unit, []);
+        byUnit.get(hit.unit).push(hit.offset);
+        found++;
+      });
+      if (!byUnit.size) continue;
+      var elements = [];
+      byUnit.forEach(function (offsets, unit) {
+        offsets.sort(function (a, b) { return a - b; });
+        elements.push({unit: unit, indices: offsets});
+      });
+      var sel = this.plugin.build().to(cell)
+        .apply(ST.Model.StructureSelectionFromBundle,
+               {bundle: SE.Bundle.fromLoci(SE.Loci(cell.data, elements)),
+                label: "unpaired polar"});
+      sel.apply(ST.Representation.StructureRepresentation3D, {
+        type: {name: "ball-and-stick",
+               params: {sizeFactor: 0.42, sizeAspectRatio: 0.6, alpha: 0.75}},
+        colorTheme: {name: "uniform", params: {value: STRANDED}},
+        sizeTheme: {name: "physical", params: {}}
+      }, {tags: ["hp-stranded"]});
+      await sel.commit();
+      if (sel.selector && sel.selector.ref) this.stranded.push(sel.selector.ref);
+    }
+    this.strandedCount = found;
+    return found;
+  };
+
   // ---------------------------------------------------------- torsions
   //
   // One torsion, picked from the panel's list, shown as its four atoms in
@@ -690,5 +750,6 @@
   // can quietly stop matching the picture.
   global.HPViewer = {Viewer: Viewer, COLORS: COLORS,
                      normalizeMol2: normalizeMol2,
-                     CLASH: CLASH, SEVERE: SEVERE, TORSION: TORSION};
+                     CLASH: CLASH, SEVERE: SEVERE, TORSION: TORSION,
+                     STRANDED: STRANDED};
 })(window);

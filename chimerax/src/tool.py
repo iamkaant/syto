@@ -93,6 +93,7 @@ class HandbookTool(HtmlToolInstance):
                 "strain": r.strain.counts if r.strain is not None else None,
                 "worst_overlap": (round(r.strain.worst_overlap, 2)
                                   if r.strain is not None else None),
+                "unsatisfied": [u.to_dict() for u in (r.unsatisfied or ())],
             }
             snap["torsions"] = self._torsion_list(st)
             from hitpicking.strain.torsions import QM_WARN_KCAL

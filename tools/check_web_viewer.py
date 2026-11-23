@@ -93,7 +93,14 @@ async function until(fn, ms, what) {
     d.getElementById("go").click();
     await until(function () { return /of \\d+/.test(
       d.getElementById("posen").textContent); }, 300000, "the first analysis");
-    await sleep(2500);
+    // Wait for the panel to be filled, not for a fixed time. The panel is
+    // sent after everything is drawn, and each thing added to the drawing
+    // pushed it later until a 2.5 s sleep read it empty.
+    await until(function () {
+      return d.getElementById("hb").contentDocument
+        .querySelectorAll("#pose tr.ix").length > 0; }, 120000,
+      "the panel's interaction list");
+    await sleep(1500);
     out.firstMs = Date.now() - t0;
     out.loadmsg = d.getElementById("loadmsg").textContent;
     out.posen = d.getElementById("posen").textContent;
@@ -122,6 +129,20 @@ async function until(fn, ms, what) {
     out.sceneClashes = scene.clashes.length;
     out.kinds = scene.lines.map(function (l) { return l.kind; });
     out.siteAtoms = (scene.site || []).length;
+    // Buried polar atoms with no H-bond partner: what the core named,
+    // what the viewer marked, and what the panel lists must be one set.
+    out.strandedScene = (scene.stranded || []).length;
+    out.strandedDrawn = V.strandedCount || 0;
+    out.strandedPanel = d.getElementById("hb").contentDocument
+      .querySelectorAll("#pose .card.warn .ix").length;
+    out.strandedErrs = [];
+    V.plugin.state.data.cells.forEach(function (c) {
+      var tags = (c.transform && c.transform.tags) || [];
+      if (typeof tags === "string") tags = [tags];
+      if (tags.indexOf("hp-stranded") >= 0 && c.status === "error") {
+        out.strandedErrs.push(String(c.errorText));
+      }
+    });
     out.siteDrawn = !!V.site;
     out.siteFocused = !!V.siteLoci;
     // Did it actually RENDER? A ref in the state tree proves nothing:
@@ -640,6 +661,18 @@ def main():
     # The pocket as sticks, framed from the start.
     check(got["siteAtoms"] > 20,
           "the core picked %d pocket atom(s) to draw" % got["siteAtoms"], f)
+    check(got.get("strandedScene", 0) > 0,
+          "the core names %s buried polar atom(s) with no H-bond partner "
+          "on this pose" % got.get("strandedScene"), f)
+    check(got.get("strandedDrawn") == got.get("strandedScene")
+          and not got.get("strandedErrs"),
+          "the viewer marks every one of them (%s of %s%s)"
+          % (got.get("strandedDrawn"), got.get("strandedScene"),
+             "; " + "; ".join(got["strandedErrs"])
+             if got.get("strandedErrs") else ""), f)
+    check(got.get("strandedPanel") == got.get("strandedScene"),
+          "and the panel lists the same ones (%s row(s))"
+          % got.get("strandedPanel"), f)
     check(got["siteDrawn"],
           "and the viewer made them into a component", f)
     print("   state cells:")

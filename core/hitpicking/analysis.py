@@ -30,7 +30,8 @@ class Options:
                  "show_clashes", "show_strain_labels", "show_limits",
                  "show_scale", "hover_detail", "line_width",
                  "handbook_on_click", "annotate_atom_values",
-                 "use_active_learning", "reveal_partners")
+                 "use_active_learning", "reveal_partners",
+                 "detect_unsatisfied")
 
     def __init__(self, enabled_nci=None, include_weak_hbonds=False,
                  site_radius=10.0, show_lengths=True, show_angles=False,
@@ -39,7 +40,9 @@ class Options:
                  show_scale=True, hover_detail=True, line_width=0.075,
                  handbook_on_click=True,
                  annotate_atom_values=False, use_active_learning=False,
-                 reveal_partners=False):
+                 reveal_partners=False, detect_unsatisfied=True):
+        # buried donors/acceptors left without a hydrogen-bond partner
+        self.detect_unsatisfied = detect_unsatisfied
         self.enabled_nci = set(C.DEFAULT_ENABLED if enabled_nci is None
                                else enabled_nci)
         self.include_weak_hbonds = include_weak_hbonds
@@ -77,8 +80,11 @@ class PoseResult:
     """Everything known about one pose."""
 
     def __init__(self, name, interactions, warnings, counts, scores=None,
-                 combined=None, n_receptor=0, strain=None):
+                 combined=None, n_receptor=0, strain=None,
+                 unsatisfied=None):
         self.name = name
+        # buried polar atoms with no hydrogen-bond partner; None = not run
+        self.unsatisfied = unsatisfied
         self.strain = strain
         self.interactions = interactions
         self.warnings = warnings
@@ -102,6 +108,8 @@ class PoseResult:
         }
         if self.strain is not None:
             d["strain"] = self.strain.to_dict()
+        if self.unsatisfied is not None:
+            d["unsatisfied"] = [u.to_dict() for u in self.unsatisfied]
         return d
 
     def summary(self):
@@ -112,6 +120,10 @@ class PoseResult:
             c = self.strain.counts
             if c["clashes"] or c["internal_clashes"] or c["strain_flags"]:
                 out += "  |  " + self.strain.summary()
+        if self.unsatisfied:
+            n = len(self.unsatisfied)
+            out += "  |  %d buried polar atom%s with no H-bond partner" % (
+                n, "" if n == 1 else "s")
         return out
 
 
@@ -227,6 +239,14 @@ class ReceptorContext:
             from .strain import analyze_strain
             strain = analyze_strain(ms)
 
+        unsatisfied = None
+        if opts.detect_unsatisfied:
+            from .nci.unsatisfied import find_unsatisfied
+            # Judged against EVERY hydrogen bond the geometry allows, not
+            # only the types switched on for drawing: hiding a line must
+            # not turn its atoms into accusations.
+            unsatisfied = find_unsatisfied(ms, feats, res.interactions)
+
         return PoseResult(str(name).strip(), res.interactions, res.warnings,
                           res.counts, scores, combined=ms, n_receptor=n_rec,
-                          strain=strain)
+                          strain=strain, unsatisfied=unsatisfied)

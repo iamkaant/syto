@@ -545,7 +545,7 @@ def draw_clashes(session, strain, all_atoms, show_overlap=True):
     return made
 
 
-def label_strain(session, strain, all_atoms):
+def label_strain(session, strain, all_atoms, unsatisfied=None):
     """Put a short note on the atoms of each strain finding.
 
     Eclipsed torsions and puckered rings have no two atoms to draw a line
@@ -571,6 +571,16 @@ def label_strain(session, strain, all_atoms):
                  "twisted_out_of_conjugation": "out of plane %.0f" % abs(f.value),
                  "forced_planar": "forced flat"}.get(f.kind, f.kind)
         texts[int(anchor)] = short
+    # Buried donors and acceptors with nothing to hydrogen-bond to. Like
+    # the strain notes they have no second atom to draw a line to, so the
+    # word goes on the atom. A strain note already there is kept and the
+    # two are joined: neither is less true for the other being present.
+    for u in (unsatisfied or ()):
+        if not (0 <= u.atom < len(all_atoms)):
+            continue
+        word = "unpaired " + u.role
+        prev = texts.get(int(u.atom))
+        texts[int(u.atom)] = (prev + ", " + word) if prev else word
     # Always set the layer, even when empty: a pose with no strain has to
     # clear the notes left by the previous one.
     return set_label_layer(session, all_atoms, LAYER_STRAIN, texts)

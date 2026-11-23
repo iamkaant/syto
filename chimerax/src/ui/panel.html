@@ -517,6 +517,27 @@ function renderPose(p) {
   });
   h += '</div>';
 
+  // Buried donors and acceptors with nothing to pair with. Listed here
+  // as well as marked in 3D because the mark says where and this says
+  // which - and a row can take you to the atom.
+  var un = p.unsatisfied || [];
+  if (un.length) {
+    h += '<div class="card warn tiny"><b>' + un.length + ' buried polar atom'
+      + (un.length === 1 ? "" : "s") + ' with no H-bond partner</b>';
+    un.forEach(function (u) {
+      h += '<div class="ix" style="cursor:pointer;padding:2px 0" '
+        + 'onclick="hp(\'highlight\',{atoms:\'' + u.atom + '\'})">'
+        + '<i class="kindsw" style="display:inline-block;height:8px;'
+        + 'vertical-align:middle;margin-right:5px;background:'
+        + ((window.hpColors || {}).unsatisfied || "#ff3dbb") + '"></i>'
+        + esc(u.label) + ' <span class="muted">&middot; ' + esc(u.role)
+        + ' &middot; ' + esc(u.side) + '</span></div>';
+    });
+    h += '<div class="muted" style="margin-top:4px">Water cannot reach '
+      + 'them in this pose and nothing replaces it. A heuristic: check '
+      + 'the geometry before believing it.</div></div>';
+  }
+
   if (!p.interactions || !p.interactions.length) {
     h += '<p class="empty">No interactions of the selected types.</p>';
   } else {

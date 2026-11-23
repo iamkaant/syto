@@ -377,7 +377,8 @@ def _redraw(session, st):
     else:
         render.clear_groups(session, render.CLASH_KINDS)
     if st.options.show_strain_labels and st.options.annotate_atom_values is False:
-        render.label_strain(session, st.result.strain, st.all_atoms)
+        render.label_strain(session, st.result.strain, st.all_atoms,
+                            unsatisfied=st.result.unsatisfied)
 
 
 def _parse_types(text):
@@ -898,6 +899,11 @@ def hitpick_report(session):
                         "  SEVERE" if c.severe else "", c.label))
         for f in sr.findings:
             log.info("   %-15s %s" % (f.severity, f.message))
+    if r.unsatisfied:
+        log.info("   <b>buried polar atoms with no H-bond partner</b>",
+                 is_html=True)
+        for u in r.unsatisfied:
+            log.info("   %-15s %s" % (u.side, u.message))
     for w in r.warnings:
         log.warning("   " + w)
     return _pose_summary(r)
