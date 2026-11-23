@@ -453,6 +453,33 @@ async function until(fn, ms, what) {
     out.hammerShown = d.getElementById("status").textContent
       .replace(/\s+/g, " ").trim();
 
+    // --- a DOCK-style mol2, whose records stop at the last bond ------
+    //
+    // Mol* reads ONE molecule from such a file. The page normalises it
+    // first; without that every "next" re-showed the first ligand.
+    log("pile-up done; checking the bare mol2");
+    var bare = [], keep = true;
+    lig.split("\\n").forEach(function (l) {
+      if (l.indexOf("@<TRIPOS>") === 0) {
+        var nm = l.slice(9).trim();
+        keep = (nm === "MOLECULE" || nm === "ATOM" || nm === "BOND");
+      } else if (l.charAt(0) === "#") { keep = true; }
+      if (keep) bare.push(l);
+    });
+    bare = bare.join("\\n");
+    async function frames(text, label) {
+      var dd = await V.plugin.builders.data.rawData({data: text, label: label});
+      var tt = await V.plugin.builders.structure.parseTrajectory(dd, "mol2");
+      var n = tt.data.frameCount;
+      try { await V.plugin.build().delete(dd.ref).commit(); }
+      catch (e) { /* a leftover data node harms nothing here */ }
+      return n;
+    }
+    // Only the normalised text is parsed. Handing Mol* the bare text for
+    // comparison is not safe in a test: on some shapes its reader does
+    // not return at all, and a hung page reports nothing.
+    out.fixedFrames = await frames(w.HPViewer.normalizeMol2(bare), "fixed");
+    out.expectFrames = (lig.match(/@<TRIPOS>MOLECULE/g) || []).length;
     out.ok = true;
   } catch (e) {
     out.error = String((e && e.stack) || e);
@@ -524,6 +551,27 @@ def main():
     if not os.path.exists(os.path.join(WEB, "vendor", "molstar", "molstar.js")):
         print("Mol* not vendored (run tools/fetch_web_deps.py); skipping")
         return 0
+
+    # Parse the driver's own script before spending fifteen minutes on
+    # it. A syntax error in PAGE means the script never starts, nothing
+    # is ever reported, and the run ends as "Pyodide may not have loaded"
+    # - which sends you looking everywhere except at the test.
+    import shutil
+    import subprocess
+    import tempfile
+    node = shutil.which("node")
+    if node:
+        js = PAGE.split("<script>")[1].split("</script>")[0]
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                         encoding="utf-8") as tf:
+            tf.write(js)
+        r = subprocess.run([node, "--check", tf.name],
+                           capture_output=True, text=True)
+        os.remove(tf.name)
+        if r.returncode != 0:
+            print("  FAIL the harness page's own script does not parse:\n%s"
+                  % r.stderr[:600])
+            return 1
 
     with open(os.path.join(WEB, DRIVER), "w", encoding="utf-8") as fh:
         fh.write(PAGE)
@@ -768,6 +816,12 @@ def main():
           "(%s lines drawn, %s in the scene for %s)"
           % (got.get("hammerDrawn"), got.get("hammerSceneLines"),
              got.get("hammerName")), f)
+
+    check(got.get("fixedFrames") == got.get("expectFrames")
+          and got.get("expectFrames", 0) > 1,
+          "a DOCK mol2 whose records stop at the last bond is read whole "
+          "(%s of %s molecules)"
+          % (got.get("fixedFrames"), got.get("expectFrames")), f)
 
     # Switching pose must redraw, not accumulate.
     check(got["posen"].startswith("1 of") and got["secondMs"] is not None,

@@ -419,6 +419,15 @@ $("go").onclick = async () => {
     const nrec = await viewer.loadReceptor(files.rec.text, "pdb");
     const fmt = /\.mol2$/i.test(files.lig.name) ? "mol2" : "sdf";
     const nmod = await viewer.loadPoses(files.lig.text, fmt);
+    // The engine and the viewer each read the pose file themselves. If
+    // the viewer found fewer molecules than the engine, stepping through
+    // the poses would change the analysis and not the picture - which is
+    // exactly what happened with DOCK mol2 files before the reader was
+    // fed a normalised copy. It must never be silent again.
+    const short = nmod < poses.length
+      ? "the viewer read " + nmod + " molecule(s) from this file but the "
+        + "analysis read " + poses.length + " - poses past " + nmod
+        + " cannot be shown" : "";
 
     $("loadmsg").innerHTML = esc(r.receptor) + ": " + r.n_atoms + " atoms"
       + (r.has_hydrogens ? "" : " &middot; <b>no hydrogens</b>")
@@ -438,6 +447,7 @@ $("go").onclick = async () => {
     viewer.setRibbon($("opt-ribbon").checked);
     await analyse(0);
     viewer.focusSite();
+    if (short) say(esc(short), true);
   } catch (e) {
     say("failed: " + esc(e.message), true);
   } finally {

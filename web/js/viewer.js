@@ -109,7 +109,48 @@
     return struct.data.elementCount;
   };
 
+  // Make a mol2 file one that Mol* will read to the end.
+  //
+  // Mol*'s reader finds the next molecule only when something follows
+  // the bond table. DOCK writes records that simply stop at the last
+  // bond - no @<TRIPOS>SUBSTRUCTURE - and for those it reads the first
+  // molecule and silently reports a one-frame trajectory. Every "next"
+  // then re-showed molecule 0 while the engine, which reads the file
+  // itself, moved on: the pocket and the lists changed and the ligand
+  // did not. Files that had passed through ViewDock happen to carry the
+  // section, which is why the samples worked.
+  //
+  // Only a section header is added, after the bonds. No coordinate is
+  // touched - positions are what the engine and the viewer are matched
+  // on, so they must stay exactly as written.
+  function normalizeMol2(text) {
+    var lines = String(text).split(/\r?\n/), out = [];
+    var section = "", open = false;
+    function close() {
+      if (open && section === "BOND") {
+        out.push("@<TRIPOS>SUBSTRUCTURE");
+        out.push("     1 LIG         1 TEMP              0 ****  ****    0 ROOT");
+      }
+    }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (line.indexOf("@<TRIPOS>") === 0) {
+        var name = line.slice(9).trim();
+        if (name === "MOLECULE") { close(); open = true; }
+        section = name;
+      } else if (section === "BOND" && line.charAt(0) === "#") {
+        // the next record's comment header: this one's bonds are over
+        close();
+        section = "";
+      }
+      out.push(line);
+    }
+    close();
+    return out.join("\n");
+  }
+
   Viewer.prototype.loadPoses = async function (text, format) {
+    if ((format || "mol2") === "mol2") text = normalizeMol2(text);
     var p = this.plugin;
     var data = await p.builders.data.rawData({data: text, label: "poses"});
     this.trajectory = await p.builders.structure.parseTrajectory(
@@ -648,5 +689,6 @@
   // drawn. A second copy of them in the page would be a legend that
   // can quietly stop matching the picture.
   global.HPViewer = {Viewer: Viewer, COLORS: COLORS,
+                     normalizeMol2: normalizeMol2,
                      CLASH: CLASH, SEVERE: SEVERE, TORSION: TORSION};
 })(window);
