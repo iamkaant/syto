@@ -179,6 +179,47 @@ tools/               build_data.py, vendor_core.py, install_bundle.sh,
 
 ---
 
+## Built with
+
+**Shipped with the tool**
+
+| Package | Version | Used for | Licence |
+|---|---|---|---|
+| [NumPy](https://numpy.org) | 2.4.6 in the browser; ChimeraX's own in the bundle | All of the engine's numerics. It is the engine's only dependency. | BSD-3-Clause |
+| [Mol\*](https://molstar.org) | 5.13.1 | The 3D view in the web page | MIT |
+| [Pyodide](https://pyodide.org) | 314.0.8 (Python 3.14) | Runs the Python engine in the browser | MPL-2.0 |
+| [UCSF ChimeraX](https://www.cgl.ucsf.edu/chimerax/) | 1.12 (the bundle declares 1.9 as its minimum; only 1.12 is tested) | Host for the bundle, with its ViewDock tool | free for noncommercial use |
+
+**Used to build or to prepare the data, not shipped**
+
+| Package | Used for |
+|---|---|
+| [PyYAML](https://pyyaml.org) | Compiling the handbook from `data-src/` |
+| [ChimeraX BundleBuilder](https://www.cgl.ucsf.edu/chimerax/docs/devel/) | Building the ChimeraX wheel |
+| [QCPortal](https://docs.qcarchive.molssi.org) | Downloading the QM torsion scans from QCArchive |
+| Headless Chrome | The browser tests |
+
+The active-learning model is a NumPy port of
+[AutoParty](https://github.com/keiserlab/autoparty); no AutoParty code or
+PyTorch is shipped.
+
+If you use Syto, please also cite the software it stands on:
+
+- Sehnal, D.; Bittrich, S.; Deshpande, M.; Svobodová, R.; Berka, K.; Bazgier,
+  V.; Velankar, S.; Burley, S. K.; Koča, J.; Rose, A. S. Mol\* Viewer: Modern
+  Web App for 3D Visualization and Analysis of Large Biomolecular Structures.
+  *Nucleic Acids Res.* **2021**, *49* (W1), W431–W437.
+  [DOI: 10.1093/nar/gkab314](https://doi.org/10.1093/nar/gkab314)
+- Meng, E. C.; Goddard, T. D.; Pettersen, E. F.; Couch, G. S.; Pearson, Z. J.;
+  Morris, J. H.; Ferrin, T. E. UCSF ChimeraX: Tools for Structure Building and
+  Analysis. *Protein Sci.* **2023**, *32* (11), e4792.
+  [DOI: 10.1002/pro.4792](https://doi.org/10.1002/pro.4792)
+- Harris, C. R.; Millman, K. J.; van der Walt, S. J.; et al. Array Programming
+  with NumPy. *Nature* **2020**, *585* (7825), 357–362.
+  [DOI: 10.1038/s41586-020-2649-2](https://doi.org/10.1038/s41586-020-2649-2)
+
+---
+
 ## Data provenance
 
 Every number in the handbook carries the DOI it came from and a locator
