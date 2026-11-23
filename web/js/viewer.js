@@ -208,7 +208,10 @@
     await p.builders.structure.representation.applyPreset(struct, "auto");
     this.pose = struct;
     this._index = null;
-    this.siteLoci = null;
+    // siteLoci is NOT forgotten here. It is the pocket, which belongs to
+    // the receptor and outlives the pose - and since the pocket is no
+    // longer rebuilt when it has not changed, clearing it here left
+    // "Reset view" with nothing to frame after any re-analysis.
     // The torsion highlight hangs off the pose node, so deleting the pose
     // already removed it. Forgetting the ref keeps a later clear from
     // trying to delete a node that is not there.

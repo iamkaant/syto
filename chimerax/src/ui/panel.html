@@ -219,6 +219,14 @@
     onchange="hp('autoexplain',{on:this.checked?1:0})"
     title="Explain an atom in this panel as soon as it is selected">
     Explain an atom when it is selected</label>
+  <label class="chk"><input type="checkbox" id="opt-strand-don"
+    onchange="hp('stranded',{donors:this.checked?1:0})"
+    title="Mark buried N-H and O-H groups that have no hydrogen-bond partner"
+    >Highlight stranded H-bond donors</label>
+  <label class="chk"><input type="checkbox" id="opt-strand-acc"
+    onchange="hp('stranded',{acceptors:this.checked?1:0})"
+    title="Mark buried N and O acceptors that have no hydrogen-bond partner"
+    >Highlight stranded H-bond acceptors</label>
   <label class="chk"><input type="checkbox" id="opt-reveal"
     onchange="hp('reveal',{on:this.checked?1:0})"
     title="Display the receptor residues the interactions point at. Unticking
@@ -405,6 +413,10 @@ window.hpSetState = function (s) {
     if (oh) oh.checked = s.options.hover_detail !== false;
     var oa = document.getElementById("opt-autoexplain");
     if (oa) oa.checked = s.options.handbook_on_click !== false;
+    var osd = document.getElementById("opt-strand-don");
+    if (osd) osd.checked = s.options.stranded_donors !== false;
+    var osa = document.getElementById("opt-strand-acc");
+    if (osa) osa.checked = !!s.options.stranded_acceptors;
     var orv = document.getElementById("opt-reveal");
     if (orv) orv.checked = !!s.options.reveal_partners;
     var ow = document.getElementById("opt-width");
@@ -522,8 +534,9 @@ function renderPose(p) {
   // which - and a row can take you to the atom.
   var un = p.unsatisfied || [];
   if (un.length) {
-    h += '<div class="card warn tiny"><b>' + un.length + ' buried polar atom'
-      + (un.length === 1 ? "" : "s") + ' with no H-bond partner</b>';
+    h += '<div class="card warn tiny"><b>' + un.length
+      + ' stranded H-bond donor' + (un.length === 1 ? "" : "s")
+      + '/acceptor' + (un.length === 1 ? "" : "s") + '</b>';
     un.forEach(function (u) {
       h += '<div class="ix" style="cursor:pointer;padding:2px 0" '
         + 'onclick="hp(\'highlight\',{atoms:\'' + u.atom + '\'})">'
@@ -533,9 +546,10 @@ function renderPose(p) {
         + esc(u.label) + ' <span class="muted">&middot; ' + esc(u.role)
         + ' &middot; ' + esc(u.side) + '</span></div>';
     });
-    h += '<div class="muted" style="margin-top:4px">Water cannot reach '
-      + 'them in this pose and nothing replaces it. A heuristic: check '
-      + 'the geometry before believing it.</div></div>';
+    h += '<div class="muted" style="margin-top:4px">Buried, with no '
+      + 'hydrogen-bond partner: water cannot reach them in this pose and '
+      + 'nothing replaces it. A heuristic: check the geometry before '
+      + 'believing it.</div></div>';
   }
 
   if (!p.interactions || !p.interactions.length) {

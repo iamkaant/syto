@@ -578,7 +578,7 @@ def label_strain(session, strain, all_atoms, unsatisfied=None):
     for u in (unsatisfied or ()):
         if not (0 <= u.atom < len(all_atoms)):
             continue
-        word = "unpaired " + u.role
+        word = "stranded " + u.role
         prev = texts.get(int(u.atom))
         texts[int(u.atom)] = (prev + ", " + word) if prev else word
     # Always set the layer, even when empty: a pose with no strain has to

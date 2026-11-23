@@ -129,20 +129,47 @@ async function until(fn, ms, what) {
     out.sceneClashes = scene.clashes.length;
     out.kinds = scene.lines.map(function (l) { return l.kind; });
     out.siteAtoms = (scene.site || []).length;
-    // Buried polar atoms with no H-bond partner: what the core named,
-    // what the viewer marked, and what the panel lists must be one set.
-    out.strandedScene = (scene.stranded || []).length;
-    out.strandedDrawn = V.strandedCount || 0;
-    out.strandedPanel = d.getElementById("hb").contentDocument
-      .querySelectorAll("#pose .card.warn .ix").length;
-    out.strandedErrs = [];
-    V.plugin.state.data.cells.forEach(function (c) {
-      var tags = (c.transform && c.transform.tags) || [];
-      if (typeof tags === "string") tags = [tags];
-      if (tags.indexOf("hp-stranded") >= 0 && c.status === "error") {
-        out.strandedErrs.push(String(c.errorText));
-      }
-    });
+    // Stranded H-bond donors and acceptors. Two settings: donors on by
+    // default, acceptors off. What the core names, what the viewer marks
+    // and what the panel lists must be one set under either setting.
+    function strandedNow(sc) {
+      var errs = [];
+      V.plugin.state.data.cells.forEach(function (c) {
+        var tags = (c.transform && c.transform.tags) || [];
+        if (typeof tags === "string") tags = [tags];
+        if (tags.indexOf("hp-stranded") >= 0 && c.status === "error") {
+          errs.push(String(c.errorText));
+        }
+      });
+      return {scene: (sc.stranded || []).length,
+              roles: (sc.stranded || []).map(function (x) { return x.role; }),
+              drawn: (sc.stranded || []).length ? (V.strandedCount || 0) : 0,
+              panel: d.getElementById("hb").contentDocument
+                .querySelectorAll("#pose .card.warn .ix").length,
+              errs: errs};
+    }
+    out.strandLabels = [].slice.call(d.querySelectorAll(
+      "label.chk")).map(function (l) { return l.textContent.trim(); })
+      .filter(function (t) { return /stranded/i.test(t); });
+    out.strandDonDefault = d.getElementById("opt-strand-don").checked;
+    out.strandAccDefault = d.getElementById("opt-strand-acc").checked;
+    out.strandedDefault = strandedNow(scene);
+    var accBox = d.getElementById("opt-strand-acc");
+    accBox.checked = true;
+    accBox.dispatchEvent(new w.Event("change"));
+    await sleep(400);
+    await until(function () { return !/analysing/.test(
+      d.getElementById("status").textContent); }, 180000, "acceptors on");
+    await sleep(2500);
+    out.strandedBoth = strandedNow(await w.HP.bridge.call("scene", {}));
+    accBox.checked = false;
+    accBox.dispatchEvent(new w.Event("change"));
+    await sleep(400);
+    await until(function () { return !/analysing/.test(
+      d.getElementById("status").textContent); }, 180000, "acceptors off");
+    await sleep(2500);
+    scene = await w.HP.bridge.call("scene", {});
+    out.strandedBack = strandedNow(scene);
     out.siteDrawn = !!V.site;
     out.siteFocused = !!V.siteLoci;
     // Did it actually RENDER? A ref in the state tree proves nothing:
@@ -661,18 +688,30 @@ def main():
     # The pocket as sticks, framed from the start.
     check(got["siteAtoms"] > 20,
           "the core picked %d pocket atom(s) to draw" % got["siteAtoms"], f)
-    check(got.get("strandedScene", 0) > 0,
-          "the core names %s buried polar atom(s) with no H-bond partner "
-          "on this pose" % got.get("strandedScene"), f)
-    check(got.get("strandedDrawn") == got.get("strandedScene")
-          and not got.get("strandedErrs"),
-          "the viewer marks every one of them (%s of %s%s)"
-          % (got.get("strandedDrawn"), got.get("strandedScene"),
-             "; " + "; ".join(got["strandedErrs"])
-             if got.get("strandedErrs") else ""), f)
-    check(got.get("strandedPanel") == got.get("strandedScene"),
-          "and the panel lists the same ones (%s row(s))"
-          % got.get("strandedPanel"), f)
+    sd = got.get("strandedDefault") or {}
+    sb = got.get("strandedBoth") or {}
+    sk = got.get("strandedBack") or {}
+    check(got.get("strandLabels") == ["Highlight stranded H-bond donors",
+                                      "Highlight stranded H-bond acceptors"],
+          "the two settings are named as asked: %s" % got.get("strandLabels"), f)
+    check(got.get("strandDonDefault") is True
+          and got.get("strandAccDefault") is False,
+          "stranded donors are highlighted by default and acceptors are not", f)
+    check(all("donor" in r for r in sd.get("roles", []))
+          and sd.get("drawn") == sd.get("scene") == sd.get("panel")
+          and not sd.get("errs"),
+          "by default only donors are named, and the view and the panel "
+          "show the same %s" % sd.get("scene"), f)
+    check(sb.get("scene", 0) > sd.get("scene", 0)
+          and sb.get("drawn") == sb.get("scene") == sb.get("panel")
+          and not sb.get("errs"),
+          "switching acceptors on adds them everywhere at once "
+          "(%s -> %s; roles %s)"
+          % (sd.get("scene"), sb.get("scene"), sb.get("roles")), f)
+    check(sk.get("scene") == sd.get("scene")
+          and sk.get("drawn") == sk.get("scene") == sk.get("panel"),
+          "and switching them off takes them away again (%s)"
+          % sk.get("scene"), f)
     check(got["siteDrawn"],
           "and the viewer made them into a component", f)
     print("   state cells:")

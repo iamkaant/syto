@@ -60,7 +60,8 @@ def test_on_real_poses_the_flags_are_buried_unpaired_n_or_o():
     from hitpicking.analysis import ReceptorContext, Options
     from hitpicking.io.pdb import read_pdb
     from hitpicking.io.mol2 import read_mol2_iter
-    ctx = ReceptorContext(read_pdb(RECEPTOR), Options())
+    ctx = ReceptorContext(read_pdb(RECEPTOR),
+                          Options(stranded_acceptors=True))
     seen = flagged = 0
     for lig in read_mol2_iter(POSES):
         seen += 1
@@ -92,3 +93,29 @@ def test_it_can_be_switched_off():
     res = ctx.analyze(next(iter(read_mol2_iter(POSES))))
     assert res.unsatisfied is None
     assert "unsatisfied" not in res.to_dict()
+
+
+@needs_data
+def test_donors_are_reported_by_default_and_acceptors_are_not():
+    from hitpicking.analysis import ReceptorContext, Options
+    from hitpicking.io.pdb import read_pdb
+    from hitpicking.io.mol2 import read_mol2_iter
+    rec = read_pdb(RECEPTOR)
+    default = ReceptorContext(rec, Options())
+    both = ReceptorContext(rec, Options(stranded_acceptors=True))
+    only_acc = ReceptorContext(rec, Options(stranded_donors=False,
+                                            stranded_acceptors=True))
+    n = roles_default = acc_seen = 0
+    for lig in read_mol2_iter(POSES):
+        n += 1
+        if n > 40:
+            break
+        a = default.analyze(lig).unsatisfied
+        b = both.analyze(lig).unsatisfied
+        c = only_acc.analyze(lig).unsatisfied
+        assert all("donor" in u.role for u in a)
+        assert all("acceptor" in u.role for u in c)
+        assert {u.atom for u in a} | {u.atom for u in c} == {u.atom for u in b}
+        roles_default += len(a)
+        acc_seen += len(c)
+    assert roles_default > 0 and acc_seen > 0

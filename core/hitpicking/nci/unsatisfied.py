@@ -71,7 +71,7 @@ class Unsatisfied:
 
     @property
     def message(self):
-        return ("%s: buried %s with no hydrogen-bond partner"
+        return ("%s: stranded H-bond %s (buried, no partner)"
                 % (self.label, self.role))
 
     def to_dict(self):

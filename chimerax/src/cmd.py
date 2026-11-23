@@ -469,6 +469,34 @@ def hitpick_reveal(session, show=True):
     return n
 
 
+def hitpick_stranded(session, donors=None, acceptors=None):
+    """Choose which stranded H-bond atoms are highlighted.
+
+    A stranded atom is a buried N or O donor/acceptor with no hydrogen
+    bond partner. Donors are highlighted by default; acceptors are off
+    because they are flagged far more often and more often harmlessly.
+    """
+    ensure_ui(session)
+    st = get_state(session)
+    if donors is not None:
+        st.options.stranded_donors = bool(donors)
+    if acceptors is not None:
+        st.options.stranded_acceptors = bool(acceptors)
+    session.logger.info(
+        "hitpick: highlighting stranded donors %s, acceptors %s"
+        % ("on" if st.options.stranded_donors else "off",
+           "on" if st.options.stranded_acceptors else "off"))
+    if st.result is not None and st.ligand_model is not None:
+        hitpick_analyze(session, st.ligand_model)
+    else:
+        st.notify()
+
+
+hitpick_stranded_desc = CmdDesc(
+    keyword=[("donors", BoolArg), ("acceptors", BoolArg)],
+    synopsis="Highlight stranded H-bond donors and/or acceptors")
+
+
 hitpick_reveal_desc = CmdDesc(
     optional=[("show", BoolArg)],
     synopsis="Display the residues the interactions point at")
@@ -900,8 +928,7 @@ def hitpick_report(session):
         for f in sr.findings:
             log.info("   %-15s %s" % (f.severity, f.message))
     if r.unsatisfied:
-        log.info("   <b>buried polar atoms with no H-bond partner</b>",
-                 is_html=True)
+        log.info("   <b>stranded H-bond donors/acceptors</b>", is_html=True)
         for u in r.unsatisfied:
             log.info("   %-15s %s" % (u.side, u.message))
     for w in r.warnings:
@@ -1574,6 +1601,8 @@ def register_commands(logger):
     register("hitpick panel", hitpick_panel_desc, hitpick_panel, logger=logger)
     register("hitpick width", hitpick_width_desc, hitpick_width, logger=logger)
     register("hitpick reveal", hitpick_reveal_desc, hitpick_reveal,
+             logger=logger)
+    register("hitpick stranded", hitpick_stranded_desc, hitpick_stranded,
              logger=logger)
     register("hitpick scaleplot", hitpick_scaleplot_desc, hitpick_scaleplot,
              logger=logger)

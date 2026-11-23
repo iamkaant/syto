@@ -77,7 +77,9 @@ const METHODS = {
   async analyse(a) {
     return toJs(engine.analyse(a.index || 0,
                                a.enabled ? pyodide.toPy(a.enabled) : null,
-                               a.strain !== false));
+                               a.strain !== false,
+                               a.strandedDonors !== false,
+                               a.strandedAcceptors === true));
   },
   async explain(a) { return toJs(engine.explain(a.index || 0, a.atom)); },
   async scene() { return toJs(engine.scene()); },

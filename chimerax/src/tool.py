@@ -183,6 +183,12 @@ class HandbookTool(HtmlToolInstance):
             elif path == "hover":
                 from .cmd import hitpick_hover
                 hitpick_hover(session, one("on") == "1")
+            elif path == "stranded":
+                from .cmd import hitpick_stranded
+                d, a = one("donors"), one("acceptors")
+                hitpick_stranded(session,
+                                 donors=None if d is None else d == "1",
+                                 acceptors=None if a is None else a == "1")
             elif path == "reveal":
                 from .cmd import hitpick_reveal
                 hitpick_reveal(session, one("on") == "1")

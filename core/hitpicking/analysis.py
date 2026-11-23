@@ -31,7 +31,8 @@ class Options:
                  "show_scale", "hover_detail", "line_width",
                  "handbook_on_click", "annotate_atom_values",
                  "use_active_learning", "reveal_partners",
-                 "detect_unsatisfied")
+                 "detect_unsatisfied", "stranded_donors",
+                 "stranded_acceptors")
 
     def __init__(self, enabled_nci=None, include_weak_hbonds=False,
                  site_radius=10.0, show_lengths=True, show_angles=False,
@@ -40,7 +41,14 @@ class Options:
                  show_scale=True, hover_detail=True, line_width=0.075,
                  handbook_on_click=True,
                  annotate_atom_values=False, use_active_learning=False,
-                 reveal_partners=False, detect_unsatisfied=True):
+                 reveal_partners=False, detect_unsatisfied=True,
+                 stranded_donors=True, stranded_acceptors=False):
+        # Which stranded atoms are reported. Donors by default and
+        # acceptors not: an unpaired buried N-H or O-H is nearly always a
+        # real cost, while acceptors are flagged far more often and more
+        # often harmlessly.
+        self.stranded_donors = stranded_donors
+        self.stranded_acceptors = stranded_acceptors
         # buried donors/acceptors left without a hydrogen-bond partner
         self.detect_unsatisfied = detect_unsatisfied
         self.enabled_nci = set(C.DEFAULT_ENABLED if enabled_nci is None
@@ -122,8 +130,8 @@ class PoseResult:
                 out += "  |  " + self.strain.summary()
         if self.unsatisfied:
             n = len(self.unsatisfied)
-            out += "  |  %d buried polar atom%s with no H-bond partner" % (
-                n, "" if n == 1 else "s")
+            out += "  |  %d stranded H-bond donor%s/acceptor%s" % (
+                n, "" if n == 1 else "s", "" if n == 1 else "s")
         return out
 
 
@@ -245,7 +253,10 @@ class ReceptorContext:
             # Judged against EVERY hydrogen bond the geometry allows, not
             # only the types switched on for drawing: hiding a line must
             # not turn its atoms into accusations.
-            unsatisfied = find_unsatisfied(ms, feats, res.interactions)
+            unsatisfied = [
+                u for u in find_unsatisfied(ms, feats, res.interactions)
+                if (opts.stranded_donors and "donor" in u.role)
+                or (opts.stranded_acceptors and "acceptor" in u.role)]
 
         return PoseResult(str(name).strip(), res.interactions, res.warnings,
                           res.counts, scores, combined=ms, n_receptor=n_rec,

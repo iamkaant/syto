@@ -141,7 +141,8 @@ def _maybe_list(value):
     return items or None
 
 
-def analyse(index=0, enabled=None, strain=True):
+def analyse(index=0, enabled=None, strain=True, stranded_donors=True,
+            stranded_acceptors=False):
     ctx = _STATE["context"]
     if ctx is None:
         raise RuntimeError("load a receptor first")
@@ -156,6 +157,8 @@ def analyse(index=0, enabled=None, strain=True):
     if kinds:
         opts.enabled_nci = set(kinds)
     opts.detect_strain = bool(strain)
+    opts.stranded_donors = bool(stranded_donors)
+    opts.stranded_acceptors = bool(stranded_acceptors)
     res = ctx.analyze(poses[i], options=opts, name=_pose_name(poses[i], i))
     _STATE["last"] = res
     return _json(_pose_dict(res, i))

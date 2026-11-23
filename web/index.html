@@ -160,9 +160,12 @@
       <label class="chk"><input type="checkbox" id="opt-clashes" checked>
         <span class="swatch" style="background:#e64646"></span>
         Clashes</label>
-      <label class="chk"><input type="checkbox" id="opt-stranded" checked>
+      <label class="chk"><input type="checkbox" id="opt-strand-don" checked>
         <span class="swatch" style="background:#ff3dbb"></span>
-        Buried polar atoms with no H-bond</label>
+        Highlight stranded H-bond donors</label>
+      <label class="chk"><input type="checkbox" id="opt-strand-acc">
+        <span class="swatch" style="background:#ff3dbb"></span>
+        Highlight stranded H-bond acceptors</label>
       <label class="chk"><input type="checkbox" id="opt-site" checked>
         Pocket residues as sticks</label>
       <label class="chk"><input type="checkbox" id="opt-reslabels">
@@ -506,7 +509,8 @@ $("reset").onclick = resetView;
 $("opt-clashes").onchange = () => { saveView(); redraw(); };
 $("opt-site").onchange = () => { saveView(); redraw(); };
 $("opt-sitekeep").onchange = () => { saveView(); redraw(); };
-$("opt-stranded").onchange = () => { saveView(); redraw(); };
+$("opt-strand-don").onchange = () => { saveView(); analyse(current); };
+$("opt-strand-acc").onchange = () => { saveView(); analyse(current); };
 $("opt-reslabels").onchange = () => {
   if (viewer) viewer.siteLabels = $("opt-reslabels").checked;
   saveView();
@@ -604,7 +608,8 @@ function saveView() {
       legend: $("opt-legend").checked,
       reslabels: $("opt-reslabels").checked,
       sitekeep: $("opt-sitekeep").checked,
-      stranded: $("opt-stranded").checked,
+      strandDon: $("opt-strand-don").checked,
+      strandAcc: $("opt-strand-acc").checked,
       left: columnWidth("--left"), right: columnWidth("--right")
     }));
   } catch (e) { /* private window */ }
@@ -621,7 +626,8 @@ function restoreView() {
   if (d.legend !== undefined) $("opt-legend").checked = !!d.legend;
   if (d.reslabels !== undefined) $("opt-reslabels").checked = !!d.reslabels;
   if (d.sitekeep !== undefined) $("opt-sitekeep").checked = !!d.sitekeep;
-  if (d.stranded !== undefined) $("opt-stranded").checked = !!d.stranded;
+  if (d.strandDon !== undefined) $("opt-strand-don").checked = !!d.strandDon;
+  if (d.strandAcc !== undefined) $("opt-strand-acc").checked = !!d.strandAcc;
   if (d.stick) $("opt-stick").value = d.stick;
   // A width saved when the slider went to 3x is outside the range now;
   // the input would clamp it silently and the readout would lie.
@@ -649,8 +655,13 @@ async function analyse(i) {
   $("pose").value = String(i);
   $("posen").textContent = (i + 1) + " of " + poses.length;
   say("analysing&hellip;");
+  // Which stranded atoms are reported is part of the analysis, not of
+  // the drawing, so the status line, the panel and the marks in the view
+  // can never disagree about how many there are.
   const res = await bridge.call("analyse",
-    {index: i, enabled: enabled, strain: true});
+    {index: i, enabled: enabled, strain: true,
+     strandedDonors: $("opt-strand-don").checked,
+     strandedAcceptors: $("opt-strand-acc").checked});
   if (my !== analyseSeq) return;
   lastResult = res;
   await loadTorsions();
@@ -718,8 +729,7 @@ async function redraw() {
   });
   // Marked after the pocket is drawn, so a flagged pocket atom's residue
   // is already on screen under its mark.
-  if ($("opt-stranded").checked) await viewer.showStranded(scene.stranded);
-  else await viewer.clearStranded();
+  await viewer.showStranded(scene.stranded);
   lastScene = scene;
   renderLegend(scene);
   if (viewer.lastMissed) {
@@ -1106,8 +1116,8 @@ function renderLegend(scene) {
       rows.push(["severe clash", hex(HPViewer.SEVERE)]);
     }
   }
-  if ($("opt-stranded").checked && (scene.stranded || []).length) {
-    rows.push(["buried, no H-bond partner", hex(HPViewer.STRANDED)]);
+  if ((scene.stranded || []).length) {
+    rows.push(["stranded H-bond donor/acceptor", hex(HPViewer.STRANDED)]);
   }
   if (torsionPick) rows.push(["picked torsion", hex(HPViewer.TORSION)]);
   el.innerHTML = rows.map((r) =>
