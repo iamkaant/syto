@@ -180,12 +180,68 @@ tools/               build_data.py, vendor_core.py, install_bundle.sh,
 
 ## Data provenance
 
-Geometric criteria: Baker & Hubbard 1984, Mills & Dean 1996, Barlow & Thornton
-1983, McGaughey 1998, Gallivan & Dougherty 1999, Auffinger 2004, Bissantz,
-Kuhn & Stahl 2010.
+Every number in the handbook carries the DOI it came from and a locator
+naming the table or figure it was read from. The sources:
 
-Quantitative values: Laurence et al. 2009 (pKBHX, incl. the full SI),
-Bissantz 2010, Dougherty 2013, Cavallo 2016, Green & Popelier 2014.
+**Geometric criteria**
+
+1. Baker, E. N.; Hubbard, R. E. Hydrogen Bonding in Globular Proteins.
+   *Prog. Biophys. Mol. Biol.* **1984**, *44* (2), 97–179.
+   [DOI: 10.1016/0079-6107(84)90007-5](https://doi.org/10.1016/0079-6107(84)90007-5)
+2. Mills, J. E. J.; Dean, P. M. Three-Dimensional Hydrogen-Bond Geometry and
+   Probability Information from a Crystal Survey. *J. Comput.-Aided Mol. Des.*
+   **1996**, *10* (6), 607–622.
+   [DOI: 10.1007/BF00134183](https://doi.org/10.1007/BF00134183)
+3. Barlow, D. J.; Thornton, J. M. Ion-Pairs in Proteins. *J. Mol. Biol.*
+   **1983**, *168* (4), 867–885.
+   [DOI: 10.1016/S0022-2836(83)80079-5](https://doi.org/10.1016/S0022-2836(83)80079-5)
+4. McGaughey, G. B.; Gagné, M.; Rappé, A. K. π-Stacking Interactions:
+   Alive and Well in Proteins. *J. Biol. Chem.* **1998**, *273* (25),
+   15458–15463.
+   [DOI: 10.1074/jbc.273.25.15458](https://doi.org/10.1074/jbc.273.25.15458)
+5. Gallivan, J. P.; Dougherty, D. A. Cation-π Interactions in Structural
+   Biology. *Proc. Natl. Acad. Sci. U.S.A.* **1999**, *96* (17), 9459–9464.
+   [DOI: 10.1073/pnas.96.17.9459](https://doi.org/10.1073/pnas.96.17.9459)
+6. Auffinger, P.; Hays, F. A.; Westhof, E.; Ho, P. S. Halogen Bonds in
+   Biological Molecules. *Proc. Natl. Acad. Sci. U.S.A.* **2004**, *101* (48),
+   16789–16794.
+   [DOI: 10.1073/pnas.0407607101](https://doi.org/10.1073/pnas.0407607101)
+7. Bissantz, C.; Kuhn, B.; Stahl, M. A Medicinal Chemist's Guide to Molecular
+   Interactions. *J. Med. Chem.* **2010**, *53* (14), 5061–5084.
+   [DOI: 10.1021/jm100112j](https://doi.org/10.1021/jm100112j)
+
+**Quantitative values**
+
+8. Laurence, C.; Brameld, K. A.; Graton, J.; Le Questel, J.-Y.; Renault, E.
+   The p*K*<sub>BHX</sub> Database: Toward a Better Understanding of
+   Hydrogen-Bond Basicity for Medicinal Chemists. *J. Med. Chem.* **2009**,
+   *52* (14), 4073–4086.
+   [DOI: 10.1021/jm801331y](https://doi.org/10.1021/jm801331y)
+   (including the full Supporting Information)
+9. Dougherty, D. A. The Cation−π Interaction. *Acc. Chem. Res.* **2013**,
+   *46* (4), 885–893.
+   [DOI: 10.1021/ar300265y](https://doi.org/10.1021/ar300265y)
+10. Cavallo, G.; Metrangolo, P.; Milani, R.; Pilati, T.; Priimagi, A.;
+    Resnati, G.; Terraneo, G. The Halogen Bond. *Chem. Rev.* **2016**,
+    *116* (4), 2478–2601.
+    [DOI: 10.1021/acs.chemrev.5b00484](https://doi.org/10.1021/acs.chemrev.5b00484)
+11. Green, A. J.; Popelier, P. L. A. Theoretical Prediction of Hydrogen-Bond
+    Basicity p*K*<sub>BHX</sub> Using Quantum Chemical Topology Descriptors.
+    *J. Chem. Inf. Model.* **2014**, *54* (2), 553–561.
+    [DOI: 10.1021/ci400657c](https://doi.org/10.1021/ci400657c)
+
+Bissantz et al. (ref 7) is also a source of quantitative values.
+
+**Torsion energy profiles** are relaxed gas-phase QM torsion drives from the
+Open Force Field datasets on the MolSSI QCArchive (OpenFF Group1 Torsions,
+Substituted Phenyl Set 1 and v2.0, WBO Conjugated Series v1.0), used under
+[CC-BY-4.0](https://github.com/openforcefield/qca-dataset-submission/blob/master/LICENSE).
+Energies were converted to kcal/mol relative to each scan's own minimum; none
+were recomputed.
+
+**Active learning** is a port of
+[AutoParty](https://github.com/keiserlab/autoparty).
+
 See `data-src/external/GAPS_AND_CONFLICTS.txt` for what is missing and which
 values disagree.
 
