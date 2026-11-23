@@ -245,13 +245,3 @@ were recomputed.
 See `data-src/external/GAPS_AND_CONFLICTS.txt` for what is missing and which
 values disagree.
 
-**Known gaps:** there is no redistributable CSD torsion library. The Hamburg
-dataset page states "All rights reserved", the 2016 CSD-histogram version
-needs a CCDC licence, and RDKit's ETKDG preferences are compiled into C++
-rather than shipped as a reusable table. So torsions are judged only where the
-chemistry is unambiguous without statistics, and everything else is marked
-`unjudged` rather than scored with invented numbers. Allen 1987 bond-length tables were not accessed,
-so there are no generic bond-geometry baselines yet.
-
-Nothing in this repository redistributes copyrighted text or figures: the
-compiled handbook holds facts and citations only.
