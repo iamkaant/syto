@@ -232,12 +232,22 @@ naming the table or figure it was read from. The sources:
 
 Bissantz et al. (ref 7) is also a source of quantitative values.
 
-**Torsion energy profiles** are relaxed gas-phase QM torsion drives from the
-Open Force Field datasets on the MolSSI QCArchive (OpenFF Group1 Torsions,
-Substituted Phenyl Set 1 and v2.0, WBO Conjugated Series v1.0), used under
+**Torsion energy profiles** are relaxed gas-phase torsion drives computed at
+**B3LYP-D3(BJ)/DZVP** in Psi4 by the Open Force Field Initiative and hosted on
+the [MolSSI QCArchive](https://api.qcarchive.molssi.org) (TorsionDrive
+datasets; 1805 scans used). The datasets, with their submission records:
+
+- [OpenFF Group1 Torsions](https://github.com/openforcefield/qca-dataset-submission/tree/master/submissions/2019-05-01-OpenFF-Group1-Torsions)
+- [OpenFF Substituted Phenyl Set 1](https://github.com/openforcefield/qca-dataset-submission/tree/master/submissions/2019-07-25-phenyl-set)
+  and its v2.0 re-run
+- [OpenFF WBO Conjugated Series v1.0](https://github.com/openforcefield/qca-dataset-submission/tree/master/submissions/2021-01-25-OpenFF-Conjugated-Series)
+
+They are used under
 [CC-BY-4.0](https://github.com/openforcefield/qca-dataset-submission/blob/master/LICENSE).
-Energies were converted to kcal/mol relative to each scan's own minimum; none
-were recomputed.
+Only the QM specification (`default`) is used; the force-field torsion drives
+stored in the same datasets are excluded. Energies were converted to kcal/mol
+relative to each scan's own minimum; none were recomputed.
+`tools/fetch_qm_torsions.py` downloads them by name.
 
 **Active learning** is a port of
 [AutoParty](https://github.com/keiserlab/autoparty).

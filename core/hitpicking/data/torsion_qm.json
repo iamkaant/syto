@@ -8,11 +8,14 @@
    "OpenFF Substituted Phenyl Set 1 v2.0",
    "OpenFF WBO Conjugated Series v1.0"
   ],
+  "level_of_theory": "B3LYP-D3(BJ)/DZVP (Psi4), relaxed torsion drives",
   "licence_statement": "All datasets in this repository are licensed under the CC-BY-4.0 license. (openforcefield/qca-dataset-submission, LICENSE)",
   "licence_url": "https://github.com/openforcefield/qca-dataset-submission/blob/master/LICENSE",
+  "non_qm_scans_excluded": 940,
   "server": "https://api.qcarchive.molssi.org",
   "server_licence_note": "The public QCArchive server itself states no site-wide data licence; only OpenFF-submitted datasets are used by default.",
   "source": "MolSSI QCArchive (public server)",
+  "specification": "default",
   "submitter": "Open Force Field Initiative"
  },
  "bin_width_deg": 15.0,
@@ -88,127 +91,127 @@
   },
   "biaryl|biaryl|no-ortho": {
    "barrier": {
-    "median": 3.6,
-    "n": 76,
-    "q1": 2.65,
-    "q3": 7.56
+    "median": 7.08,
+    "n": 48,
+    "q1": 3.35,
+    "q3": 8.35
    },
    "bond_type": "biaryl",
    "coarse": false,
    "coordinate": "planar_0_perpendicular_90",
    "curve": {
     "0": {
-     "median": 1.34,
-     "n": 151,
-     "q1": 0.28,
-     "q3": 2.68
+     "median": 1.29,
+     "n": 95,
+     "q1": 0.0,
+     "q3": 6.77
     },
     "15": {
-     "median": 0.67,
-     "n": 302,
-     "q1": 0.41,
-     "q3": 1.45
+     "median": 0.76,
+     "n": 190,
+     "q1": 0.29,
+     "q3": 3.74
     },
     "30": {
-     "median": 0.11,
-     "n": 302,
-     "q1": 0.0,
-     "q3": 1.24
+     "median": 1.0,
+     "n": 190,
+     "q1": 0.11,
+     "q3": 1.5
     },
     "45": {
-     "median": 0.35,
-     "n": 302,
-     "q1": 0.13,
-     "q3": 1.46
+     "median": 0.76,
+     "n": 190,
+     "q1": 0.05,
+     "q3": 2.61
     },
     "60": {
-     "median": 1.24,
-     "n": 302,
-     "q1": 0.75,
-     "q3": 3.12
+     "median": 1.23,
+     "n": 190,
+     "q1": 0.34,
+     "q3": 4.67
     },
     "75": {
-     "median": 2.4,
-     "n": 304,
-     "q1": 1.68,
-     "q3": 4.73
+     "median": 2.49,
+     "n": 192,
+     "q1": 1.17,
+     "q3": 6.61
     },
     "90": {
-     "median": 2.98,
-     "n": 152,
-     "q1": 2.23,
-     "q3": 5.53
+     "median": 3.07,
+     "n": 96,
+     "q1": 1.78,
+     "q3": 7.56
     }
    },
-   "n_scans": 76,
+   "n_scans": 48,
    "ortho_substituted": false,
    "preferred_angle": {
     "median": 30.0,
-    "n": 76,
-    "q1": 15.0,
+    "n": 48,
+    "q1": 0.0,
     "q3": 45.0
    },
    "subtype": "biaryl"
   },
   "biaryl|biaryl|ortho": {
    "barrier": {
-    "median": 7.07,
-    "n": 108,
-    "q1": 4.28,
-    "q3": 8.53
+    "median": 6.85,
+    "n": 52,
+    "q1": 5.13,
+    "q3": 9.85
    },
    "bond_type": "biaryl",
    "coarse": false,
    "coordinate": "planar_0_perpendicular_90",
    "curve": {
     "0": {
-     "median": 4.6,
-     "n": 216,
-     "q1": 2.77,
-     "q3": 8.26
+     "median": 2.71,
+     "n": 104,
+     "q1": 0.99,
+     "q3": 6.46
     },
     "15": {
-     "median": 2.57,
-     "n": 432,
-     "q1": 1.69,
-     "q3": 4.8
+     "median": 1.8,
+     "n": 208,
+     "q1": 0.24,
+     "q3": 4.41
     },
     "30": {
-     "median": 0.82,
-     "n": 432,
-     "q1": 0.3,
-     "q3": 1.59
+     "median": 0.8,
+     "n": 208,
+     "q1": 0.12,
+     "q3": 2.28
     },
     "45": {
-     "median": 0.07,
-     "n": 432,
-     "q1": 0.0,
-     "q3": 0.99
+     "median": 0.98,
+     "n": 208,
+     "q1": 0.1,
+     "q3": 2.24
     },
     "60": {
-     "median": 0.69,
-     "n": 432,
-     "q1": 0.17,
-     "q3": 1.86
+     "median": 1.82,
+     "n": 208,
+     "q1": 0.61,
+     "q3": 3.44
     },
     "75": {
-     "median": 1.57,
-     "n": 432,
-     "q1": 0.92,
-     "q3": 3.03
+     "median": 2.83,
+     "n": 208,
+     "q1": 1.37,
+     "q3": 5.13
     },
     "90": {
-     "median": 1.99,
-     "n": 216,
-     "q1": 1.23,
-     "q3": 3.13
+     "median": 2.84,
+     "n": 104,
+     "q1": 1.61,
+     "q3": 5.42
     }
    },
-   "n_scans": 108,
+   "n_scans": 52,
    "ortho_substituted": true,
    "preferred_angle": {
-    "median": 45.0,
-    "n": 108,
+    "median": 37.5,
+    "n": 52,
     "q1": 30.0,
     "q3": 45.0
    },
@@ -216,65 +219,65 @@
   },
   "conjugated|anilide N|no-ortho": {
    "barrier": {
-    "median": 5.39,
-    "n": 394,
-    "q1": 4.0,
-    "q3": 6.56
+    "median": 5.52,
+    "n": 132,
+    "q1": 3.8,
+    "q3": 8.01
    },
    "bond_type": "conjugated",
    "coarse": false,
    "coordinate": "planar_0_perpendicular_90",
    "curve": {
     "0": {
-     "median": 0.19,
-     "n": 788,
+     "median": 0.0,
+     "n": 264,
      "q1": 0.0,
-     "q3": 1.47
+     "q3": 1.48
     },
     "15": {
-     "median": 0.2,
-     "n": 1576,
-     "q1": 0.04,
-     "q3": 1.27
+     "median": 0.24,
+     "n": 528,
+     "q1": 0.13,
+     "q3": 1.4
     },
     "30": {
-     "median": 0.49,
-     "n": 1576,
-     "q1": 0.18,
-     "q3": 1.37
+     "median": 0.81,
+     "n": 528,
+     "q1": 0.46,
+     "q3": 1.69
     },
     "45": {
-     "median": 1.26,
-     "n": 1576,
-     "q1": 0.76,
-     "q3": 2.1
+     "median": 1.67,
+     "n": 528,
+     "q1": 1.12,
+     "q3": 2.39
     },
     "60": {
-     "median": 2.54,
-     "n": 1576,
-     "q1": 1.83,
-     "q3": 3.48
+     "median": 2.84,
+     "n": 528,
+     "q1": 2.02,
+     "q3": 3.66
     },
     "75": {
-     "median": 4.1,
-     "n": 1576,
-     "q1": 3.08,
-     "q3": 5.1
+     "median": 4.27,
+     "n": 528,
+     "q1": 2.85,
+     "q3": 5.29
     },
     "90": {
-     "median": 5.1,
-     "n": 788,
-     "q1": 3.86,
-     "q3": 6.34
+     "median": 5.34,
+     "n": 264,
+     "q1": 3.42,
+     "q3": 6.62
     }
    },
-   "n_scans": 394,
+   "n_scans": 132,
    "ortho_substituted": false,
    "preferred_angle": {
-    "median": 15.0,
-    "n": 394,
+    "median": 0.0,
+    "n": 132,
     "q1": 0.0,
-    "q3": 15.0
+    "q3": 0.0
    },
    "subtype": "anilide N"
   },
@@ -344,63 +347,63 @@
   },
   "conjugated|aniline N|no-ortho": {
    "barrier": {
-    "median": 5.08,
-    "n": 445,
-    "q1": 3.86,
-    "q3": 6.54
+    "median": 5.05,
+    "n": 138,
+    "q1": 3.61,
+    "q3": 6.68
    },
    "bond_type": "conjugated",
    "coarse": false,
    "coordinate": "planar_0_perpendicular_90",
    "curve": {
     "0": {
-     "median": 0.07,
-     "n": 890,
-     "q1": 0.0,
-     "q3": 0.44
+     "median": 0.28,
+     "n": 276,
+     "q1": 0.07,
+     "q3": 0.59
     },
     "15": {
      "median": 0.17,
-     "n": 1780,
-     "q1": 0.07,
-     "q3": 0.31
+     "n": 552,
+     "q1": 0.01,
+     "q3": 0.37
     },
     "30": {
-     "median": 0.62,
-     "n": 1780,
-     "q1": 0.37,
-     "q3": 1.01
+     "median": 0.59,
+     "n": 552,
+     "q1": 0.27,
+     "q3": 1.09
     },
     "45": {
-     "median": 1.49,
-     "n": 1780,
-     "q1": 0.92,
-     "q3": 2.12
+     "median": 1.51,
+     "n": 552,
+     "q1": 0.79,
+     "q3": 2.41
     },
     "60": {
-     "median": 2.59,
-     "n": 1780,
-     "q1": 1.77,
-     "q3": 3.44
+     "median": 2.67,
+     "n": 552,
+     "q1": 1.64,
+     "q3": 3.66
     },
     "75": {
-     "median": 3.89,
-     "n": 1780,
-     "q1": 2.79,
-     "q3": 5.08
+     "median": 3.62,
+     "n": 552,
+     "q1": 2.55,
+     "q3": 5.18
     },
     "90": {
-     "median": 5.03,
-     "n": 890,
-     "q1": 3.64,
-     "q3": 6.48
+     "median": 4.77,
+     "n": 276,
+     "q1": 2.74,
+     "q3": 6.66
     }
    },
-   "n_scans": 445,
+   "n_scans": 138,
    "ortho_substituted": false,
    "preferred_angle": {
-    "median": 0.0,
-    "n": 445,
+    "median": 15.0,
+    "n": 138,
     "q1": 0.0,
     "q3": 15.0
    },
@@ -600,65 +603,65 @@
   },
   "conjugated|aryl carbonyl|no-ortho": {
    "barrier": {
-    "median": 7.19,
-    "n": 123,
-    "q1": 6.13,
-    "q3": 7.9
+    "median": 6.75,
+    "n": 43,
+    "q1": 5.82,
+    "q3": 8.18
    },
    "bond_type": "conjugated",
    "coarse": false,
    "coordinate": "planar_0_perpendicular_90",
    "curve": {
     "0": {
-     "median": 0.01,
-     "n": 246,
+     "median": 0.23,
+     "n": 86,
      "q1": 0.0,
-     "q3": 0.28
+     "q3": 0.91
     },
     "15": {
-     "median": 0.37,
-     "n": 492,
-     "q1": 0.3,
-     "q3": 0.53
+     "median": 0.39,
+     "n": 172,
+     "q1": 0.31,
+     "q3": 0.68
     },
     "30": {
-     "median": 1.34,
-     "n": 492,
-     "q1": 1.12,
-     "q3": 1.56
+     "median": 1.39,
+     "n": 172,
+     "q1": 0.77,
+     "q3": 1.69
     },
     "45": {
-     "median": 2.9,
-     "n": 492,
-     "q1": 2.41,
-     "q3": 3.25
+     "median": 3.03,
+     "n": 172,
+     "q1": 2.0,
+     "q3": 3.41
     },
     "60": {
      "median": 4.75,
-     "n": 492,
-     "q1": 4.01,
-     "q3": 5.27
+     "n": 172,
+     "q1": 3.63,
+     "q3": 5.51
     },
     "75": {
-     "median": 6.24,
-     "n": 492,
-     "q1": 5.46,
-     "q3": 6.98
+     "median": 6.21,
+     "n": 172,
+     "q1": 5.2,
+     "q3": 7.36
     },
     "90": {
-     "median": 6.87,
-     "n": 246,
-     "q1": 6.09,
-     "q3": 7.63
+     "median": 6.75,
+     "n": 86,
+     "q1": 5.81,
+     "q3": 8.11
     }
    },
-   "n_scans": 123,
+   "n_scans": 43,
    "ortho_substituted": false,
    "preferred_angle": {
     "median": 0.0,
-    "n": 123,
+    "n": 43,
     "q1": 0.0,
-    "q3": 0.0
+    "q3": 15.0
    },
    "subtype": "aryl carbonyl"
   },
@@ -792,10 +795,10 @@
   },
   "conjugated|aryl ether O|no-ortho": {
    "barrier": {
-    "median": 3.1,
-    "n": 273,
-    "q1": 2.09,
-    "q3": 3.94
+    "median": 3.62,
+    "n": 90,
+    "q1": 1.87,
+    "q3": 4.98
    },
    "bond_type": "conjugated",
    "coarse": false,
@@ -803,54 +806,54 @@
    "curve": {
     "0": {
      "median": 0.04,
-     "n": 546,
+     "n": 180,
      "q1": 0.0,
-     "q3": 1.03
+     "q3": 0.6
     },
     "15": {
-     "median": 0.33,
-     "n": 1092,
-     "q1": 0.17,
-     "q3": 0.96
+     "median": 0.37,
+     "n": 360,
+     "q1": 0.26,
+     "q3": 0.76
     },
     "30": {
-     "median": 0.83,
-     "n": 1092,
-     "q1": 0.51,
-     "q3": 1.41
+     "median": 1.11,
+     "n": 360,
+     "q1": 0.7,
+     "q3": 1.55
     },
     "45": {
-     "median": 1.5,
-     "n": 1092,
-     "q1": 0.88,
-     "q3": 2.23
+     "median": 2.18,
+     "n": 360,
+     "q1": 0.91,
+     "q3": 2.8
     },
     "60": {
-     "median": 2.16,
-     "n": 1092,
-     "q1": 1.31,
-     "q3": 3.08
+     "median": 2.91,
+     "n": 360,
+     "q1": 1.18,
+     "q3": 3.88
     },
     "75": {
-     "median": 2.64,
-     "n": 1092,
-     "q1": 1.73,
-     "q3": 3.57
+     "median": 3.21,
+     "n": 360,
+     "q1": 1.49,
+     "q3": 4.64
     },
     "90": {
-     "median": 2.86,
-     "n": 546,
-     "q1": 1.95,
-     "q3": 3.78
+     "median": 3.37,
+     "n": 180,
+     "q1": 1.57,
+     "q3": 4.97
     }
    },
-   "n_scans": 273,
+   "n_scans": 90,
    "ortho_substituted": false,
    "preferred_angle": {
     "median": 0.0,
-    "n": 273,
+    "n": 90,
     "q1": 0.0,
-    "q3": 0.0
+    "q3": 15.0
    },
    "subtype": "aryl ether O"
   },
@@ -920,10 +923,10 @@
   },
   "conjugated|aryl nitro|no-ortho": {
    "barrier": {
-    "median": 6.45,
-    "n": 36,
+    "median": 6.28,
+    "n": 12,
     "q1": 4.93,
-    "q3": 6.88
+    "q3": 7.89
    },
    "bond_type": "conjugated",
    "coarse": false,
@@ -931,52 +934,52 @@
    "curve": {
     "0": {
      "median": 0.0,
-     "n": 72,
+     "n": 24,
      "q1": 0.0,
      "q3": 0.0
     },
     "15": {
-     "median": 0.25,
-     "n": 144,
-     "q1": 0.23,
-     "q3": 0.27
+     "median": 0.27,
+     "n": 48,
+     "q1": 0.25,
+     "q3": 0.35
     },
     "30": {
-     "median": 1.05,
-     "n": 144,
-     "q1": 0.93,
-     "q3": 1.15
+     "median": 1.12,
+     "n": 48,
+     "q1": 0.99,
+     "q3": 1.43
     },
     "45": {
-     "median": 2.46,
-     "n": 144,
-     "q1": 2.11,
-     "q3": 2.57
+     "median": 2.52,
+     "n": 48,
+     "q1": 2.13,
+     "q3": 3.17
     },
     "60": {
-     "median": 4.21,
-     "n": 144,
-     "q1": 3.4,
-     "q3": 4.35
+     "median": 4.23,
+     "n": 48,
+     "q1": 3.42,
+     "q3": 5.28
     },
     "75": {
-     "median": 5.8,
-     "n": 144,
+     "median": 5.69,
+     "n": 48,
      "q1": 4.5,
-     "q3": 6.01
+     "q3": 7.12
     },
     "90": {
-     "median": 6.45,
-     "n": 72,
+     "median": 6.28,
+     "n": 24,
      "q1": 4.93,
-     "q3": 6.88
+     "q3": 7.89
     }
    },
-   "n_scans": 36,
+   "n_scans": 12,
    "ortho_substituted": false,
    "preferred_angle": {
     "median": 0.0,
-    "n": 36,
+    "n": 12,
     "q1": 0.0,
     "q3": 0.0
    },
@@ -1279,8 +1282,8 @@
    "subtype": ""
   }
  },
- "min_scans_per_class": 6,
- "n_scans_total": 2745,
+ "min_scans_per_class": 5,
+ "n_scans_total": 1805,
  "schema_version": 1,
  "units": "kcal/mol, relative to the minimum of each folded scan"
 }

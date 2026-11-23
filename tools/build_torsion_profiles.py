@@ -43,6 +43,13 @@ SP3_PERIOD = 120.0
 CONJ_PERIOD = 180.0
 
 
+# The one specification in these datasets that is quantum mechanics:
+# OpenFF's "default", B3LYP-D3(BJ)/DZVP in Psi4, as the QCArchive server
+# reports it for all four datasets. Everything else is a force field.
+QM_SPEC = "default"
+LEVEL_OF_THEORY = "B3LYP-D3(BJ)/DZVP (Psi4), relaxed torsion drives"
+
+
 def fold_angle(angle, bond_type):
     """Map a scan angle onto the coordinate the tool measures."""
     a = abs(float(angle)) % 360.0
@@ -87,11 +94,22 @@ def build(min_scans=5, split_ortho=True):
 
     classes = {}
     datasets = set()
+    skipped_mm = 0
     for path in files:
         try:
             with open(path) as fh:
                 rec = json.load(fh)
         except Exception:
+            continue
+        # Only the QM specification. The Substituted Phenyl sets also
+        # carry torsion drives run with force fields (OpenFF 1.x, GAFF
+        # 2.11, in OpenMM) under other specification names; the fetch
+        # takes every specification, and those 935 molecular-mechanics
+        # scans were being pooled into what the tool reports as QM. A
+        # force field's torsion profile is the thing these QM scans
+        # exist to correct - it has no business in the reference.
+        if rec.get("spec", QM_SPEC) != QM_SPEC:
+            skipped_mm += 1
             continue
         datasets.add(rec.get("dataset", "?"))
         bond_type = rec.get("bond_type") or "other"
@@ -143,6 +161,9 @@ def build(min_scans=5, split_ortho=True):
         with open(ATTR) as fh:
             attribution = json.load(fh)
     attribution["datasets_used"] = sorted(datasets)
+    attribution["level_of_theory"] = LEVEL_OF_THEORY
+    attribution["specification"] = QM_SPEC
+    attribution["non_qm_scans_excluded"] = skipped_mm
 
     payload = {
         "schema_version": 1,
