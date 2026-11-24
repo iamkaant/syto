@@ -361,6 +361,24 @@
   // with ChimeraX. The page turns them into whole residues - half an
   // arginine is not a thing anyone wants to look at.
 
+  // A hydrogen bonded to carbon: hidden in the pocket, kept in the data.
+  // Falls back to keeping the atom whenever the bonding is not there to
+  // read, because a missing bond table must not silently strip hydrogens
+  // that are holding the hydrogen bonds.
+  function nonpolarHydrogen(unit, offset) {
+    var h = unit.model && unit.model.atomicHierarchy;
+    var bonds = unit.bonds;
+    if (!h || !bonds || !bonds.offset || !bonds.b) return false;
+    var sym = function (off) {
+      return String(h.atoms.type_symbol.value(unit.elements[off]));
+    };
+    if (sym(offset) !== "H") return false;
+    for (var j = bonds.offset[offset]; j < bonds.offset[offset + 1]; j++) {
+      if (sym(bonds.b[j]) === "C") return true;
+    }
+    return false;
+  }
+
   Viewer.prototype.clearSite = async function () {
     if (!this.site) return;
     try { await this.plugin.build().delete(this.site).commit(); }
@@ -385,13 +403,28 @@
     }
     if (!found) return 0;
 
+    // Whole residues, minus the hydrogens on carbon. Those are most of
+    // the atoms in a pocket and none of the chemistry being shown: they
+    // hide the pose behind a haze of white sticks. The ones on N, O and S
+    // stay, because they are the ones making the hydrogen bonds. Nothing
+    // is deleted - the analysis still sees every atom, this is display
+    // only - so a clash against a methyl hydrogen is still reported.
     var elements = [];
     byUnit.forEach(function (offsets, unit) {
       offsets.sort(function (a, b) { return a - b; });
-      elements.push({unit: unit, indices: offsets});
+      var want = Object.create(null);
+      for (var k = 0; k < offsets.length; k++) {
+        want[unit.residueIndex[unit.elements[offsets[k]]]] = 1;
+      }
+      var keep = [];
+      for (var o = 0; o < unit.elements.length; o++) {
+        if (!want[unit.residueIndex[unit.elements[o]]]) continue;
+        if (nonpolarHydrogen(unit, o)) continue;
+        keep.push(o);
+      }
+      elements.push({unit: unit, indices: keep.length ? keep : offsets});
     });
     var loci = SE.Loci(this.receptor.data, elements);
-    try { loci = SE.Loci.extendToWholeResidues(loci); } catch (e) { /* as-is */ }
     this.siteLoci = loci;
 
     var ST = global.molstar.lib.plugin.StateTransforms;
