@@ -18,6 +18,8 @@ construction, and a test proves the ChimeraX path and the standalone path agree
 atom for atom.
 
 Detailed documentation is on the [Wiki](https://github.com/iamkaant/syto/wiki) 
+
+
 [ChimeraX Toolshed Page](https://cxtoolshed.rbvi.ucsf.edu/apps/chimeraxsyto)
 
 ![logo](img/syto-logo.jpg)
