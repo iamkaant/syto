@@ -17,10 +17,7 @@ inside Pyodide in a browser. Both front ends therefore give the same answers by
 construction, and a test proves the ChimeraX path and the standalone path agree
 atom for atom.
 
-Detailed documentation is on the [Wiki](https://github.com/iamkaant/syto/wiki) 
-
-
-[ChimeraX Toolshed Page](https://cxtoolshed.rbvi.ucsf.edu/apps/chimeraxsyto)
+[Wiki](https://github.com/iamkaant/syto/wiki)  |  [ChimeraX Toolshed Page](https://cxtoolshed.rbvi.ucsf.edu/apps/chimeraxsyto). | [Web version](https://kyrylch.uk/syto/)
 
 ![logo](img/syto-logo.jpg)
 ---
