@@ -75,7 +75,69 @@ def clear_groups(session, kinds=None):
         session.models.close(removed)
     if kinds is None:
         clear_centroids(session)
+        clear_stranded(session)
     return len(removed)
+
+
+STRANDED_MODEL = "hitpick stranded"
+STRANDED_COLOR = (255, 61, 187, 110)      # the web page's magenta, faint
+STRANDED_RADIUS = 0.7                     # A; just clear of a stick
+
+
+def clear_stranded(session):
+    doomed = [m for m in list(session.models)
+              if getattr(m, "name", "") == STRANDED_MODEL]
+    if doomed:
+        session.models.close(doomed)
+
+
+def draw_stranded(session, unsatisfied, all_atoms):
+    """A wire cage around each stranded H-bond donor or acceptor.
+
+    These used to be words on the atom, "stranded acceptor" three times
+    over on one ligand, which covered the chemistry they were about. A
+    cage says where; the panel card says which and why. It cannot be
+    picked, so a click on the atom inside still reaches the atom.
+    Returns the number of cages drawn.
+    """
+    clear_stranded(session)
+    atoms = [all_atoms[u.atom] for u in (unsatisfied or ())
+             if 0 <= u.atom < len(all_atoms)]
+    if not atoms:
+        return 0
+    import numpy as np
+    from chimerax.atomic import Atom
+    from chimerax.core.models import Model
+    from chimerax.geometry import Places
+    from chimerax.graphics import Drawing
+    from chimerax.surface.shapes import sphere_geometry2
+
+    sas = np.zeros((len(atoms), 4), np.float32)
+    for i, a in enumerate(atoms):
+        sas[i, :3] = a.scene_coord
+        sas[i, 3] = (a.radius + 0.15 if a.draw_mode == Atom.SPHERE_STYLE
+                     else STRANDED_RADIUS)
+    m = Model(STRANDED_MODEL, session)
+    d = Drawing("cages")
+    va, na, ta = sphere_geometry2(24)
+    d.set_geometry(va, na, ta)
+    d.display_style = d.Mesh
+    d.positions = Places(shift_and_scale=sas)
+    d.colors = np.array([STRANDED_COLOR] * len(atoms), np.uint8)
+    d.pickable = False
+    m.pickable = False
+    m.add_drawing(d)
+    session.models.add([m])
+    return len(atoms)
+
+
+def label_stranded(session, unsatisfied, all_atoms):
+    """"stranded" over "donor"/"acceptor" on each such atom, two lines."""
+    texts = {}
+    for u in (unsatisfied or ()):
+        if 0 <= u.atom < len(all_atoms):
+            texts[int(u.atom)] = "stranded\n" + u.role
+    return set_label_layer(session, all_atoms, LAYER_STRANDED, texts)
 
 
 def clear_centroids(session):
@@ -293,19 +355,22 @@ LAYER_TORSION = "torsion"
 LAYER_VALUE = "value"
 # Drawing order, and colour priority: the digits you just asked for outrank
 # a standing strain note, which outranks a handbook value.
-LAYER_ORDER = (LAYER_TORSION, LAYER_STRAIN, LAYER_VALUE)
+LAYER_STRANDED = "stranded"
+LAYER_ORDER = (LAYER_TORSION, LAYER_STRAIN, LAYER_VALUE, LAYER_STRANDED)
 LAYER_PARTS = "hitpick_label_parts"
 
 # One label3d call carries one colour, so atoms are grouped by whichever
 # layer is on top. The torsion colour has to be worked out against the
 # current background, which is why this is a function.
 STRAIN_TEXT_COLOR = (200, 90, 30, 255)
+STRANDED_TEXT_COLOR = (205, 40, 150, 255)
 
 
 def _layer_colors(session):
     return {LAYER_TORSION: _readable_text_color(session, TORSION_COLOR),
             LAYER_STRAIN: STRAIN_TEXT_COLOR,
-            LAYER_VALUE: None}
+            LAYER_VALUE: None,
+            LAYER_STRANDED: STRANDED_TEXT_COLOR}
 
 
 def _register_attrs(session):
@@ -341,7 +406,12 @@ def _parts(atom):
 
 def _compose(atom, parts):
     """Write the layers back, and return the text that should be drawn."""
-    text = " \u00b7 ".join(parts[k] for k in LAYER_ORDER if parts.get(k))
+    # The stranded note is two short lines under whatever else is there,
+    # not one more item on a line that is already long.
+    text = " \u00b7 ".join(parts[k] for k in LAYER_ORDER
+                           if parts.get(k) and k != LAYER_STRANDED)
+    if parts.get(LAYER_STRANDED):
+        text = (text + "\n" if text else "") + parts[LAYER_STRANDED]
     try:
         setattr(atom, LAYER_PARTS, parts)
         setattr(atom, LABEL_ATTR, text)
@@ -415,7 +485,67 @@ def set_label_layer(session, all_atoms, layer, texts, color=None):
                   color=colors.get(top), height=ATOM_LABEL_HEIGHT)
         except Exception:
             continue
+    _stack_multiline(session, labelled)
     return len([a for a in all_atoms if _parts(a).get(layer)])
+
+
+def _stack_multiline(session, atoms):
+    """Draw labels whose text has line breaks as stacked lines.
+
+    ChimeraX paints a 3D label with one drawText call, which ignores a
+    newline. Its label objects do take a ready-made image, so each line
+    is rendered separately and the images stacked. A label that is back
+    to one line gets its image taken away again, or it would keep
+    showing the old words.
+    """
+    try:
+        import numpy as np
+        from chimerax.graphics import text_image_rgba
+        from chimerax.label.label3d import labels_model
+        from Qt.QtCore import QCoreApplication
+    except Exception:
+        return 0
+    gui = QCoreApplication.instance() is not None
+    done = 0
+    dirty = set()
+    for a in atoms:
+        try:
+            lm = labels_model(a.structure)
+            los = lm.labels([a]) if lm is not None else []
+        except Exception:
+            continue
+        if not los:
+            continue
+        lo = los[0]
+        lines = (getattr(a, LABEL_ATTR, "") or "").split("\n")
+        if len(lines) < 2:
+            if lo.custom_image is not None:
+                lo.custom_image = None
+                dirty.add(lm)
+            continue
+        lo.height = ATOM_LABEL_HEIGHT * len(lines)
+        dirty.add(lm)
+        done += 1
+        if not gui:
+            continue          # no fonts without a GUI; the text is still set
+        bg = lo.background
+        xpad = 0 if bg is None else int(.2 * lo.size)
+        imgs = [text_image_rgba(t, tuple(lo.color), lo.size, lo.font,
+                                background_color=bg, xpad=xpad)
+                for t in lines]
+        w = max(i.shape[1] for i in imgs)
+        fill = (0, 0, 0, 0) if bg is None else tuple(bg)
+        rows = []
+        for im in reversed(imgs):         # row 0 of an image is its bottom
+            pad = np.empty((im.shape[0], w, 4), np.uint8)
+            pad[:] = fill
+            x0 = (w - im.shape[1]) // 2
+            pad[:, x0:x0 + im.shape[1]] = im
+            rows.append(pad)
+        lo.custom_image = np.concatenate(rows, axis=0)
+    for lm in dirty:
+        lm.update_labels()
+    return done
 
 
 def clear_label_layer(session, all_atoms, layer):
@@ -545,7 +675,7 @@ def draw_clashes(session, strain, all_atoms, show_overlap=True):
     return made
 
 
-def label_strain(session, strain, all_atoms, unsatisfied=None):
+def label_strain(session, strain, all_atoms):
     """Put a short note on the atoms of each strain finding.
 
     Eclipsed torsions and puckered rings have no two atoms to draw a line
@@ -571,16 +701,6 @@ def label_strain(session, strain, all_atoms, unsatisfied=None):
                  "twisted_out_of_conjugation": "out of plane %.0f" % abs(f.value),
                  "forced_planar": "forced flat"}.get(f.kind, f.kind)
         texts[int(anchor)] = short
-    # Buried donors and acceptors with nothing to hydrogen-bond to. Like
-    # the strain notes they have no second atom to draw a line to, so the
-    # word goes on the atom. A strain note already there is kept and the
-    # two are joined: neither is less true for the other being present.
-    for u in (unsatisfied or ()):
-        if not (0 <= u.atom < len(all_atoms)):
-            continue
-        word = "stranded " + u.role
-        prev = texts.get(int(u.atom))
-        texts[int(u.atom)] = (prev + ", " + word) if prev else word
     # Always set the layer, even when empty: a pose with no strain has to
     # clear the notes left by the previous one.
     return set_label_layer(session, all_atoms, LAYER_STRAIN, texts)

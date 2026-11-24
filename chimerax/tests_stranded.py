@@ -54,10 +54,24 @@ def roles():
     return None if r.unsatisfied is None else [u.role for u in r.unsatisfied]
 
 
+def cages(st):
+    """Centres of the wire cages drawn in 3D, as atom indices."""
+    out = []
+    for m in session.models:
+        if m.name != render.STRANDED_MODEL:
+            continue
+        for d in m.child_drawings():
+            for c in d.positions.shift_and_scale_array()[:, :3]:
+                out += [i for i, a in enumerate(st.all_atoms)
+                        if max(abs(float(x) - float(y)) for x, y in
+                               zip(a.scene_coord, c)) < 1e-3]
+    return sorted(out)
+
+
 def words(st):
-    """The 'stranded ...' words written on atoms in 3D."""
-    return sorted(i for i, a in enumerate(st.all_atoms)
-                  if "stranded" in (getattr(a, render.LABEL_ATTR, "") or ""))
+    """Atoms still carrying the old 'stranded ...' text label."""
+    return [i for i, a in enumerate(st.all_atoms)
+            if "stranded" in (getattr(a, render.LABEL_ATTR, "") or "")]
 
 
 print("[1] with both settings on, the command gives the core's own answer")
@@ -93,8 +107,23 @@ if found is not None:
     print("     %s: %s" % (found.name, both))
 
     print("[2] the atoms are marked in 3D and listed for the panel")
-    check(words(st) == sorted(set(u.atom for u in st.result.unsatisfied)),
-          "every stranded atom carries the word in 3D, and no other atom")
+    check(cages(st) == sorted(set(u.atom for u in st.result.unsatisfied)),
+          "every stranded atom has a cage around it, and no other atom")
+    check(sorted(words(st)) == cages(st),
+          "and each carries the label")
+    texts = [getattr(st.all_atoms[i], render.LABEL_ATTR) for i in words(st)]
+    check(all(x.split("\n")[-2:] in (["stranded", "donor"],
+                                      ["stranded", "acceptor"],
+                                      ["stranded", "donor/acceptor"])
+              for x in texts),
+          "the label is two lines: 'stranded' over the role (%s)"
+          % sorted(set(x.replace("\n", " / ") for x in texts)))
+    from chimerax.label.label3d import labels_model
+    los = [labels_model(st.all_atoms[i].structure).labels([st.all_atoms[i]])[0]
+           for i in words(st)]
+    check(all(abs(lo.height - 2 * render.ATOM_LABEL_HEIGHT) < 1e-6
+              for lo in los if "\n" in lo.text and lo.text.count("\n") == 1),
+          "a two-line label is twice the height of a one-line one")
     stub = types.SimpleNamespace(session=session, _state=st)
     for _n in ("_snapshot", "_torsion_list", "_torsion_profile",
                "_pick_torsion"):
@@ -118,8 +147,13 @@ if found is not None:
           "the two halves cover the whole list")
     run(session, "hitpick stranded donors false acceptors false", log=False)
     st = get_state(session)
-    check(roles() == [] and words(st) == [],
-          "both off: no rows and no words left in 3D")
+    check(roles() == [] and cages(st) == [] and words(st) == [],
+          "both off: no rows, cages or labels left in 3D")
+    run(session, "hitpick stranded donors true acceptors true", log=False)
+    run(session, "hitpick clear", log=False)
+    check(not [m for m in session.models
+               if m.name == render.STRANDED_MODEL],
+          "hitpick clear removes the cages")
 
 if failures:
     print("FAILURES (%d):" % len(failures))

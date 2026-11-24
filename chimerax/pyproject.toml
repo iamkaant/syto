@@ -35,7 +35,7 @@ custom-init = false
 
 [chimerax.package-data]
 "src/ui" = ["*.html", "*.css", "*.js"]
-"src/docs/user/tools" = ["*.html"]
+"src/docs/user/tools" = ["*.html", "*.jpg"]
 "src/docs/user/commands" = ["*.html"]
 "src/_vendor" = ["README.txt"]
 "src/_vendor/hitpicking" = ["*.py", "data/*.json"]

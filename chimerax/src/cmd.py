@@ -379,8 +379,9 @@ def _redraw(session, st):
     else:
         render.clear_groups(session, render.CLASH_KINDS)
     if st.options.show_strain_labels and st.options.annotate_atom_values is False:
-        render.label_strain(session, st.result.strain, st.all_atoms,
-                            unsatisfied=st.result.unsatisfied)
+        render.label_strain(session, st.result.strain, st.all_atoms)
+    render.draw_stranded(session, st.result.unsatisfied, st.all_atoms)
+    render.label_stranded(session, st.result.unsatisfied, st.all_atoms)
 
 
 def _parse_types(text):
