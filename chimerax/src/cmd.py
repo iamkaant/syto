@@ -315,11 +315,13 @@ def _analyze_pose(session, st, lig):
         from hitpicking.strain import analyze_strain
         strain = analyze_strain(ms)
 
-    from hitpicking.analysis import PoseResult
+    from hitpicking.analysis import PoseResult, stranded_atoms
     n_rec = st.receptor_model.num_atoms
+    unsatisfied = stranded_atoms(ms, feats, res.interactions, st.options)
     st.result = PoseResult(lig.name, res.interactions, res.warnings,
                            res.counts, adapter.pose_scores(lig),
-                           combined=ms, n_receptor=n_rec, strain=strain)
+                           combined=ms, n_receptor=n_rec, strain=strain,
+                           unsatisfied=unsatisfied)
 
     _redraw(session, st)
     session.logger.info("hitpick: %s -> %s"

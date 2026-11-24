@@ -84,6 +84,22 @@ class Options:
                     else getattr(self, k)) for k in self.__slots__}
 
 
+def stranded_atoms(ms, feats, interactions, opts):
+    """The stranded H-bond donors/acceptors the options ask for, or None.
+
+    One function because there are two callers - ReceptorContext.analyze
+    and the ChimeraX command, which builds its own PoseResult - and the
+    second one once simply did not do this, so the setting was a checkbox
+    wired to nothing.
+    """
+    if not opts.detect_unsatisfied:
+        return None
+    from .nci.unsatisfied import find_unsatisfied
+    return [u for u in find_unsatisfied(ms, feats, interactions)
+            if (opts.stranded_donors and "donor" in u.role)
+            or (opts.stranded_acceptors and "acceptor" in u.role)]
+
+
 class PoseResult:
     """Everything known about one pose."""
 
@@ -247,16 +263,7 @@ class ReceptorContext:
             from .strain import analyze_strain
             strain = analyze_strain(ms)
 
-        unsatisfied = None
-        if opts.detect_unsatisfied:
-            from .nci.unsatisfied import find_unsatisfied
-            # Judged against EVERY hydrogen bond the geometry allows, not
-            # only the types switched on for drawing: hiding a line must
-            # not turn its atoms into accusations.
-            unsatisfied = [
-                u for u in find_unsatisfied(ms, feats, res.interactions)
-                if (opts.stranded_donors and "donor" in u.role)
-                or (opts.stranded_acceptors and "acceptor" in u.role)]
+        unsatisfied = stranded_atoms(ms, feats, res.interactions, opts)
 
         return PoseResult(str(name).strip(), res.interactions, res.warnings,
                           res.counts, scores, combined=ms, n_receptor=n_rec,
