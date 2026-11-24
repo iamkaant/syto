@@ -1,4 +1,4 @@
-"""MDL SDF/MOL (V2000) reader.
+"""MDL SDF/MOL reader (V2000 and V3000).
 
 Unlike the ChimeraX path, SDF *does* carry bond orders. They are used here to
 derive hybridisation and aromaticity and are then discarded: nothing
@@ -50,10 +50,89 @@ def iter_sdf_records(path):
         yield buf
 
 
-def _parse_record(lines, part, source):
-    if len(lines) < 4:
+def _v30_lines(lines, start):
+    """The V3000 block as logical lines, and the index just past M  END.
+
+    A V3000 line starts 'M  V30 ' and one ending in '-' continues on the
+    next, which is how long atom and bond lines are wrapped.
+    """
+    out, pending, i = [], "", start
+    while i < len(lines):
+        ln = lines[i]
+        i += 1
+        if ln.startswith("M  END"):
+            break
+        if not ln.startswith("M  V30"):
+            continue
+        body = ln[6:].strip()
+        if body.endswith("-"):
+            pending += body[:-1]
+            continue
+        out.append(pending + body)
+        pending = ""
+    return out, i
+
+
+def _parse_v3000(lines):
+    """Atoms and bonds of a V3000 record, or None if there are none.
+
+    RDKit writes V3000 whenever a molecule has more than 999 atoms or
+    bonds, stereo groups, or was simply asked to. A reader that only knew
+    V2000 saw the '0  0' counts line such a record carries for old tools,
+    took it as an empty molecule, and returned nothing for the whole file.
+    """
+    v30, end = _v30_lines(lines, 4)
+    atoms, bonds_raw, section = [], [], None
+    for ln in v30:
+        f = ln.split()
+        if not f:
+            continue
+        if f[0] == "BEGIN":
+            section = f[1] if len(f) > 1 else None
+            continue
+        if f[0] == "END":
+            section = None
+            continue
+        if section == "ATOM" and len(f) >= 5:
+            atoms.append(f)
+        elif section == "BOND" and len(f) >= 4:
+            bonds_raw.append(f)
+    na = len(atoms)
+    if na <= 0:
         return None
-    title = lines[0].strip()
+
+    xyz = np.empty((na, 3), dtype=np.float64)
+    element = np.empty(na, dtype="<U2")
+    fchg = np.zeros(na, dtype=np.int8)
+    index = {}                       # V3000 atom ids need not be 1..n
+    for k, f in enumerate(atoms):
+        index[f[0]] = k
+        element[k] = normalize_element(f[1])
+        xyz[k] = (float(f[2]), float(f[3]), float(f[4]))
+        for tok in f[6:]:
+            if tok.startswith("CHG="):
+                try:
+                    fchg[k] = int(tok[4:])
+                except ValueError:
+                    pass
+
+    pairs, orders = [], []
+    for f in bonds_raw:
+        ia, ib = index.get(f[2]), index.get(f[3])
+        if ia is None or ib is None:
+            continue
+        try:
+            o = int(f[1])
+        except ValueError:
+            o = 1
+        pairs.append((ia, ib))
+        orders.append(o)
+    bonds = np.array(pairs, dtype=np.int32).reshape(-1, 2)
+    order = np.array(orders, dtype=np.int8)
+    return xyz, element, fchg, bonds, order, end
+
+
+def _parse_v2000(lines):
     counts = lines[3]
     try:
         na = int(counts[0:3])
@@ -90,7 +169,6 @@ def _parse_record(lines, part, source):
         bonds[k] = (a, b)
         order[k] = o
 
-    props = {}
     i = 4 + na + nb
     while i < len(lines):
         ln = lines[i]
@@ -106,6 +184,21 @@ def _parse_record(lines, part, source):
                 if 0 <= ai < na:
                     fchg[ai] = cv
         i += 1
+    return xyz, element, fchg, bonds, order, i
+
+
+def _parse_record(lines, part, source):
+    if len(lines) < 4:
+        return None
+    title = lines[0].strip()
+    parsed = (_parse_v3000(lines) if "V3000" in lines[3]
+              else _parse_v2000(lines))
+    if parsed is None:
+        return None
+    xyz, element, fchg, bonds, order, i = parsed
+    na = len(xyz)
+
+    props = {}
     while i < len(lines):
         ln = lines[i]
         if ln.startswith(">"):
