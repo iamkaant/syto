@@ -1,0 +1,119 @@
+<html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="../userdocs.css">
+<title>Tool: Hit Picking Learn</title>
+<style>
+@media (prefers-color-scheme: dark) { :root { color-scheme: dark; } }
+table.syto { border-collapse: collapse; margin: 6px 0 12px; }
+table.syto td, table.syto th { border: 1px solid #8884; padding: 3px 8px;
+  text-align: left; vertical-align: top; }
+</style>
+</head><body>
+
+<a name="top"></a>
+<a href="../index.html">
+<img width="60px" src="../ChimeraX-docs-icon.svg" alt="ChimeraX docs icon"
+class="clRighticon" title="User Guide Index"></a>
+
+<h3><a href="../index.html#tools">Tool</a>: Hit Picking Learn</h3>
+<p>
+<b>Hit Picking Learn</b> is the active-learning panel of the Syto bundle.
+You grade some poses, a small model learns from your grades, and it tells
+you which poses are worth looking at next. It is a port of
+<a href="https://github.com/keiserlab/autoparty" target="_blank">AutoParty</a>
+and is optional: nothing is loaded until you use it.
+See also:
+<a href="syto_handbook.html"><b>Hit Picking Handbook</b></a>,
+<a href="viewdock.html"><b>ViewDock</b></a>,
+<a href="../commands/hitpick.html#learn"><b>hitpick learn</b></a>
+</p>
+<p>
+Open it from <b>Tools &rarr; Binding Analysis &rarr; Hit Picking Learn</b>
+or with <b>hitpick learn panel</b>. The receptor and poses must be open and
+<a href="../commands/hitpick.html#setup"><b>hitpick setup</b></a> run first.
+</p>
+
+<a name="loop"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>The loop</h3>
+<ol>
+<li><b>Analyse poses</b> (<b>hitpick learn collect</b>) computes the
+features of every pose. It runs in the background; the panel shows
+progress and <b>Cancel</b> stops it.
+<li>Grade some poses <b>bad</b>, <b>maybe</b> or <b>good</b>, with the
+large buttons in the panel or with ViewDock's own rating (keys <b>b</b>,
+<b>m</b>, <b>g</b>). Grades are stored in ViewDock's <b>Rating</b> column,
+so your opinion is recorded in one place only.
+<li><b>Train</b> (<b>hitpick learn train</b>) fits a committee of small
+neural networks to the grades given so far. The training curve is shown
+in the panel.
+<li><b>Look at these next</b> lists the poses to grade now. Click a row to
+jump to that pose. Grade them, train again, and repeat.
+</ol>
+<p>
+By default, grading a pose moves straight on to the next suggestion.
+</p>
+
+<a name="next"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Choosing what to look at next</h3>
+<table class="syto">
+<tr><th>Strategy</th><th>Shows you</th></tr>
+<tr><td>uncertainty</td><td>poses the model is least sure about; grading
+these teaches it most (the default)</td></tr>
+<tr><td>disagreement</td><td>graded poses where the model disagrees with
+your grade</td></tr>
+<tr><td>prediction</td><td>the poses it predicts are best</td></tr>
+</table>
+<p>
+The work-list button puts the suggestions into the ViewDock table in the
+model's order (<b>hitpick learn worklist</b>). A pose leaves the list when
+you grade it, so <b>b</b>/<b>m</b>/<b>g</b> walks the batch. The list is
+not re-ranked while you work it.
+</p>
+<p>
+<b>hitpick learn apply</b> writes the model's predictions into the ViewDock
+table as sortable columns.
+</p>
+
+<a name="terms"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Docking score terms</h3>
+<p>
+The model learns from the interaction fingerprint, ligand features and,
+optionally, up to seven of the docking program's own score terms. For
+DOCK&nbsp;3 mol2 files the terms are recognised automatically. For other
+programs choose them in the <b>Docking score terms</b> section
+(<b>Apply</b>, <b>Auto</b>, <b>None</b>); identifiers such as rank or pose
+number are marked as unusable so they cannot leak into the model.
+</p>
+
+<a name="assume"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Rating by exception</h3>
+<p>
+If you went through a whole list and only marked the poses you objected
+to, the model has no examples of what you would buy. The panel then offers
+to treat the unrated poses as <b>good</b>
+(<b>hitpick learn assume</b>). Use this only on a list you walked to the
+end: on a half-finished list it labels poses you never looked at. The
+assumed grades are kept apart from the ones you gave and can be removed
+with <b>hitpick learn assume forget true</b>.
+</p>
+
+<a name="save"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Saving</h3>
+<p>
+<b>Save&hellip;</b> and <b>Load&hellip;</b> write and read one JSON file
+holding the grades and the trained model
+(<b>hitpick learn save</b>, <b>hitpick learn load</b>). The panel is not
+saved in ChimeraX sessions.
+</p>
+
+<hr>
+<address>Syto &middot; Andrii Kyrylchuk &middot;
+<a href="https://github.com/iamkaant/syto" target="_blank">github.com/iamkaant/syto</a>
+(<a href="https://github.com/iamkaant/syto/wiki" target="_blank">wiki</a>,
+<a href="https://github.com/iamkaant/syto/issues" target="_blank">report a problem</a>)
+</address>
+</body></html>

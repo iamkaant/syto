@@ -45,7 +45,7 @@ class LearnTool(HtmlToolInstance):
     SESSION_SAVE = False
     CUSTOM_SCHEME = "hplearn"
     PLACEMENT = "side"
-    help = None
+    help = "help:user/tools/syto_learn.html"
 
     def __init__(self, session, tool_name):
         super().__init__(session, tool_name, size_hint=(460, 640),

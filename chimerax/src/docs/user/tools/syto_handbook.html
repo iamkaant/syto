@@ -1,0 +1,172 @@
+<html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="../userdocs.css">
+<title>Tool: Hit Picking Handbook</title>
+<style>
+@media (prefers-color-scheme: dark) { :root { color-scheme: dark; } }
+table.syto { border-collapse: collapse; margin: 6px 0 12px; }
+table.syto td, table.syto th { border: 1px solid #8884; padding: 3px 8px;
+  text-align: left; vertical-align: top; }
+</style>
+</head><body>
+
+<a name="top"></a>
+<a href="../index.html">
+<img width="60px" src="../ChimeraX-docs-icon.svg" alt="ChimeraX docs icon"
+class="clRighticon" title="User Guide Index"></a>
+
+<h3><a href="../index.html#tools">Tool</a>: Hit Picking Handbook</h3>
+<p>
+<b>Hit Picking Handbook</b> is the main panel of the Syto bundle. It analyses
+one docked pose at a time in its binding site: it finds and scores the
+non-covalent interactions, flags clashes, strained torsions and stranded
+hydrogen-bond donors, and shows citation-backed reference values for whatever
+atom you click. It is meant to be used next to
+<a href="viewdock.html"><b>ViewDock</b></a>.
+See also:
+<a href="syto_learn.html"><b>Hit Picking Learn</b></a>,
+<a href="../commands/hitpick.html"><b>hitpick</b></a>
+</p>
+<p>
+The scores are heuristic ranking aids measured against published geometric
+criteria. They are not free energies and are never summed into one number.
+</p>
+
+<a name="start"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Getting started</h3>
+<p>
+Open the receptor and the docked poses, then prepare the site once:
+</p>
+<blockquote>
+<b>open</b> receptor.pdb<br>
+<b>open</b> poses.mol2 &nbsp;&nbsp;<i>(ViewDock opens)</i><br>
+<b><a href="../commands/hitpick.html#setup">hitpick setup</a></b><br>
+<b><a href="../commands/hitpick.html#analyze">hitpick analyze</a></b>
+</blockquote>
+<p>
+Open the panel from the menu <b>Tools &rarr; Binding Analysis &rarr; Hit
+Picking Handbook</b>. While ViewDock is running, each pose is analysed as you
+step through its table, so <b>hitpick analyze</b> is only needed by hand
+without ViewDock.
+The ligand and the receptor should carry explicit hydrogens.
+</p>
+
+<a name="pose"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Current pose</h3>
+<p>
+The top of the panel lists every interaction found for the displayed pose.
+Each row gives the interaction type and its colour in the 3D view, the two
+partners, a quality bar (0&ndash;1, how well the geometry fits the
+literature criteria), the measured distance and angles, and a note where
+something is off, for example &ldquo;D-H&middot;&middot;&middot;A 128&deg;,
+well off linear&rdquo;. Click a row to highlight its atoms.
+</p>
+<p>
+In the graphics window interactions are dashed lines, one colour per type:
+hydrogen bonds, charged hydrogen bonds, salt bridges, &pi;-stacking
+(parallel and T-shaped), cation&ndash;&pi; and halogen bonds. Weak
+C&ndash;H hydrogen bonds and hydrophobic contacts are available but off by
+default. Clashes are red, severe clashes dark red, and clashes within the
+ligand orange.
+</p>
+<p>
+Warning cards appear under the list when there is something to check:
+</p>
+<ul>
+<li><b>Clashes</b> &ndash; van der Waals overlaps, worst first.
+<li><b>Stranded H-bond donors / acceptors</b> &ndash; buried N or O atoms
+with no hydrogen-bond partner. Donors are reported by default; acceptors
+are off by default because they are flagged more often and more often
+harmlessly. Click a row to highlight the atom.
+<li><b>Torsions worth a look</b> &ndash; see <a href="#torsions">below</a>.
+</ul>
+
+<a name="controls"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Panel controls</h3>
+<p>
+<b>Interactions shown</b> has one checkbox per interaction type.
+<b>Display</b> holds the rest: distance and angle labels, the literature
+limits in the labels, clashes, the two stranded-atom settings, the line
+width, and the basicity plot. Every control has a
+<a href="../commands/hitpick.html"><b>hitpick</b></a> command equivalent,
+listed on the command page.
+</p>
+<p>
+When docked at the side the panel is one column. Detach it with
+<a href="../commands/hitpick.html#panel"><b>hitpick panel</b></a> and
+widen it to get two or three columns.
+</p>
+
+<a name="click"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>What you clicked</h3>
+<p>
+Ctrl-click a single atom (any way of selecting exactly one atom works). The
+panel shows the atom's chemical role, highlights the whole group it belongs
+to, and lists the handbook entries for that group: geometric criteria,
+energy estimates and, for acceptors and bases, where the group sits on the
+pK<sub>BHX</sub> (hydrogen-bond basicity) and pK<sub>BH+</sub> (conjugate
+acid pK<sub>a</sub>) scales. Every value names the paper and table it came
+from, with a link.
+</p>
+<p>
+The scale values are for the unsubstituted parent compound, with the family
+range shown; substituents can move them by a log unit or more. The two
+scales are not interchangeable: a strong hydrogen-bond acceptor is not
+necessarily a strong base.
+</p>
+<p>
+Turn the behaviour off with
+<a href="../commands/hitpick.html#autoexplain"><b>hitpick autoexplain
+false</b></a>. To use a dedicated mouse button instead:
+</p>
+<blockquote><b>mousemode right "hit picking handbook"</b></blockquote>
+<p>
+Hovering also works: an atom gives its role and basicity, an interaction
+line gives its measured terms against the limits, a clash gives its
+overlap, and a rotatable bond gives its torsion angle
+(<a href="../commands/hitpick.html#hover"><b>hitpick hover false</b></a>
+restores the standard balloon).
+</p>
+
+<a name="torsions"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Torsions</h3>
+<p>
+<b>Torsions worth a look</b> lists the flagged rotatable bonds, worst
+first. The judgement compares the measured dihedral with quantum-mechanical
+torsion scans of the same bond class (OpenFF torsion drives,
+B3LYP-D3(BJ)/DZVP). A torsion is noted at 1.5 kcal/mol above that class's
+own minimum and shown in orange at 3 kcal/mol. Click a row to select the
+bond and plot its energy profile, with the pose's angle marked, under the
+list. Bond classes with no scan data get no judgement.
+</p>
+
+<a name="viewdock"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>ViewDock columns</h3>
+<p>
+Five columns are added to the ViewDock table:
+</p>
+<table class="syto">
+<tr><th>Column</th><th>Meaning</th></tr>
+<tr><td>HP H-Bonds</td><td>number of hydrogen bonds</td></tr>
+<tr><td>HP Salt</td><td>number of salt bridges</td></tr>
+<tr><td>HP Stack</td><td>number of &pi;-stacking interactions</td></tr>
+<tr><td>HP Good</td><td>interactions comfortably inside their literature
+limits (quality &ge; 0.55)</td></tr>
+<tr><td>HP Clash</td><td>worst overlap, in &Aring;</td></tr>
+</table>
+<p>
+Sort on <b>HP Good</b>, but read it next to <b>HP Clash</b>.
+</p>
+
+<hr>
+<address>Syto &middot; Andrii Kyrylchuk &middot;
+<a href="https://github.com/iamkaant/syto" target="_blank">github.com/iamkaant/syto</a>
+(<a href="https://github.com/iamkaant/syto/wiki" target="_blank">wiki</a>,
+<a href="https://github.com/iamkaant/syto/issues" target="_blank">report a problem</a>)
+</address>
+</body></html>

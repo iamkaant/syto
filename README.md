@@ -72,6 +72,8 @@ The tool is planned to be published on the ChimeraX Toolshed
 
 ## Use
 
+Help is built in: choose **Help** in either panel's context menu, or type `help hitpick` for the command reference.
+
 ```
 open receptor.pdb
 open poses.mol2                  # ViewDock opens automatically

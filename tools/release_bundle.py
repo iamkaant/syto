@@ -311,7 +311,12 @@ def check_wheel(wheel, version):
     # then says "handbook data not built" is worse than one that fails.
     for want in ("_vendor/hitpicking/data/handbook.json",
                  "_vendor/hitpicking/data/torsion_qm.json",
-                 "ui/panel.html", "ui/learn.html"):
+                 "ui/panel.html", "ui/learn.html",
+                 # The Help entry of each tool's context menu, and
+                 # "help hitpick", open these.
+                 "docs/user/tools/syto_handbook.html",
+                 "docs/user/tools/syto_learn.html",
+                 "docs/user/commands/hitpick.html"):
         if PKG + "/" + want not in names:
             raise Failed("the wheel is missing %s" % want)
     ok("handbook data, torsion profiles and both panels are inside")

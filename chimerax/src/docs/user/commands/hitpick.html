@@ -1,0 +1,324 @@
+<html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="../userdocs.css">
+<title>Command: hitpick</title>
+<style>
+@media (prefers-color-scheme: dark) { :root { color-scheme: dark; } }
+table.syto { border-collapse: collapse; margin: 6px 0 12px; }
+table.syto td, table.syto th { border: 1px solid #8884; padding: 3px 8px;
+  text-align: left; vertical-align: top; }
+</style>
+</head><body>
+
+<a name="top"></a>
+<a href="../index.html">
+<img width="60px" src="../ChimeraX-docs-icon.svg" alt="ChimeraX docs icon"
+class="clRighticon" title="User Guide Index"></a>
+
+<h3><a href="../index.html#commands">Command</a>: hitpick</h3>
+<p>
+The <b>hitpick</b> commands belong to the Syto bundle. They analyse a
+docked pose in its binding site, draw and score its non-covalent
+interactions, flag clashes, strained torsions and stranded hydrogen-bond
+donors, and run active learning over the grades given to poses.
+See also:
+<a href="../tools/syto_handbook.html"><b>Hit Picking Handbook</b></a>,
+<a href="../tools/syto_learn.html"><b>Hit Picking Learn</b></a>,
+<a href="../tools/viewdock.html"><b>ViewDock</b></a>
+</p>
+<p>
+<a href="#analysis">Analysis</a> &bull;
+<a href="#display">Display</a> &bull;
+<a href="#handbook">Handbook</a> &bull;
+<a href="#torsions-sec">Torsions</a> &bull;
+<a href="#learn">Active learning</a>
+</p>
+<p>
+A typical start:
+</p>
+<blockquote>
+<b>open</b> receptor.pdb<br>
+<b>open</b> poses.mol2<br>
+<b>hitpick setup</b><br>
+<b>hitpick analyze</b>
+</blockquote>
+<p>
+Options that take <b>true</b> or <b>false</b> default to <b>true</b> when
+the value is left out.
+</p>
+
+<a name="analysis"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Analysis</h3>
+
+<a name="setup"></a>
+<blockquote>
+<b>hitpick setup &nbsp;[&nbsp;<i>receptor-model</i>&nbsp;[&nbsp;<i>ligand-model</i>&nbsp;]]</b>
+<br>
+Perceive the receptor: atom types, charges, rings, donors and acceptors. Run once per receptor, before anything else. Without arguments the receptor and the docked poses are found among the open models.
+</blockquote>
+
+<a name="analyze"></a><a name="analyse"></a>
+<blockquote>
+<b>hitpick analyze &nbsp;[&nbsp;<i>ligand-model</i>&nbsp;]</b>
+<br>
+Analyse one docked pose and draw its interactions. Without an argument the displayed pose is used. With ViewDock running this happens automatically as you step through its table. <b>hitpick analyse</b> is the same command.
+</blockquote>
+
+<a name="report"></a>
+<blockquote>
+<b>hitpick report</b>
+<br>
+Write a text listing of the current pose to the Log: each interaction with its geometry, quality and flags, then clashes, strained torsions and stranded H-bond donors/acceptors.
+</blockquote>
+
+<a name="clear"></a>
+<blockquote>
+<b>hitpick clear</b>
+<br>
+Remove everything hitpick has drawn.
+</blockquote>
+
+<a name="display"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Display</h3>
+
+<a name="show"></a>
+<blockquote>
+<b>hitpick show &nbsp;[&nbsp;<i>types</i>&nbsp;]</b>
+<br>
+Enable interaction types and redraw. <i>Types</i> is a list of one or more of: <b>hbond</b>, <b>hbond_charged</b>, <b>weak_hbond</b>, <b>salt_bridge</b>, <b>pi_stack_parallel</b>, <b>pi_stack_tshaped</b>, <b>cation_pi</b>, <b>halogen_bond</b>, <b>hydrophobic</b>. Names can be shortened to a unique prefix; <b>stacking</b> means both stacking types, <b>hbonds</b> both hydrogen-bond types, <b>all</b> everything and <b>default</b> the default set (everything except <b>weak_hbond</b> and <b>hydrophobic</b>). Without an argument the default set is enabled.
+</blockquote>
+
+<a name="hide"></a>
+<blockquote>
+<b>hitpick hide &nbsp;[&nbsp;<i>types</i>&nbsp;]</b>
+<br>
+Disable interaction types, named as for <a href="#show"><b>hitpick show</b></a>. Without an argument all types are disabled.
+</blockquote>
+
+<a name="lengths"></a>
+<blockquote>
+<b>hitpick lengths&nbsp;[&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Show or hide the distance label on each interaction line.
+</blockquote>
+
+<a name="angles"></a>
+<blockquote>
+<b>hitpick angles&nbsp;[&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Show or hide the angle terms in the labels.
+</blockquote>
+
+<a name="limits"></a>
+<blockquote>
+<b>hitpick limits&nbsp;[&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Put the literature limits in each label next to the measured value, instead of showing them by colour only.
+</blockquote>
+
+<a name="clashes"></a>
+<blockquote>
+<b>hitpick clashes&nbsp;[&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Draw or hide van der Waals clashes: red for a clash, dark red for a severe one, orange for a clash within the ligand.
+</blockquote>
+
+<a name="stranded"></a>
+<blockquote>
+<b>hitpick stranded &nbsp;[&nbsp;<b>donors</b>&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]&nbsp;[&nbsp;<b>acceptors</b>&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Choose which stranded hydrogen-bond atoms are highlighted. A stranded atom is a buried N or O donor or acceptor with no hydrogen-bond partner. Donors are on by default; acceptors are off because they are flagged more often and more often harmlessly. The pose is analysed again.
+</blockquote>
+
+<a name="reveal"></a>
+<blockquote>
+<b>hitpick reveal&nbsp;[&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Display the residues the interactions point at. <b>false</b> hides only the atoms this command displayed.
+</blockquote>
+
+<a name="width"></a>
+<blockquote>
+<b>hitpick width &nbsp;[&nbsp;<i>w</i>&nbsp;]</b>
+<br>
+Set the thickness of the interaction and clash lines, for example <b>hitpick width 0.05</b>. Without a value the current width is reported.
+</blockquote>
+
+<a name="panel"></a>
+<blockquote>
+<b>hitpick panel&nbsp;[&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Detach the Hit Picking Handbook panel into its own window, where it can be widened to two or three columns; <b>false</b> docks it again.
+</blockquote>
+
+<a name="hover"></a>
+<blockquote>
+<b>hitpick hover&nbsp;[&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Show hitpick detail in the hover balloon: role and basicity for an atom, measured terms for an interaction line, overlap for a clash, angle for a rotatable bond. <b>false</b> restores the standard balloon.
+</blockquote>
+
+<a name="handbook"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Handbook</h3>
+
+<a name="explain"></a>
+<blockquote>
+<b>hitpick explain &nbsp;[&nbsp;<i>atom-spec</i>&nbsp;]</b>
+<br>
+Show the handbook entries for an atom in the panel and highlight the group it belongs to. Without an argument the selected atom is used.
+</blockquote>
+
+<a name="autoexplain"></a>
+<blockquote>
+<b>hitpick autoexplain&nbsp;[&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Explain an atom automatically whenever exactly one atom is selected, for example by ctrl-click. On by default once the panel is open.
+</blockquote>
+
+<a name="labels"></a>
+<blockquote>
+<b>hitpick labels &nbsp;[&nbsp;<b>pKBHX</b>&nbsp;|&nbsp;<b>pKBH+</b>&nbsp;|&nbsp;<b>off</b>&nbsp;]</b>
+<br>
+Label the ligand atoms in 3D with handbook values (default <b>pKBHX</b>). <b>pKBHX</b> is hydrogen-bond acceptor strength; <b>pKBH+</b> is the pK<sub>a</sub> of the conjugate acid. Each label is the value of the unsubstituted parent compound, with the family range in brackets; a * marks a value flagged for review. <b>off</b> removes the labels.
+</blockquote>
+
+<a name="scale"></a>
+<blockquote>
+<b>hitpick scale &nbsp;[&nbsp;<b>pKBHX</b>&nbsp;|&nbsp;<b>pKBH+</b>&nbsp;[&nbsp;<i>all-elements</i>&nbsp;]]</b>
+<br>
+Print a basicity scale to the Log with the last clicked group marked. <i>All-elements</i> (<b>true</b> or <b>false</b>, default <b>false</b>) includes acceptor families of every element.
+</blockquote>
+
+<a name="scaleplot"></a>
+<blockquote>
+<b>hitpick scaleplot&nbsp;[&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Show or hide the basicity scale plot in the panel.
+</blockquote>
+
+<a name="torsions-sec"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Torsions</h3>
+
+<a name="torsions"></a>
+<blockquote>
+<b>hitpick torsions &nbsp;[&nbsp;<i>all</i>&nbsp;]</b>
+<br>
+List the flagged rotatable torsions of the current pose in the Log, judged against quantum-mechanical torsion scans of the same bond class. <b>hitpick torsions true</b> lists every rotatable bond.
+</blockquote>
+
+<a name="torsionprofile"></a>
+<blockquote>
+<b>hitpick torsionprofile &nbsp;[&nbsp;<i>all</i>&nbsp;]</b>
+<br>
+Plot the QM energy profile for the torsions of this pose, with the pose's own angle marked. <b>true</b> includes the torsions that were not flagged.
+</blockquote>
+
+<a name="learn"></a>
+<p class="nav">[<a href="#top">back to top</a>]</p>
+<h3>Active learning</h3>
+<p>
+See <a href="../tools/syto_learn.html"><b>Hit Picking Learn</b></a> for the
+workflow.
+</p>
+
+<a name="learn-panel"></a>
+<blockquote>
+<b>hitpick learn panel</b>
+<br>
+Open the Hit Picking Learn panel.
+</blockquote>
+
+<a name="learn-collect"></a>
+<blockquote>
+<b>hitpick learn collect &nbsp;[&nbsp;<i>limit</i>&nbsp;]&nbsp;[&nbsp;<b>wait</b>&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Analyse and featurise the poses. Runs in the background and returns at once; <b>wait true</b> blocks until it is done, for scripts. <i>Limit</i> restricts it to the first <i>N</i> poses.
+</blockquote>
+
+<a name="learn-grade"></a>
+<blockquote>
+<b>hitpick learn grade &nbsp;<b>good</b>&nbsp;|&nbsp;<b>maybe</b>&nbsp;|&nbsp;<b>bad</b>&nbsp;[&nbsp;<i>model</i>&nbsp;]</b>
+<br>
+Grade a pose (default: the displayed one). The grade is also written to ViewDock's rating when ViewDock is running.
+</blockquote>
+
+<a name="learn-train"></a>
+<blockquote>
+<b>hitpick learn train &nbsp;[&nbsp;<i>epochs</i>&nbsp;]&nbsp;[&nbsp;<b>wait</b>&nbsp;<b>true</b>&nbsp;|&nbsp;<b>false</b>&nbsp;]</b>
+<br>
+Train the model on the grades given so far (default 120 epochs). Runs in the background unless <b>wait true</b>.
+</blockquote>
+
+<a name="learn-next"></a>
+<blockquote>
+<b>hitpick learn next &nbsp;[&nbsp;<i>count</i>&nbsp;[&nbsp;<b>uncertainty</b>&nbsp;|&nbsp;<b>disagreement</b>&nbsp;|&nbsp;<b>prediction</b>&nbsp;]]</b>
+<br>
+List the poses worth looking at next (default 10, by <b>uncertainty</b>). <b>uncertainty</b>: ungraded poses the model is least sure about. <b>disagreement</b>: graded poses where the model disagrees with you. <b>prediction</b>: the ungraded poses it predicts are best.
+</blockquote>
+
+<a name="learn-worklist"></a>
+<blockquote>
+<b>hitpick learn worklist &nbsp;[&nbsp;<i>count</i>&nbsp;[&nbsp;<i>strategy</i>&nbsp;[&nbsp;<i>off</i>&nbsp;]]]</b>
+<br>
+Put the suggestion list (default 20 poses) into the ViewDock table in the model's order. A pose leaves the list when it is graded. The list is not re-ranked while it is being worked. Giving <b>true</b> for <i>off</i>, or finishing the batch, returns the table to ViewDock.
+</blockquote>
+
+<a name="learn-apply"></a>
+<blockquote>
+<b>hitpick learn apply</b>
+<br>
+Write the model's predictions into the ViewDock table.
+</blockquote>
+
+<a name="learn-terms"></a>
+<blockquote>
+<b>hitpick learn terms &nbsp;[&nbsp;<i>names</i>&nbsp;|&nbsp;<b>auto</b>&nbsp;|&nbsp;<b>none</b>&nbsp;]</b>
+<br>
+Choose which of the docking program's score terms the model may learn from (up to seven). Without an argument the current choice and all terms carried by the poses are reported, with unusable ones (row numbers, constants, failed values) marked. <b>auto</b> picks for you; <b>none</b> uses no score terms. Poses do not need to be analysed again.
+</blockquote>
+
+<a name="learn-assume"></a>
+<blockquote>
+<b>hitpick learn assume &nbsp;[&nbsp;<i>grade</i>&nbsp;[&nbsp;<i>forget</i>&nbsp;[&nbsp;<i>check</i>&nbsp;]]]</b>
+<br>
+Treat every unrated pose as <i>grade</i> (default <b>good</b>), for a list that was rated by exception and walked to the end. With <i>check</i> (default <b>true</b>) the assumption is first tested against the trained model and the result reported. <b>hitpick learn assume forget true</b> removes the assumed grades. Do not use it on a list you have not finished.
+</blockquote>
+
+<a name="learn-status"></a>
+<blockquote>
+<b>hitpick learn status</b>
+<br>
+Report the state of the model and the number of graded poses.
+</blockquote>
+
+<a name="learn-save"></a>
+<blockquote>
+<b>hitpick learn save &nbsp;<i>path</i></b>
+<br>
+Save the grades and the model to a JSON file.
+</blockquote>
+
+<a name="learn-load"></a>
+<blockquote>
+<b>hitpick learn load &nbsp;<i>path</i></b>
+<br>
+Load grades and a model saved with <b>hitpick learn save</b>.
+</blockquote>
+
+<a name="learn-cancel"></a>
+<blockquote>
+<b>hitpick learn cancel</b>
+<br>
+Stop background analysis or training.
+</blockquote>
+
+<hr>
+<address>Syto &middot; Andrii Kyrylchuk &middot;
+<a href="https://github.com/iamkaant/syto" target="_blank">github.com/iamkaant/syto</a>
+(<a href="https://github.com/iamkaant/syto/wiki" target="_blank">wiki</a>,
+<a href="https://github.com/iamkaant/syto/issues" target="_blank">report a problem</a>)
+</address>
+</body></html>

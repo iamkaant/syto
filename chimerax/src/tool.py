@@ -35,7 +35,7 @@ class HandbookTool(HtmlToolInstance):
     SESSION_SAVE = False
     CUSTOM_SCHEME = "hitpick"
     PLACEMENT = "side"
-    help = None
+    help = "help:user/tools/syto_handbook.html"
 
     def __init__(self, session, tool_name):
         super().__init__(session, tool_name, size_hint=(560, 820),

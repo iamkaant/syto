@@ -4,7 +4,7 @@ build-backend = "chimerax.bundle_builder.cx_pep517"
 
 [project]
 name = "ChimeraX-Syto"
-version = "0.1.0"
+version = "0.1.1"
 license = { text = "MIT" }
 authors = [{ name = "Andrii Kyrylchuk" }]
 description = "Hit-picking helper: scored non-covalent interactions and a contextual molecular-interaction handbook, alongside ViewDock"
@@ -35,6 +35,8 @@ custom-init = false
 
 [chimerax.package-data]
 "src/ui" = ["*.html", "*.css", "*.js"]
+"src/docs/user/tools" = ["*.html"]
+"src/docs/user/commands" = ["*.html"]
 "src/_vendor" = ["README.txt"]
 "src/_vendor/hitpicking" = ["*.py", "data/*.json"]
 "src/_vendor/hitpicking/io" = ["*.py"]
@@ -157,6 +159,18 @@ description = "Train the model on the grades given so far"
 [chimerax.command."hitpick learn next"]
 category = "Binding Analysis"
 description = "List the poses worth grading next"
+
+[chimerax.command."hitpick learn worklist"]
+category = "Binding Analysis"
+description = "Work the suggestion list down inside ViewDock"
+
+[chimerax.command."hitpick learn terms"]
+category = "Binding Analysis"
+description = "Choose which docking score terms the model learns from"
+
+[chimerax.command."hitpick learn assume"]
+category = "Binding Analysis"
+description = "Treat unrated poses as a grade, for a fully walked list"
 
 [chimerax.command."hitpick learn status"]
 category = "Binding Analysis"
