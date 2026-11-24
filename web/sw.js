@@ -33,6 +33,7 @@ const CORE = [
   "./ui/bridge.js",
   "./ui/panel.html",
   "./build.js",
+  "./logo.png",
   "./vendor/hitpicking.zip",
   "./vendor/molstar/molstar.js",
   "./vendor/molstar/molstar.css",

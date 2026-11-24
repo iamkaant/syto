@@ -316,7 +316,7 @@ def check_wheel(wheel, version):
                  # "help hitpick", open these.
                  "docs/user/tools/syto_handbook.html",
                  "docs/user/tools/syto_learn.html",
-                 "docs/user/tools/syto-logo.jpg",
+                 "docs/user/tools/syto-logo-square.jpg",
                  "docs/user/commands/hitpick.html"):
         if PKG + "/" + want not in names:
             raise Failed("the wheel is missing %s" % want)
