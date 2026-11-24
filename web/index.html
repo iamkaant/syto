@@ -290,6 +290,17 @@ function say(text, bad) {
   $("status").className = bad ? "warn" : "";
   $("status").innerHTML = text;
 }
+// What went wrong, in one line. An error raised inside Pyodide arrives
+// with its whole Python traceback in .message; putting that in the status
+// line showed the user a stack and hid the sentence that named the
+// problem. The last line of a traceback IS that sentence.
+function errText(e) {
+  const raw = String((e && e.message) || e || "unknown error").trim();
+  const lines = raw.split("\n").map((s) => s.trim()).filter(Boolean);
+  const last = lines.length ? lines[lines.length - 1] : raw;
+  return last.replace(/^[A-Za-z_.]*(Error|Exception):\s*/, "");
+}
+
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
     ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -428,7 +439,10 @@ $("go").onclick = async () => {
     }
     say("drawing&hellip;");
     const nrec = await viewer.loadReceptor(files.rec.text, "pdb");
-    const fmt = /\.mol2$/i.test(files.lig.name) ? "mol2" : "sdf";
+    // The engine says which format it actually read; the viewer has to
+    // parse the same file the same way or the two disagree about what a
+    // pose is. A misnamed file is the case this exists for.
+    const fmt = p.format || (/\.mol2$/i.test(files.lig.name) ? "mol2" : "sdf");
     const nmod = await viewer.loadPoses(files.lig.text, fmt);
     // The engine and the viewer each read the pose file themselves. If
     // the viewer found fewer molecules than the engine, stepping through
@@ -460,7 +474,7 @@ $("go").onclick = async () => {
     viewer.focusSite();
     if (short) say(esc(short), true);
   } catch (e) {
-    say("failed: " + esc(e.message), true);
+    say("failed: " + esc(errText(e)), true);
   } finally {
     $("go").disabled = false;
   }
@@ -490,7 +504,7 @@ $("train").onclick = async () => {
           + r.seconds + " s");
     }
   } catch (e) {
-    say("training failed: " + esc(e.message), true);
+    say("training failed: " + esc(errText(e)), true);
   }
   await refreshAl();
 };
@@ -760,7 +774,7 @@ async function loadTorsions() {
       torsionProfile = await bridge.call("torsionProfile", {});
     }
   } catch (e) {
-    say("torsions unavailable: " + esc(e.message), true);
+    say("torsions unavailable: " + esc(errText(e)), true);
   }
 }
 
@@ -830,7 +844,7 @@ async function focusInteraction(atoms) {
     const n = viewer.focusAtoms(xyz);
     if (!n) say("those atoms are not in the viewer", true);
   } catch (e) {
-    say("could not focus that interaction: " + esc(e.message), true);
+    say("could not focus that interaction: " + esc(errText(e)), true);
   }
 }
 
@@ -859,7 +873,7 @@ async function onBondClick(a, b) {
     }
     say(msg, !!t.flagged);
   } catch (e) {
-    say("could not measure that bond: " + esc(e.message), true);
+    say("could not measure that bond: " + esc(errText(e)), true);
   }
 }
 
@@ -870,7 +884,7 @@ async function onAtomClick(xyz, name) {
     if (hit.error) { say(esc(hit.error), true); return; }
     sendPanel(baseSnapshot(hit, hit.scales || []));
   } catch (e) {
-    say("explain failed: " + esc(e.message), true);
+    say("explain failed: " + esc(errText(e)), true);
   }
 }
 
@@ -937,7 +951,7 @@ async function featuriseAll() {
       await new Promise((r2) => setTimeout(r2, 0));
     }
   } catch (e) {
-    say("analysing failed: " + esc(e.message), true);
+    say("analysing failed: " + esc(errText(e)), true);
   }
   featurising = false;
   $("featurise").textContent = "Analyse all poses";
@@ -974,7 +988,7 @@ async function gradePose(value) {
   try {
     alState = await bridge.call("grade", {index: current, value: value});
   } catch (e) {
-    say("could not grade: " + esc(e.message), true);
+    say("could not grade: " + esc(errText(e)), true);
     return;
   }
   myGrades[current] = value;
@@ -1060,7 +1074,7 @@ async function saveResultsCsv() {
     download(base + "-hitpicking.csv", lines.join("\n"), "text/csv");
     say("wrote " + r.rows.length + " row(s)");
   } catch (e) {
-    say("could not export: " + esc(e.message), true);
+    say("could not export: " + esc(errText(e)), true);
   }
 }
 
@@ -1069,7 +1083,7 @@ async function savePartyFile() {
     const st = await bridge.call("saveParty", {});
     download("party.json", JSON.stringify(st), "application/json");
   } catch (e) {
-    say("nothing to save yet: " + esc(e.message), true);
+    say("nothing to save yet: " + esc(errText(e)), true);
   }
 }
 
@@ -1084,7 +1098,7 @@ async function loadPartyFile(file) {
     await refreshAl();
     renderPoseOptions();
   } catch (e) {
-    say("could not load that party: " + esc(e.message), true);
+    say("could not load that party: " + esc(errText(e)), true);
   }
 }
 
@@ -1299,7 +1313,7 @@ async function freshStart() {
         + " &middot; Mol* " + (window.molstar ? molstar.version : "missing")
         + " &middot; <span class='muted'>everything runs in this tab</span>");
   } catch (e) {
-    say("the engine failed to start: " + esc(e.message)
+    say("the engine failed to start: " + esc(errText(e))
         + " &mdash; serve this folder: <code>python tools/serve_web.py</code>",
         true);
   }

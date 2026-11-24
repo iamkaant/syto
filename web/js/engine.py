@@ -64,11 +64,35 @@ def handbook():
     return _STATE["handbook"]
 
 
-def _read_ligands(path, limit=None):
-    low = path.lower()
+def ligand_format(name, text):
+    """mol2 or sdf, decided by what is IN the file, not by its name.
+
+    A mol2 saved as .sdf (or the reverse) used to parse to zero molecules
+    in silence. The page was then left with an empty pose list, and the
+    next thing the user clicked raised "load poses first" - a message
+    about the wrong step, with a traceback, for a misnamed file.
+    """
+    head = text[:65536]
+    if "@<TRIPOS>MOLECULE" in head:
+        return "mol2"
+    if "V2000" in head or "V3000" in head or "$$$$" in head:
+        return "sdf"
+    low = (name or "").lower()
     if low.endswith(".mol2"):
+        return "mol2"
+    if low.endswith((".sdf", ".sd", ".mol")):
+        return "sdf"
+    return None
+
+
+def _read_ligands(path, limit=None, fmt=None):
+    if fmt is None:
+        low = path.lower()
+        fmt = ("mol2" if low.endswith(".mol2")
+               else "sdf" if low.endswith((".sdf", ".sd", ".mol")) else None)
+    if fmt == "mol2":
         it = read_mol2_iter(path)
-    elif low.endswith((".sdf", ".sd", ".mol")):
+    elif fmt == "sdf":
         it = read_sdf_iter(path)
     else:
         raise ValueError("ligands must be .mol2 or .sdf, not %s" % path)
@@ -108,11 +132,28 @@ def setup(receptor_name, receptor_text):
 def load_poses(name, text, limit=None):
     if _STATE["context"] is None:
         raise RuntimeError("load a receptor first")
+    fmt = ligand_format(name, text)
+    if fmt is None:
+        raise ValueError(
+            "%s does not look like a mol2 or an SDF: no @<TRIPOS>MOLECULE "
+            "and no V2000/V3000 counts line" % name)
+    named = (name or "").lower()
+    misnamed = not named.endswith(
+        ".mol2" if fmt == "mol2" else (".sdf", ".sd", ".mol"))
     p = _path(name, text)
-    poses = _read_ligands(p, int(limit) if limit else None)
+    poses = _read_ligands(p, int(limit) if limit else None, fmt)
+    # Zero molecules is a failure, and it has to be said HERE. Storing an
+    # empty list made the next call complain instead, about a step the
+    # user had already done ("load poses first"), with a traceback.
+    if not poses:
+        raise ValueError(
+            "no molecules could be read from %s - it was read as %s%s"
+            % (name, fmt,
+               " (decided by its contents, not its name)" if misnamed else ""))
     _STATE["poses"] = poses
     return _json({
         "file": name,
+        "format": fmt,
         "count": len(poses),
         "names": [_pose_name(m, i) for i, m in enumerate(poses)],
     })
